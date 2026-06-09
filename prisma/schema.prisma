@@ -1,0 +1,359 @@
+// ENDURANCE — banco do protótipo.
+// Multi-tenant por schema único: cada negócio é uma Organization e os módulos
+// ativados ficam em OrgModule (o "registry de módulos" persistido).
+// Postgres (produção/Vercel). Em dev local, aponte DATABASE_URL para o mesmo
+// Postgres hospedado (não há mais SQLite).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  name       String
+  niche      String
+  nicheLabel String
+  city       String   @default("")
+  state      String   @default("")
+  country    String   @default("")
+  segment    String   @default("")
+  createdAt  DateTime @default(now())
+
+  modules      OrgModule[]
+  users        User[]
+  products     Product[]
+  sales        Sale[]
+  customers    Customer[]
+  fiscalConfig FiscalConfig?
+  fiscalDocs   FiscalDocument[]
+  cashSessions CashSession[]
+  finEntries   FinancialEntry[]
+  suppliers    Supplier[]
+  purchases    PurchaseOrder[]
+  categories   Category[]
+  importedInvoices ImportedInvoice[]
+}
+
+// Nota fiscal importada por XML (NF-e modelo 55 / NFC-e modelo 65). Registro
+// para migração/auditoria — guarda o cabeçalho parseado + o XML bruto.
+// Idempotente por chave de acesso dentro da organização.
+model ImportedInvoice {
+  id             String   @id @default(cuid())
+  organizationId String
+  chave          String
+  modelo         String   @default("55")
+  serie          Int      @default(0)
+  numero         Int      @default(0)
+  emitCnpj       String   @default("")
+  emitNome       String   @default("")
+  total          Float    @default(0)
+  itemsCount     Int      @default(0)
+  dhEmi          DateTime @default(now())
+  xml            String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, chave])
+  @@index([organizationId])
+}
+
+// Registro de categorias (alimentado pela importação em massa; reutilizável em
+// filtros/cadastros). Único por nome dentro da organização.
+model Category {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+// Fornecedor do negócio (compras / reposição de estoque).
+model Supplier {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  cnpj           String   @default("")
+  phone          String   @default("")
+  email          String   @default("")
+  note           String   @default("")
+  createdAt      DateTime @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  orders       PurchaseOrder[]
+
+  @@index([organizationId])
+}
+
+// Pedido de compra. Ao ser RECEBIDO: dá entrada no estoque dos itens e gera uma
+// conta a pagar no financeiro (fechando o ciclo reposição → compra → estoque → $).
+model PurchaseOrder {
+  id             String    @id @default(cuid())
+  organizationId String
+  supplierId     String
+  status         String    @default("enviado") // enviado | recebido | cancelado
+  total          Float     @default(0)
+  note           String    @default("")
+  createdAt      DateTime  @default(now())
+  receivedAt     DateTime?
+  sentAt         DateTime? // quando o pedido foi enviado ao fornecedor
+  sentVia        String    @default("") // whatsapp | email | manual
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplier     Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  items        PurchaseOrderItem[]
+
+  @@index([organizationId])
+}
+
+model PurchaseOrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String?
+  name      String
+  quantity  Int
+  unitCost  Float
+
+  order PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+// Sessão de caixa (turno do PDV). Abre com um fundo de troco e fecha com a
+// conferência do dinheiro contado x esperado. Vendas feitas com o caixa aberto
+// ficam vinculadas a ele para compor o esperado em dinheiro.
+model CashSession {
+  id             String    @id @default(cuid())
+  organizationId String
+  userId         String?
+  status         String    @default("aberto") // aberto | fechado
+  openingAmount  Float     @default(0)
+  countedAmount  Float? // informado no fechamento
+  expectedAmount Float? // congelado no fechamento
+  difference     Float? // contado - esperado
+  note           String    @default("")
+  openedAt       DateTime  @default(now())
+  closedAt       DateTime?
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  movements    CashMovement[]
+  sales        Sale[]
+
+  @@index([organizationId])
+}
+
+// Movimento de caixa: suprimento (reforço) ou sangria (retirada).
+model CashMovement {
+  id        String   @id @default(cuid())
+  sessionId String
+  type      String // suprimento | sangria
+  amount    Float
+  reason    String   @default("")
+  userId    String?
+  createdAt DateTime @default(now())
+
+  session CashSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+// Lançamento financeiro: conta a receber ou a pagar. Os recebíveis são gerados
+// automaticamente a partir das formas de pagamento das vendas do PDV.
+model FinancialEntry {
+  id             String    @id @default(cuid())
+  organizationId String
+  kind           String // receber | pagar
+  description    String
+  category       String    @default("")
+  amount         Float
+  status         String    @default("pendente") // pendente | pago
+  method         String    @default("")
+  saleId         String?
+  dueDate        DateTime
+  paidAt         DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([organizationId, kind])
+}
+
+// Configuração fiscal da empresa (emitente da NFC-e, modelo 65). Uma por org.
+// crt: regime tributário (1=Simples Nacional, 3=Regime Normal).
+// ambiente: 1=Produção, 2=Homologação. csc/cscId: credencial do QR Code.
+model FiscalConfig {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  cnpj           String   @default("")
+  razaoSocial    String   @default("")
+  nomeFantasia   String   @default("")
+  ie             String   @default("")
+  crt            String   @default("1")
+  uf             String   @default("SP")
+  cMun           String   @default("")
+  municipio      String   @default("")
+  serie          Int      @default(1)
+  proxNumero     Int      @default(1)
+  ambiente       String   @default("2")
+  cscId          String   @default("000001")
+  csc            String   @default("")
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// Documento fiscal emitido (NFC-e, modelo 65) vinculado a uma venda do PDV.
+// No protótipo a autorização SEFAZ é simulada (protocolo/data), mas a chave de
+// acesso, o dígito verificador, o QR Code e o XML seguem o layout oficial 4.00.
+model FiscalDocument {
+  id              String    @id @default(cuid())
+  organizationId  String
+  saleId          String    @unique
+  modelo          String    @default("65")
+  serie           Int
+  numero          Int
+  chave           String    @unique
+  status          String    @default("autorizada") // autorizada | cancelada
+  ambiente        String
+  protocolo       String    @default("")
+  qrCode          String    @default("")
+  xml             String    @default("")
+  valorTotal      Float
+  motivoCancel    String    @default("")
+  dataEmissao     DateTime  @default(now())
+  dataAutorizacao DateTime?
+  dataCancel      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sale         Sale         @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// Cliente do negócio (CRM). Pode ser cadastrado na hora da venda no PDV.
+model Customer {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  phone          String   @default("")
+  email          String   @default("")
+  document       String   @default("")
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sales        Sale[]
+
+  @@index([organizationId])
+}
+
+// Produto do catálogo de um negócio (módulo Cadastro de produtos / Estoque).
+// Sempre escopado por organizationId — isolamento multi-tenant.
+model Product {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  sku            String   @default("")
+  barcode        String   @default("")
+  category       String   @default("")
+  price          Float    @default(0)
+  cost           Float    @default(0)
+  stock          Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, barcode])
+}
+
+// Venda registrada no PDV. Baixa o estoque dos produtos no fechamento.
+model Sale {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String?
+  userId         String?
+  cashSessionId  String?
+  token          String   @unique
+  subtotal       Float    @default(0)
+  discount       Float    @default(0)
+  total          Float
+  itemsCount     Int
+  createdAt      DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  seller       User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  cashSession  CashSession?  @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
+  items        SaleItem[]
+  payments     SalePayment[]
+  fiscalDoc    FiscalDocument?
+
+  @@index([organizationId])
+  @@index([customerId])
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  productId String?
+  name      String
+  quantity  Int
+  unitPrice Float
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+// Pagamento de uma venda (permite split: várias formas na mesma venda).
+model SalePayment {
+  id     String @id @default(cuid())
+  saleId String
+  method String // dinheiro | credito | debito | pix
+  amount Float
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+}
+
+// Usuário de uma organização. role: OWNER | ADMIN | MEMBER (string — SQLite não
+// suporta enum no Prisma). email é único global (login por e-mail + senha).
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String
+  name           String
+  role           String   @default("MEMBER")
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sales        Sale[]
+
+  @@index([organizationId])
+}
+
+model OrgModule {
+  id             String  @id @default(cuid())
+  organizationId String
+  moduleId       String
+  enabled        Boolean @default(true)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, moduleId])
+  @@index([organizationId])
+}
