@@ -93,7 +93,10 @@ export default function Shell({
   modules,
   userName,
   canManage,
+<<<<<<< HEAD
   canViewDashboard = true,
+=======
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
   children,
 }: {
   orgName: string;
@@ -102,7 +105,10 @@ export default function Shell({
   modules: ShellModule[];
   userName: string;
   canManage: boolean;
+<<<<<<< HEAD
   canViewDashboard?: boolean;
+=======
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -144,8 +150,12 @@ export default function Shell({
     pathname.startsWith(`${base}/recibo/`) ||
     pathname.startsWith(`${base}/nfce/`) ||
     pathname.startsWith(`${base}/relatorio`) ||
+<<<<<<< HEAD
     pathname.startsWith(`${base}/pedido/`) ||
     pathname.startsWith(`${base}/etiquetas`)
+=======
+    pathname.startsWith(`${base}/pedido/`)
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
   ) {
     return (
       <div className={dark ? "dark" : ""}>
@@ -257,6 +267,7 @@ export default function Shell({
           </div>
 
           <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+<<<<<<< HEAD
             {canViewDashboard && (
               <NavGroup>
                 <NavItem
@@ -267,6 +278,16 @@ export default function Shell({
                 />
               </NavGroup>
             )}
+=======
+            <NavGroup>
+              <NavItem
+                href={base}
+                icon={LayoutDashboard}
+                label="Visão geral"
+                active={pathname === base}
+              />
+            </NavGroup>
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
 
             <NavGroup title="O essencial">
               {core.map((m) => (
@@ -299,7 +320,11 @@ export default function Shell({
                 <NavItem
                   href={`${base}/equipe`}
                   icon={Users}
+<<<<<<< HEAD
                   label="Usuários"
+=======
+                  label="Equipe"
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
                   active={pathname === `${base}/equipe`}
                 />
               </NavGroup>

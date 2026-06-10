@@ -1,6 +1,10 @@
 import Link from "next/link";
+<<<<<<< HEAD
 import { notFound, redirect } from "next/navigation";
 import { Lock } from "lucide-react";
+=======
+import { notFound } from "next/navigation";
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
 import {
   ShoppingCart,
   DollarSign,
@@ -12,11 +16,14 @@ import type { LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getWorkspace } from "@/lib/endurance/workspace";
 import { getSession } from "@/lib/auth";
+<<<<<<< HEAD
 import { canAccessModule, type AccessRole } from "@/lib/endurance/catalog";
 import {
   effectivePermissions,
   modulePermission,
 } from "@/lib/endurance/permissions";
+=======
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
 import { getSalesSummary } from "@/lib/endurance/sales-analytics";
 import { SalesByDayChart, PaymentMixChart } from "./m/reports-charts";
 
@@ -41,6 +48,7 @@ export default async function EspacoPage({
   const session = await getSession();
   const firstName = (session?.name || "").split(" ")[0];
 
+<<<<<<< HEAD
   // Módulos que o usuário pode acessar (RBAC por papel + permissão).
   const perms = new Set(
     effectivePermissions(session?.role ?? "MEMBER", session?.permissions),
@@ -66,6 +74,8 @@ export default async function EspacoPage({
     return <NoDashboardAccess />;
   }
 
+=======
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
   const orgId = session?.org ?? "";
   const summary = orgId
     ? await getSalesSummary(orgId, 30)
@@ -82,8 +92,13 @@ export default async function EspacoPage({
       ])
     : [[], 0];
 
+<<<<<<< HEAD
   const core = visible.filter((m) => m.core);
   const niche = visible.filter((m) => !m.core);
+=======
+  const core = ws.modules.filter((m) => m.core);
+  const niche = ws.modules.filter((m) => !m.core);
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
 
   const stats = [
     {
@@ -242,6 +257,7 @@ export default async function EspacoPage({
   );
 }
 
+<<<<<<< HEAD
 function NoDashboardAccess() {
   return (
     <div className="grid place-items-center rounded-2xl border border-dashed border-amber-300 bg-amber-500/5 px-6 py-20 text-center dark:border-amber-500/30">
@@ -259,6 +275,8 @@ function NoDashboardAccess() {
   );
 }
 
+=======
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
 function EmptySales({ slug }: { slug: string }) {
   return (
     <div className="grid h-[260px] place-items-center text-center">

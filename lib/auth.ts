@@ -1,10 +1,16 @@
 import "server-only";
+<<<<<<< HEAD
 import { cache } from "react";
+=======
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
+<<<<<<< HEAD
 import { prisma } from "@/lib/db";
+=======
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
 
 export const SESSION_COOKIE = "endurance_session";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 dias
@@ -18,8 +24,11 @@ export interface SessionPayload {
   role: Role;
   org: string; // organizationId
   slug: string; // slug da organização (para redirecionar sem consultar o banco)
+<<<<<<< HEAD
   profile?: string; // id do perfil pré-configurado
   permissions?: string[]; // ids de permissão (RBAC granular)
+=======
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
 }
 
 /** OWNER e ADMIN podem gerenciar a equipe; MEMBER não. */
@@ -27,6 +36,7 @@ export function canManageTeam(role: Role): boolean {
   return role === "OWNER" || role === "ADMIN";
 }
 
+<<<<<<< HEAD
 /**
  * Pode gerenciar a equipe se for OWNER/ADMIN OU tiver a permissão team.manage.
  * Usada nas telas/ações de Gestão de Usuários (RBAC granular).
@@ -47,6 +57,8 @@ export function sessionHasPermission(
   return Boolean(session.permissions?.includes(permId));
 }
 
+=======
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
 function getSecret(): Uint8Array {
   const secret = process.env.AUTH_SECRET;
   if (!secret) throw new Error("AUTH_SECRET não definido no ambiente (.env).");
@@ -74,16 +86,20 @@ export async function verifySession(
       role: payload.role as Role,
       org: String(payload.org),
       slug: String(payload.slug),
+<<<<<<< HEAD
       profile: payload.profile ? String(payload.profile) : "",
       permissions: Array.isArray(payload.permissions)
         ? (payload.permissions as string[])
         : [],
+=======
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
     };
   } catch {
     return null;
   }
 }
 
+<<<<<<< HEAD
 /**
  * Carrega o usuário do banco para hidratar a autorização. Deduplicado por
  * request com React cache() — várias chamadas a getSession() no mesmo render
@@ -131,6 +147,12 @@ export async function getSession(): Promise<SessionPayload | null> {
     profile: user.profile,
     permissions: user.permissions,
   };
+=======
+/** Lê a sessão atual a partir do cookie (Server Components / Actions). */
+export async function getSession(): Promise<SessionPayload | null> {
+  const store = await cookies();
+  return verifySession(store.get(SESSION_COOKIE)?.value);
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
 }
 
 /** Grava o cookie de sessão. */

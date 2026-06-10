@@ -30,7 +30,10 @@ export default async function DanfePage({
     where: { organizationId: session.org },
   });
   const sale = doc.sale;
+<<<<<<< HEAD
   const docLabel = doc.modelo === "55" ? "NF-e" : "NFC-e";
+=======
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
   const qrDataUrl = await QRCode.toDataURL(doc.qrCode, { margin: 1, width: 220 });
   const cancelada = doc.status === "cancelada";
   const when = doc.dataEmissao.toLocaleString("pt-BR", {
@@ -59,13 +62,21 @@ export default async function DanfePage({
             </p>
           )}
           <p className="mt-1 text-[11px] font-semibold">
+<<<<<<< HEAD
             Documento Auxiliar da {docLabel}
+=======
+            Documento Auxiliar da NFC-e
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
           </p>
         </div>
 
         {cancelada && (
           <p className="mt-2 rounded border border-red-300 py-1 text-center text-[11px] font-bold uppercase text-red-600">
+<<<<<<< HEAD
             {docLabel} CANCELADA
+=======
+            NFC-e CANCELADA
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
           </p>
         )}
         {doc.ambiente === "2" && (
@@ -131,7 +142,11 @@ export default async function DanfePage({
 
         <div className="space-y-0.5 text-center text-[10px] text-slate-500">
           <p className="font-semibold text-slate-700">
+<<<<<<< HEAD
             {docLabel} nº {doc.numero} · Série {doc.serie}
+=======
+            NFC-e nº {doc.numero} · Série {doc.serie}
+>>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
           </p>
           <p>Emissão: {when}</p>
           <p className="break-all">
