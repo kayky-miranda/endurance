@@ -94,9 +94,13 @@ export default function Shell({
   userName,
   canManage,
 <<<<<<< HEAD
+<<<<<<< HEAD
   canViewDashboard = true,
 =======
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+  canViewDashboard = true,
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   children,
 }: {
   orgName: string;
@@ -106,9 +110,13 @@ export default function Shell({
   userName: string;
   canManage: boolean;
 <<<<<<< HEAD
+<<<<<<< HEAD
   canViewDashboard?: boolean;
 =======
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+  canViewDashboard?: boolean;
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -151,11 +159,16 @@ export default function Shell({
     pathname.startsWith(`${base}/nfce/`) ||
     pathname.startsWith(`${base}/relatorio`) ||
 <<<<<<< HEAD
+<<<<<<< HEAD
     pathname.startsWith(`${base}/pedido/`) ||
     pathname.startsWith(`${base}/etiquetas`)
 =======
     pathname.startsWith(`${base}/pedido/`)
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+    pathname.startsWith(`${base}/pedido/`) ||
+    pathname.startsWith(`${base}/etiquetas`)
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   ) {
     return (
       <div className={dark ? "dark" : ""}>
@@ -268,6 +281,9 @@ export default function Shell({
 
           <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
             {canViewDashboard && (
               <NavGroup>
                 <NavItem
@@ -278,6 +294,7 @@ export default function Shell({
                 />
               </NavGroup>
             )}
+<<<<<<< HEAD
 =======
             <NavGroup>
               <NavItem
@@ -288,6 +305,8 @@ export default function Shell({
               />
             </NavGroup>
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 
             <NavGroup title="O essencial">
               {core.map((m) => (
@@ -321,10 +340,14 @@ export default function Shell({
                   href={`${base}/equipe`}
                   icon={Users}
 <<<<<<< HEAD
+<<<<<<< HEAD
                   label="Usuários"
 =======
                   label="Equipe"
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+                  label="Usuários"
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
                   active={pathname === `${base}/equipe`}
                 />
               </NavGroup>

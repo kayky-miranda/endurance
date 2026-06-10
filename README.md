@@ -1,4 +1,7 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 # ENDURANCE — 0.1v
 
 ERP em SaaS multi-nicho para pequenos negócios brasileiros. Este repositório
@@ -63,6 +66,9 @@ curl -s http://localhost:3000/api/onboarding \
   -H "Content-Type: application/json" \
   -d '{"description":"Tenho um mercadinho de bairro em Campinas, SP."}'
 ```
+<<<<<<< HEAD
 =======
 # endurance
 >>>>>>> fc8c0345e5eba55dd23ed0ef03042faf97d6a5d6
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)

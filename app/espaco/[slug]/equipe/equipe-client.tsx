@@ -1,10 +1,14 @@
 "use client";
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { useEffect, useMemo, useRef, useState } from "react";
 =======
 import { useState } from "react";
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+import { useEffect, useMemo, useRef, useState } from "react";
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 import { useRouter } from "next/navigation";
 import {
   Loader2,
@@ -15,6 +19,9 @@ import {
   Mail,
   Lock,
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   Phone,
   Briefcase,
   Search,
@@ -94,12 +101,15 @@ type ProfileDef = {
   baseRole: string;
   permissions: string[];
 };
+<<<<<<< HEAD
 =======
 } from "lucide-react";
 import { addMemberAction, removeMemberAction } from "@/app/actions";
 
 type Member = { id: string; name: string; email: string; role: string };
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 
 const ROLE_LABEL: Record<string, string> = {
   OWNER: "Dono",
@@ -108,6 +118,9 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 const ACTION_LABEL: Record<string, string> = {
   "user.create": "Criou usuário",
   "user.update": "Editou permissões",
@@ -179,13 +192,19 @@ function fmtDateTime(iso: string | null): string {
   });
 }
 
+<<<<<<< HEAD
 =======
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 export default function EquipeClient({
   slug,
   currentUserId,
   members,
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   activity,
   permissions,
   permissionGroups,
@@ -655,6 +674,7 @@ function UserModal({
   }));
 
   async function save() {
+<<<<<<< HEAD
 =======
 }: {
   slug: string;
@@ -672,11 +692,16 @@ function UserModal({
 
   async function add() {
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
     if (busy) return;
     setBusy(true);
     setError("");
     try {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
       const permissions = Array.from(perms);
       const res =
         mode === "create"
@@ -972,6 +997,7 @@ function ResetPasswordModal({
       if (res.ok) {
         setDone(true);
         setShow(true);
+<<<<<<< HEAD
 =======
       const res = await addMemberAction({ name, email, password, role });
       if (res.ok) {
@@ -981,6 +1007,8 @@ function ResetPasswordModal({
         setRole("MEMBER");
         router.refresh();
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
       } else {
         setError(res.error);
       }
@@ -990,6 +1018,9 @@ function ResetPasswordModal({
   }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
       <div className="w-full max-w-md overflow-hidden rounded-t-2xl bg-white shadow-xl dark:bg-ink-900 sm:rounded-2xl">
@@ -1492,6 +1523,7 @@ function SectionHeader({
       {hint && (
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p>
       )}
+<<<<<<< HEAD
 =======
   async function remove(id: string) {
     setRemovingId(id);
@@ -1616,6 +1648,8 @@ function SectionHeader({
         </div>
       </section>
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
     </div>
   );
 }
@@ -1627,9 +1661,13 @@ function Field({
   value,
   onChange,
 <<<<<<< HEAD
+<<<<<<< HEAD
   disabled,
 =======
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+  disabled,
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 }: {
   icon: typeof User;
   type?: string;
@@ -1637,28 +1675,39 @@ function Field({
   value: string;
   onChange: (v: string) => void;
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   disabled?: boolean;
 }) {
   return (
     <div className="relative">
       <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+<<<<<<< HEAD
 =======
 }) {
   return (
     <div className="relative">
       <Icon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
 <<<<<<< HEAD
+<<<<<<< HEAD
         disabled={disabled}
         className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 disabled:opacity-60 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100 dark:placeholder:text-slate-500"
 =======
         className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100 dark:placeholder:text-slate-500"
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+        disabled={disabled}
+        className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 disabled:opacity-60 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100 dark:placeholder:text-slate-500"
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
       />
     </div>
   );

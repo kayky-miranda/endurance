@@ -1,5 +1,8 @@
 import "server-only";
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 import {
   GoogleGenAI,
   Type,
@@ -10,9 +13,12 @@ import {
 import { prisma } from "@/lib/db";
 import { getStockAlerts } from "./stock-alerts";
 import { getFinanceOverview } from "./finance";
+<<<<<<< HEAD
 =======
 import { GoogleGenAI } from "@google/genai";
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 
 const GEMINI_MODELS = process.env.GEMINI_MODEL
   ? [process.env.GEMINI_MODEL]
@@ -29,15 +35,22 @@ export interface ChatMsg {
 }
 export interface AssistantContext {
 <<<<<<< HEAD
+<<<<<<< HEAD
   orgId: string;
 =======
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+  orgId: string;
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   orgName: string;
   nicheLabel: string;
   modules: string[];
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 // ---------------------------------------------------------------------------
 // Widgets: dados estruturados que o agente devolve para a UI renderizar
 // (cards de KPI, tabelas, listas de alerta, comparações e mini-gráficos).
@@ -623,11 +636,14 @@ function isNetworkError(e: unknown): boolean {
 }
 
 /** Agente do assistente: function calling do Gemini sobre os dados do negócio. */
+<<<<<<< HEAD
 =======
 type Result = { ok: true; reply: string } | { ok: false; error: string };
 
 /** Assistente operacional (chat) do ENDURANCE, via Gemini. */
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 export async function askAssistant(
   ctx: AssistantContext,
   messages: ChatMsg[],
@@ -637,10 +653,14 @@ export async function askAssistant(
     return {
       ok: false,
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
       error: "O assistente precisa de uma chave de IA (GEMINI_API_KEY) configurada.",
     };
 
   const contents: Content[] = messages
+<<<<<<< HEAD
 =======
       error:
         "O assistente precisa de uma chave de IA (GEMINI_API_KEY) configurada.",
@@ -654,6 +674,8 @@ Regras: responda em português do Brasil, de forma BREVE e prática (use passos 
 
   const contents = messages
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
     .slice(-12)
     .map((m) => ({
       role: m.role === "assistant" ? "model" : "user",
@@ -661,6 +683,9 @@ Regras: responda em português do Brasil, de forma BREVE e prática (use passos 
     }));
   while (contents.length && contents[0].role === "model") contents.shift();
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   if (contents.length === 0) return { ok: false, error: "Envie uma pergunta." };
 
   const widgets: Widget[] = [];
@@ -760,6 +785,7 @@ Regras: responda em português do Brasil, de forma BREVE e prática (use passos 
         error:
           "Limite de uso da IA atingido (cota gratuita do Gemini). Aguarde cerca de um minuto e tente de novo — ou configure uma chave com mais cota no .env.",
       };
+<<<<<<< HEAD
 =======
   if (contents.length === 0)
     return { ok: false, error: "Envie uma pergunta." };
@@ -787,6 +813,8 @@ Regras: responda em português do Brasil, de forma BREVE e prática (use passos 
       }
     }
 >>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
+=======
+>>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
     return {
       ok: false,
       error: "Não consegui responder agora. Tente novamente em instantes.",
