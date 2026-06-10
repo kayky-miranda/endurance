@@ -30,14 +30,7 @@ export default async function DanfePage({
     where: { organizationId: session.org },
   });
   const sale = doc.sale;
-<<<<<<< HEAD
-<<<<<<< HEAD
   const docLabel = doc.modelo === "55" ? "NF-e" : "NFC-e";
-=======
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
-  const docLabel = doc.modelo === "55" ? "NF-e" : "NFC-e";
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   const qrDataUrl = await QRCode.toDataURL(doc.qrCode, { margin: 1, width: 220 });
   const cancelada = doc.status === "cancelada";
   const when = doc.dataEmissao.toLocaleString("pt-BR", {
@@ -66,29 +59,13 @@ export default async function DanfePage({
             </p>
           )}
           <p className="mt-1 text-[11px] font-semibold">
-<<<<<<< HEAD
-<<<<<<< HEAD
             Documento Auxiliar da {docLabel}
-=======
-            Documento Auxiliar da NFC-e
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
-            Documento Auxiliar da {docLabel}
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
           </p>
         </div>
 
         {cancelada && (
           <p className="mt-2 rounded border border-red-300 py-1 text-center text-[11px] font-bold uppercase text-red-600">
-<<<<<<< HEAD
-<<<<<<< HEAD
             {docLabel} CANCELADA
-=======
-            NFC-e CANCELADA
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
-            {docLabel} CANCELADA
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
           </p>
         )}
         {doc.ambiente === "2" && (
@@ -154,15 +131,7 @@ export default async function DanfePage({
 
         <div className="space-y-0.5 text-center text-[10px] text-slate-500">
           <p className="font-semibold text-slate-700">
-<<<<<<< HEAD
-<<<<<<< HEAD
             {docLabel} nº {doc.numero} · Série {doc.serie}
-=======
-            NFC-e nº {doc.numero} · Série {doc.serie}
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
-            {docLabel} nº {doc.numero} · Série {doc.serie}
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
           </p>
           <p>Emissão: {when}</p>
           <p className="break-all">

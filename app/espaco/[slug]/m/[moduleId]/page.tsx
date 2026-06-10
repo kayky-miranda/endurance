@@ -1,13 +1,5 @@
 import Link from "next/link";
-<<<<<<< HEAD
-<<<<<<< HEAD
 import { notFound, redirect } from "next/navigation";
-=======
-import { notFound } from "next/navigation";
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
-import { notFound, redirect } from "next/navigation";
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 import {
   ArrowLeft,
   Wrench,
@@ -38,16 +30,8 @@ import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { getWorkspace } from "@/lib/endurance/workspace";
 import { canAccessModule, type AccessRole } from "@/lib/endurance/catalog";
-<<<<<<< HEAD
-<<<<<<< HEAD
 import { modulePermission } from "@/lib/endurance/permissions";
 import { sessionHasPermission } from "@/lib/auth";
-=======
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
-import { modulePermission } from "@/lib/endurance/permissions";
-import { sessionHasPermission } from "@/lib/auth";
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 import { getSalesSummary } from "@/lib/endurance/sales-analytics";
 import {
   getReplenishment,
@@ -77,20 +61,11 @@ import PurchasingClient from "../purchasing-client";
 import { getCashflow, type DRE } from "@/lib/endurance/cashflow";
 import ImportClient from "../import-client";
 import { SalesByDayChart, PaymentMixChart, CashflowChart } from "../reports-charts";
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 import CodigoBarrasClient from "../codigo-barras-client";
 import NotificacoesClient from "../notificacoes-client";
 import NfeClient from "../nfe-client";
 import { getNotifications } from "@/lib/endurance/notifications";
 import { getNfeOverview } from "@/lib/endurance/nfe-service";
-<<<<<<< HEAD
-=======
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -107,10 +82,6 @@ export default async function ModulePage({
   const mod = ws.modules.find((m) => m.id === moduleId);
   if (!mod) notFound(); // módulo não existe ou não está ativo neste espaço
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   // "Acesso & multiusuário" é a Gestão de Usuários — vive em /equipe.
   if (moduleId === "acesso") redirect(`/espaco/${slug}/equipe`);
 
@@ -123,14 +94,6 @@ export default async function ModulePage({
     (!canAccessModule(gate.role as AccessRole, moduleId) ||
       (requiredPerm ? !sessionHasPermission(gate, requiredPerm) : false));
   if (denied) {
-<<<<<<< HEAD
-=======
-  // RBAC: bloqueia acesso direto por URL a módulos restritos a gestores.
-  const gate = await getSession();
-  if (gate && !canAccessModule(gate.role as AccessRole, moduleId)) {
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
     return (
       <div className="space-y-6">
         <Header slug={slug} label={mod.label} description={mod.description} />
@@ -726,10 +689,6 @@ export default async function ModulePage({
     );
   }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   // Código de barras — geração de códigos e impressão de etiquetas.
   if (moduleId === "codigo_barras") {
     const session = await getSession();
@@ -826,11 +785,6 @@ export default async function ModulePage({
     );
   }
 
-<<<<<<< HEAD
-=======
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   // Demais módulos: placeholder
   return (
     <div className="space-y-6">

@@ -1,10 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 import {
   X,
   Send,
@@ -31,20 +27,6 @@ const SUGGESTIONS = [
   "Quais contas vencem hoje?",
   "Compare as vendas deste mês com o passado",
   "Qual meu lucro deste mês?",
-<<<<<<< HEAD
-=======
-import { X, Send, Loader2, Sparkles } from "lucide-react";
-import { assistantAction } from "./assistant-actions";
-
-type Msg = { role: "user" | "assistant"; content: string };
-
-const SUGGESTIONS = [
-  "Como faço uma venda no PDV?",
-  "Como cadastrar um produto?",
-  "Como dar desconto numa venda?",
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 ];
 
 export default function AssistantWidget() {
@@ -53,14 +35,7 @@ export default function AssistantWidget() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
-<<<<<<< HEAD
-<<<<<<< HEAD
   const inputRef = useRef<HTMLTextAreaElement>(null);
-=======
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
-  const inputRef = useRef<HTMLTextAreaElement>(null);
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -74,10 +49,6 @@ export default function AssistantWidget() {
     setInput("");
     setBusy(true);
     try {
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
       // Envia só role+content para o agente (widgets ficam só na UI).
       const res = await assistantAction(next.map((m) => ({ role: m.role, content: m.content })));
       setMsgs((m) => [
@@ -85,15 +56,6 @@ export default function AssistantWidget() {
         res.ok
           ? { role: "assistant", content: res.reply, widgets: res.widgets }
           : { role: "assistant", content: res.error },
-<<<<<<< HEAD
-=======
-      const res = await assistantAction(next);
-      setMsgs((m) => [
-        ...m,
-        { role: "assistant", content: res.ok ? res.reply : res.error },
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
       ]);
     } catch {
       setMsgs((m) => [
@@ -105,10 +67,6 @@ export default function AssistantWidget() {
     }
   }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -116,11 +74,6 @@ export default function AssistantWidget() {
     }
   }
 
-<<<<<<< HEAD
-=======
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   return (
     <>
       {!open && (
@@ -129,23 +82,11 @@ export default function AssistantWidget() {
           className="fixed bottom-5 right-5 z-50 inline-flex items-center gap-2 rounded-full bg-brand-500 px-4 py-3 text-sm font-semibold text-ink-950 shadow-lg shadow-black/20 transition hover:bg-brand-400"
         >
           <Sparkles className="h-5 w-5" />
-<<<<<<< HEAD
-<<<<<<< HEAD
           Gerente IA
-=======
-          Assistente
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
-          Gerente IA
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
         </button>
       )}
 
       {open && (
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
         <div className="fixed bottom-5 right-5 z-50 flex h-[min(88vh,680px)] w-[min(94vw,440px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-black/30 dark:border-ink-700 dark:bg-ink-900">
           {/* Header */}
           <header className="flex items-center gap-3 border-b border-slate-200 bg-gradient-to-r from-brand-500/15 to-transparent px-4 py-3 dark:border-ink-800">
@@ -172,30 +113,12 @@ export default function AssistantWidget() {
             <button
               onClick={() => setOpen(false)}
               className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-ink-800 dark:hover:text-slate-200"
-<<<<<<< HEAD
-=======
-        <div className="fixed bottom-5 right-5 z-50 flex h-[520px] w-[min(92vw,380px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-black/30 dark:border-ink-700 dark:bg-ink-900">
-          <header className="flex items-center justify-between border-b border-slate-200 bg-brand-500/10 px-4 py-3 dark:border-ink-800">
-            <span className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-100">
-              <Sparkles className="h-4 w-4 text-brand-500" />
-              Assistente IA
-            </span>
-            <button
-              onClick={() => setOpen(false)}
-              className="text-slate-400 transition hover:text-slate-600 dark:hover:text-slate-200"
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
               aria-label="Fechar"
             >
               <X className="h-5 w-5" />
             </button>
           </header>
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
           {/* Conversa */}
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
             {msgs.length === 0 && (
@@ -237,80 +160,11 @@ export default function AssistantWidget() {
                 rows={1}
                 placeholder="Pergunte sobre vendas, lucro, estoque, clientes…"
                 className="max-h-28 flex-1 resize-none bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100"
-<<<<<<< HEAD
-=======
-          <div className="flex-1 space-y-3 overflow-y-auto p-4">
-            {msgs.length === 0 && (
-              <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Oi! Sou o assistente operacional. Posso ajudar com o uso do
-                  sistema e o dia a dia do caixa.
-                </p>
-                <div className="mt-3 flex flex-col gap-2">
-                  {SUGGESTIONS.map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => send(q)}
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-left text-sm text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:text-slate-300"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {msgs.map((m, i) => (
-              <div
-                key={i}
-                className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${
-                    m.role === "user"
-                      ? "bg-brand-500 text-ink-950"
-                      : "bg-slate-100 text-slate-700 dark:bg-ink-800 dark:text-slate-200"
-                  }`}
-                >
-                  {m.content}
-                </div>
-              </div>
-            ))}
-
-            {busy && (
-              <div className="flex justify-start">
-                <div className="rounded-2xl bg-slate-100 px-3 py-2 dark:bg-ink-800">
-                  <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-                </div>
-              </div>
-            )}
-            <div ref={endRef} />
-          </div>
-
-          <div className="border-t border-slate-200 p-3 dark:border-ink-800">
-            <div className="flex items-center gap-2">
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && send()}
-                placeholder="Pergunte algo…"
-                className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
               />
               <button
                 onClick={() => send()}
                 disabled={busy || !input.trim()}
-<<<<<<< HEAD
-<<<<<<< HEAD
                 className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-500 text-ink-950 transition hover:bg-brand-400 disabled:opacity-40"
-=======
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-500 text-ink-950 transition hover:bg-brand-400 disabled:opacity-40"
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-500 text-ink-950 transition hover:bg-brand-400 disabled:opacity-40"
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
                 aria-label="Enviar"
               >
                 <Send className="h-4 w-4" />
@@ -322,10 +176,6 @@ export default function AssistantWidget() {
     </>
   );
 }
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 
 // --------------------------------------------------------------------------
 function Welcome({ onPick }: { onPick: (q: string) => void }) {
@@ -572,8 +422,3 @@ function Header({
     </div>
   );
 }
-<<<<<<< HEAD
-=======
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)

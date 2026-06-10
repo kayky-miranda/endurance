@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSession, canManageTeam } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import {
   createSupplier,
   createPurchaseOrder,
@@ -11,8 +11,6 @@ import {
 } from "@/lib/endurance/purchasing";
 
 type R = { ok: boolean; error?: string };
-
-const DENIED: R = { ok: false, error: "Acesso restrito a administradores." };
 
 function rev(slug: string) {
   revalidatePath(`/espaco/${slug}/m/fornecedores`);
@@ -24,9 +22,9 @@ export async function createSupplierAction(input: {
   phone?: string;
   email?: string;
 }): Promise<R> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeam(s.role)) return DENIED;
+  const gate = await requirePermission("suppliers.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
   const res = await createSupplier(s.org, input);
   if (res.ok) rev(s.slug);
   return res;
@@ -37,9 +35,9 @@ export async function createPurchaseOrderAction(
   items: POItemInput[],
   note: string,
 ): Promise<R> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeam(s.role)) return DENIED;
+  const gate = await requirePermission("suppliers.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
   const res = await createPurchaseOrder(s.org, supplierId, items, note);
   if (res.ok) rev(s.slug);
   return res;
@@ -49,9 +47,9 @@ export async function markOrderSentAction(
   orderId: string,
   via: string,
 ): Promise<R> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeam(s.role)) return DENIED;
+  const gate = await requirePermission("suppliers.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
   const res = await markOrderSent(s.org, orderId, via);
   if (res.ok) {
     rev(s.slug);
@@ -61,9 +59,9 @@ export async function markOrderSentAction(
 }
 
 export async function receivePurchaseOrderAction(orderId: string): Promise<R> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeam(s.role)) return DENIED;
+  const gate = await requirePermission("suppliers.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
   const res = await receivePurchaseOrder(s.org, orderId);
   if (res.ok) {
     rev(s.slug);

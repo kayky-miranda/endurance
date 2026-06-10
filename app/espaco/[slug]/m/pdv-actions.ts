@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { getSession, requirePermission } from "@/lib/auth";
 import { suggestCrossSell, type Suggestion } from "@/lib/endurance/crosssell";
 import { getOpenSession } from "@/lib/endurance/cash";
 import { createReceivablesForSale } from "@/lib/endurance/finance";
@@ -40,8 +40,9 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export async function finalizeSaleAction(
   input: FinalizeInput,
 ): Promise<Result> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
+  const gate = await requirePermission("pdv.sell");
+  if (!gate.ok) return gate;
+  const s = gate.session;
 
   const { token } = input;
   if (!token) return { ok: false, error: "Token de venda ausente." };
@@ -185,8 +186,9 @@ export type CustomerResult =
 export async function createCustomerAction(
   input: CustomerInput,
 ): Promise<CustomerResult> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
+  const gate = await requirePermission("customers.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
 
   const name = (input.name ?? "").trim();
   if (!name) return { ok: false, error: "Informe o nome do cliente." };

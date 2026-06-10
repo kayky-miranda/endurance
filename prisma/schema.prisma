@@ -38,14 +38,7 @@ model Organization {
   purchases    PurchaseOrder[]
   categories   Category[]
   importedInvoices ImportedInvoice[]
-<<<<<<< HEAD
-<<<<<<< HEAD
   activityLogs ActivityLog[]
-=======
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
-  activityLogs ActivityLog[]
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 }
 
 // Nota fiscal importada por XML (NF-e modelo 55 / NFC-e modelo 65). Registro
@@ -339,10 +332,6 @@ model SalePayment {
 
 // Usuário de uma organização. role: OWNER | ADMIN | MEMBER (string — SQLite não
 // suporta enum no Prisma). email é único global (login por e-mail + senha).
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 // O RBAC granular fica em `permissions` (ids do catálogo lib/endurance/permissions.ts);
 // `profile` guarda o perfil pré-configurado escolhido (ou "" se personalizado).
 // `status` controla bloqueio (active | blocked). `lastLoginAt` registra o último acesso.
@@ -360,19 +349,6 @@ model User {
   lastLoginAt    DateTime?
   organizationId String
   createdAt      DateTime  @default(now())
-<<<<<<< HEAD
-=======
-model User {
-  id             String   @id @default(cuid())
-  email          String   @unique
-  passwordHash   String
-  name           String
-  role           String   @default("MEMBER")
-  organizationId String
-  createdAt      DateTime @default(now())
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   sales        Sale[]
@@ -380,10 +356,6 @@ model User {
   @@index([organizationId])
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 // Trilha de auditoria: registra ações relevantes (criação/edição/bloqueio de
 // usuários, etc.) por organização, para o "Histórico de atividades".
 model ActivityLog {
@@ -401,11 +373,6 @@ model ActivityLog {
   @@index([organizationId, createdAt])
 }
 
-<<<<<<< HEAD
-=======
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 model OrgModule {
   id             String  @id @default(cuid())
   organizationId String

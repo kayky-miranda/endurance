@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSession, canManageTeam } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import {
   validateImport,
   commitImport,
@@ -13,21 +13,18 @@ export async function validateImportAction(
   entity: string,
   text: string,
 ): Promise<ValidateResult> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeam(s.role))
-    return { ok: false, error: "Acesso restrito a administradores." };
-  return validateImport(s.org, entity, text);
+  const gate = await requirePermission("settings.general");
+  if (!gate.ok) return gate;
+  return validateImport(gate.session.org, entity, text);
 }
 
 export async function commitImportAction(
   entity: string,
   text: string,
 ): Promise<CommitResult> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeam(s.role))
-    return { ok: false, error: "Acesso restrito a administradores." };
+  const gate = await requirePermission("settings.general");
+  if (!gate.ok) return gate;
+  const s = gate.session;
   const res = await commitImport(s.org, entity, text);
   if (res.ok) {
     revalidatePath(`/espaco/${s.slug}/m/produtos`);

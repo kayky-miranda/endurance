@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -21,8 +21,9 @@ function revalidate(slug: string) {
 }
 
 export async function createProductAction(input: NewProduct): Promise<Result> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
+  const gate = await requirePermission("products.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
 
   const name = (input.name ?? "").trim();
   if (!name) return { ok: false, error: "Informe o nome do produto." };
@@ -54,8 +55,9 @@ export async function createProductAction(input: NewProduct): Promise<Result> {
 }
 
 export async function deleteProductAction(id: string): Promise<Result> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
+  const gate = await requirePermission("products.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
 
   const p = await prisma.product.findUnique({ where: { id } });
   if (!p || p.organizationId !== s.org)
@@ -70,8 +72,9 @@ export async function adjustStockAction(
   id: string,
   delta: number,
 ): Promise<Result> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
+  const gate = await requirePermission("stock.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
 
   const p = await prisma.product.findUnique({ where: { id } });
   if (!p || p.organizationId !== s.org)

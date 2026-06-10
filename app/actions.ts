@@ -13,14 +13,7 @@ import {
   type Role,
 } from "@/lib/auth";
 import { createWorkspace, EmailTakenError } from "@/lib/endurance/workspace";
-<<<<<<< HEAD
-<<<<<<< HEAD
 import { allPermissionIds } from "@/lib/endurance/permissions";
-=======
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
-import { allPermissionIds } from "@/lib/endurance/permissions";
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -70,16 +63,8 @@ export async function signupAction(input: SignupInput): Promise<AuthResult> {
       role: "OWNER",
       org: orgId,
       slug,
-<<<<<<< HEAD
-<<<<<<< HEAD
       profile: "administrador",
       permissions: allPermissionIds(),
-=======
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
-      profile: "administrador",
-      permissions: allPermissionIds(),
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
     });
     return { ok: true, slug };
   } catch (e) {
@@ -105,10 +90,6 @@ export async function loginAction(
   if (!user || !(await verifyPassword(password, user.passwordHash)))
     return { ok: false, error: "E-mail ou senha inválidos." };
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   if (user.status === "blocked")
     return {
       ok: false,
@@ -121,11 +102,6 @@ export async function loginAction(
     data: { lastLoginAt: new Date() },
   });
 
-<<<<<<< HEAD
-=======
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   await createSession({
     sub: user.id,
     name: user.name,
@@ -133,16 +109,8 @@ export async function loginAction(
     role: user.role as Role,
     org: user.organizationId,
     slug: user.organization.slug,
-<<<<<<< HEAD
-<<<<<<< HEAD
     profile: user.profile,
     permissions: user.permissions,
-=======
->>>>>>> 4601ad18c1a383bb3f7086a9290822d31bf3f5fa
-=======
-    profile: user.profile,
-    permissions: user.permissions,
->>>>>>> b07ccfa (Resolve conflitos de merge (lado HEAD) e estabiliza o build)
   });
   return { ok: true, slug: user.organization.slug };
 }

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSession, canManageTeam } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
   emitNfce,
@@ -10,10 +10,9 @@ import {
 } from "@/lib/endurance/fiscal-service";
 
 export async function emitNfceAction(saleId: string): Promise<EmitResult> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeam(s.role))
-    return { ok: false, error: "Acesso restrito a administradores." };
+  const gate = await requirePermission("fiscal.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
   const res = await emitNfce(s.org, saleId);
   if (res.ok) revalidatePath(`/espaco/${s.slug}/m/nfce`);
   return res;
@@ -23,10 +22,9 @@ export async function cancelNfceAction(
   docId: string,
   motivo: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeam(s.role))
-    return { ok: false, error: "Acesso restrito a administradores." };
+  const gate = await requirePermission("fiscal.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
   const res = await cancelNfce(s.org, docId, motivo);
   if (res.ok) revalidatePath(`/espaco/${s.slug}/m/nfce`);
   return res;
@@ -50,10 +48,9 @@ export interface FiscalConfigInput {
 export async function saveFiscalConfigAction(
   input: FiscalConfigInput,
 ): Promise<{ ok: boolean; error?: string }> {
-  const s = await getSession();
-  if (!s) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeam(s.role))
-    return { ok: false, error: "Acesso restrito a administradores." };
+  const gate = await requirePermission("fiscal.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
 
   const data = {
     cnpj: (input.cnpj ?? "").replace(/\D/g, "").slice(0, 14),
