@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
+import { money } from "./money";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -129,18 +130,25 @@ export async function getFinanceOverview(org: string): Promise<FinanceOverview> 
   let pagoMes = 0;
   for (const e of entries) {
     const pend = e.status === "pendente";
+    const amount = money(e.amount);
     if (e.kind === "receber") {
-      if (pend) aReceber += e.amount;
-      else if (e.paidAt && e.paidAt >= startMonth) recebidoMes += e.amount;
+      if (pend) aReceber += amount;
+      else if (e.paidAt && e.paidAt >= startMonth) recebidoMes += amount;
     } else {
-      if (pend) aPagar += e.amount;
-      else if (e.paidAt && e.paidAt >= startMonth) pagoMes += e.amount;
+      if (pend) aPagar += amount;
+      else if (e.paidAt && e.paidAt >= startMonth) pagoMes += amount;
     }
     if (pend && e.dueDate < today) vencidos++;
   }
 
-  const receber = entries.filter((e) => e.kind === "receber").map(toRow).slice(0, 40);
-  const pagar = entries.filter((e) => e.kind === "pagar").map(toRow).slice(0, 40);
+  const receber = entries
+    .filter((e) => e.kind === "receber")
+    .map((e) => toRow({ ...e, amount: money(e.amount) }))
+    .slice(0, 40);
+  const pagar = entries
+    .filter((e) => e.kind === "pagar")
+    .map((e) => toRow({ ...e, amount: money(e.amount) }))
+    .slice(0, 40);
 
   return {
     kpis: {

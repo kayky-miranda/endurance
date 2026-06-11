@@ -244,6 +244,18 @@ async function callAnthropic(text: string): Promise<OnboardingJson | null> {
       format: { type: "json_schema", schema: ONBOARDING_SCHEMA },
     },
   });
+  // Valida o prompt caching: na 1ª requisição espera-se cache_write > 0 (prefixo
+  // gravado); nas seguintes (até 5 min), cache_read > 0. Se ambos ficarem sempre
+  // em 0, o prefixo está abaixo do mínimo cacheável do modelo ou algo volátil
+  // entrou no system prompt (ver lib/endurance/onboarding.ts:SYSTEM).
+  const u = response.usage;
+  console.info(
+    "[onboarding:anthropic] usage:",
+    `input=${u.input_tokens}`,
+    `cache_write=${u.cache_creation_input_tokens ?? 0}`,
+    `cache_read=${u.cache_read_input_tokens ?? 0}`,
+    `output=${u.output_tokens}`,
+  );
   const block = response.content.find((b) => b.type === "text");
   return block && block.type === "text" ? JSON.parse(block.text) : null;
 }

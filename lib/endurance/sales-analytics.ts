@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { money } from "./money";
 
 export interface SalesSummary {
   days: number;
@@ -33,7 +34,7 @@ export async function getSalesSummary(
     orderBy: { createdAt: "asc" },
   });
 
-  const faturamento = sum(sales.map((s) => s.total));
+  const faturamento = sum(sales.map((s) => money(s.total)));
   const vendas = sales.length;
   const ticketMedio = vendas ? faturamento / vendas : 0;
   const itens = sum(sales.map((s) => s.itemsCount));
@@ -48,7 +49,7 @@ export async function getSalesSummary(
     for (const it of s.items) {
       const e = prod.get(it.name) ?? { qty: 0, revenue: 0 };
       e.qty += it.quantity;
-      e.revenue += it.quantity * it.unitPrice;
+      e.revenue += it.quantity * money(it.unitPrice);
       prod.set(it.name, e);
     }
   const topProdutos = [...prod.entries()]
@@ -59,7 +60,8 @@ export async function getSalesSummary(
   // Formas de pagamento.
   const pay = new Map<string, number>();
   for (const s of sales)
-    for (const p of s.payments) pay.set(p.method, (pay.get(p.method) ?? 0) + p.amount);
+    for (const p of s.payments)
+      pay.set(p.method, (pay.get(p.method) ?? 0) + money(p.amount));
   const pagamentos = [...pay.entries()]
     .map(([method, amount]) => ({ method, amount: round2(amount) }))
     .sort((a, b) => b.amount - a.amount);
@@ -76,7 +78,7 @@ export async function getSalesSummary(
     const total = sum(
       sales
         .filter((s) => s.createdAt >= d && s.createdAt < next)
-        .map((s) => s.total),
+        .map((s) => money(s.total)),
     );
     porDia.push({ date: d.toISOString().slice(0, 10), total: round2(total) });
   }
@@ -86,7 +88,7 @@ export async function getSalesSummary(
   for (const s of sales) {
     const name = s.seller?.name ?? "—";
     const e = seller.get(name) ?? { total: 0, vendas: 0 };
-    e.total += s.total;
+    e.total += money(s.total);
     e.vendas += 1;
     seller.set(name, e);
   }
@@ -101,7 +103,7 @@ export async function getSalesSummary(
     vendas,
     ticketMedio: round2(ticketMedio),
     itens,
-    hojeFaturamento: round2(sum(todays.map((s) => s.total))),
+    hojeFaturamento: round2(sum(todays.map((s) => money(s.total)))),
     hojeVendas: todays.length,
     topProdutos,
     pagamentos,

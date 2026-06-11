@@ -7,6 +7,7 @@ import {
   type FunctionDeclaration,
 } from "@google/genai";
 import { prisma } from "@/lib/db";
+import { money } from "./money";
 import { getStockAlerts } from "./stock-alerts";
 import { getFinanceOverview } from "./finance";
 
@@ -152,13 +153,13 @@ async function salesMetrics(org: string, since: Date, until: Date) {
       select: { id: true, cost: true },
     }),
   ]);
-  const costById = new Map(products.map((p) => [p.id, p.cost]));
+  const costById = new Map(products.map((p) => [p.id, money(p.cost)]));
 
   let faturamento = 0;
   let itens = 0;
   let cmv = 0;
   for (const s of sales) {
-    faturamento += s.total;
+    faturamento += money(s.total);
     itens += s.itemsCount;
     for (const it of s.items) {
       const c = it.productId ? costById.get(it.productId) ?? 0 : 0;
@@ -219,7 +220,7 @@ const TOOLS: Record<
       },
       select: { amount: true },
     });
-    const despesas = round2(payables.reduce((a, p) => a + p.amount, 0));
+    const despesas = round2(payables.reduce((a, p) => a + money(p.amount), 0));
     const resultado = round2(m.lucroBruto - despesas);
     return {
       data: {
@@ -291,7 +292,7 @@ const TOOLS: Record<
     for (const it of items) {
       const e = agg.get(it.name) ?? { qty: 0, revenue: 0 };
       e.qty += it.quantity;
-      e.revenue += it.quantity * it.unitPrice;
+      e.revenue += it.quantity * money(it.unitPrice);
       agg.set(it.name, e);
     }
     const top = [...agg.entries()]
@@ -326,7 +327,7 @@ const TOOLS: Record<
       const k = s.customerId as string;
       const e = agg.get(k) ?? { name: s.customer?.name ?? "—", orders: 0, total: 0 };
       e.orders += 1;
-      e.total += s.total;
+      e.total += money(s.total);
       agg.set(k, e);
     }
     const top = [...agg.values()]
@@ -388,7 +389,7 @@ const TOOLS: Record<
         valor: 0,
       };
       e.pedidos += 1;
-      e.valor += o.total;
+      e.valor += money(o.total);
       agg.set(o.supplierId, e);
     }
     const rows = [...agg.values()]
@@ -431,7 +432,7 @@ const TOOLS: Record<
       orderBy: { dueDate: "asc" },
       take: 20,
     });
-    const total = round2(entries.reduce((a, e) => a + e.amount, 0));
+    const total = round2(entries.reduce((a, e) => a + money(e.amount), 0));
     return {
       data: {
         total,
@@ -439,7 +440,7 @@ const TOOLS: Record<
         contas: entries.map((e) => ({
           descricao: e.description,
           tipo: e.kind,
-          valor: e.amount,
+          valor: money(e.amount),
           vencimento: e.dueDate.toISOString().slice(0, 10),
         })),
       },
@@ -448,7 +449,7 @@ const TOOLS: Record<
         title: `${title} — total ${brl(total)}`,
         items: entries.map((e) => ({
           title: e.description,
-          sub: `${e.kind === "pagar" ? "A pagar" : "A receber"} · ${brl(e.amount)} · vence ${e.dueDate.toLocaleDateString("pt-BR")}`,
+          sub: `${e.kind === "pagar" ? "A pagar" : "A receber"} · ${brl(money(e.amount))} · vence ${e.dueDate.toLocaleDateString("pt-BR")}`,
           tone: e.kind === "pagar" ? "warn" : "ok",
         })),
       },

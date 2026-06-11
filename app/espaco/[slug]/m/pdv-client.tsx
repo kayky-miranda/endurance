@@ -240,8 +240,14 @@ export default function PdvClient({
   }
 
   function addPayment(method: string) {
-    if (remaining <= 0) return;
-    setPayments([...payments, { method, amount: Math.round(remaining * 100) / 100 }]);
+    // Atualização funcional: cliques rápidos em sequência veem o estado mais
+    // recente (sem isso, dois cliques adicionavam dois pagamentos cheios).
+    setPayments((prev) => {
+      const paidPrev = prev.reduce((s, p) => s + p.amount, 0);
+      const rem = Math.round(Math.max(0, total - paidPrev) * 100) / 100;
+      if (rem <= 0) return prev;
+      return [...prev, { method, amount: rem }];
+    });
   }
   function updatePayment(i: number, amount: number) {
     const copy = [...payments];

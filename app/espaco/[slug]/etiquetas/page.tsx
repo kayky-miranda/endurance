@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { requireOrgAccess } from "@/lib/auth";
+import { money } from "@/lib/endurance/money";
 import BarcodeSvg from "../m/barcode-svg";
 import EtiquetasPrint from "./etiquetas-print";
 
@@ -38,7 +39,7 @@ export default async function EtiquetasPage({
     const p = byId.get(it.id);
     if (!p || !p.barcode) continue;
     for (let i = 0; i < it.qty; i++)
-      labels.push({ name: p.name, price: p.price, barcode: p.barcode });
+      labels.push({ name: p.name, price: money(p.price), barcode: p.barcode });
   }
 
   return (

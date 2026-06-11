@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { money } from "./money";
 
 export type ReplenLevel = "rompido" | "critico" | "atencao" | "ok";
 
@@ -79,7 +80,7 @@ export async function getReplenishment(
     else if ((daysLeft !== null && daysLeft <= 7) || p.stock <= 5)
       level = "atencao";
 
-    const estCost = round(suggestedQty * (p.cost || 0), 2);
+    const estCost = round(suggestedQty * money(p.cost), 2);
     if (suggestedQty > 0) {
       needing++;
       totalCost += estCost;

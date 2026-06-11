@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { money } from "./money";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -76,10 +77,14 @@ async function computeBreakdown(
     where: { sessionId },
   });
   const suprimentos = round2(
-    movements.filter((m) => m.type === "suprimento").reduce((a, m) => a + m.amount, 0),
+    movements
+      .filter((m) => m.type === "suprimento")
+      .reduce((a, m) => a + money(m.amount), 0),
   );
   const sangrias = round2(
-    movements.filter((m) => m.type === "sangria").reduce((a, m) => a + m.amount, 0),
+    movements
+      .filter((m) => m.type === "sangria")
+      .reduce((a, m) => a + money(m.amount), 0),
   );
 
   const sales = await prisma.sale.findMany({
@@ -89,9 +94,9 @@ async function computeBreakdown(
   let cashSales = 0;
   let salesTotal = 0;
   for (const s of sales) {
-    salesTotal += s.total;
+    salesTotal += money(s.total);
     for (const p of s.payments) {
-      if (p.method === "dinheiro") cashSales += p.amount;
+      if (p.method === "dinheiro") cashSales += money(p.amount);
     }
   }
   cashSales = round2(cashSales);
@@ -126,7 +131,7 @@ export async function getCaixaOverview(
   const open = await getOpenSession(org, userId);
   let openView: OpenSessionView | null = null;
   if (open) {
-    const breakdown = await computeBreakdown(open.id, open.openingAmount);
+    const breakdown = await computeBreakdown(open.id, money(open.openingAmount));
     const movements = await prisma.cashMovement.findMany({
       where: { sessionId: open.id },
       orderBy: { createdAt: "desc" },
@@ -140,12 +145,12 @@ export async function getCaixaOverview(
         hour: "2-digit",
         minute: "2-digit",
       }),
-      openingAmount: open.openingAmount,
+      openingAmount: money(open.openingAmount),
       breakdown,
       movements: movements.map((m) => ({
         id: m.id,
         type: m.type as "suprimento" | "sangria",
-        amount: m.amount,
+        amount: money(m.amount),
         reason: m.reason,
         quando: m.createdAt.toLocaleString("pt-BR", {
           hour: "2-digit",
@@ -167,7 +172,7 @@ export async function getCaixaOverview(
       orderBy: { openedAt: "desc" },
     });
     for (const o of otherOpen) {
-      const b = await computeBreakdown(o.id, o.openingAmount);
+      const b = await computeBreakdown(o.id, money(o.openingAmount));
       others.push({
         id: o.id,
         operator: o.userId ? (nameById.get(o.userId) ?? "—") : "—",
@@ -202,10 +207,10 @@ export async function getCaixaOverview(
       hour: "2-digit",
       minute: "2-digit",
     }),
-    openingAmount: s.openingAmount,
-    expectedAmount: s.expectedAmount ?? 0,
-    countedAmount: s.countedAmount ?? 0,
-    difference: s.difference ?? 0,
+    openingAmount: money(s.openingAmount),
+    expectedAmount: money(s.expectedAmount),
+    countedAmount: money(s.countedAmount),
+    difference: money(s.difference),
   }));
 
   return { open: openView, others, history };
@@ -240,7 +245,7 @@ export async function addMovement(
   if (type !== "suprimento" && type !== "sangria")
     return { ok: false, error: "Tipo inválido." };
   if (type === "sangria") {
-    const b = await computeBreakdown(open.id, open.openingAmount);
+    const b = await computeBreakdown(open.id, money(open.openingAmount));
     if (value > b.expected)
       return {
         ok: false,
@@ -267,7 +272,7 @@ export async function closeCash(
 ): Promise<{ ok: boolean; error?: string }> {
   const open = await getOpenSession(org, userId);
   if (!open) return { ok: false, error: "Você não tem caixa aberto." };
-  const breakdown = await computeBreakdown(open.id, open.openingAmount);
+  const breakdown = await computeBreakdown(open.id, money(open.openingAmount));
   const counted = round2(Number(countedAmount) || 0);
   const difference = round2(counted - breakdown.expected);
   await prisma.cashSession.update({

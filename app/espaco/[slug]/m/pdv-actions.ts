@@ -6,6 +6,7 @@ import { getSession, requirePermission } from "@/lib/auth";
 import { suggestCrossSell, type Suggestion } from "@/lib/endurance/crosssell";
 import { getOpenSession } from "@/lib/endurance/cash";
 import { createReceivablesForSale } from "@/lib/endurance/finance";
+import { money } from "@/lib/endurance/money";
 
 type Result =
   | { ok: true; total: number; saleId: string; change: number }
@@ -57,9 +58,9 @@ export async function finalizeSaleAction(
   if (existing)
     return {
       ok: true,
-      total: existing.total,
+      total: money(existing.total),
       saleId: existing.id,
-      change: existing.change,
+      change: money(existing.change),
     };
 
   // Cliente (só se existir e for do mesmo espaço).
@@ -93,7 +94,10 @@ export async function finalizeSaleAction(
   }
 
   const subtotal = round2(
-    clean.reduce((sum, it) => sum + byId.get(it.productId)!.price * it.qty, 0),
+    clean.reduce(
+      (sum, it) => sum + money(byId.get(it.productId)!.price) * it.qty,
+      0,
+    ),
   );
   const discount = Math.min(Math.max(0, round2(input.discount ?? 0)), subtotal);
   const total = round2(subtotal - discount);
@@ -123,6 +127,15 @@ export async function finalizeSaleAction(
         .filter((p) => p.method === "dinheiro")
         .reduce((a, p) => a + p.amount, 0),
     );
+    // Cartão/Pix cobram o valor exato — acima do total é erro de digitação
+    // (ex.: forma de pagamento adicionada duas vezes), não caso de troco.
+    const nonCash = round2(paidTotal - cashPaid);
+    if (nonCash > total + 0.01)
+      return {
+        ok: false,
+        error:
+          "Cartão/Pix somam mais que o total da venda — confira as formas de pagamento (alguma foi adicionada duas vezes?).",
+      };
     if (cashPaid + 0.01 < change)
       return {
         ok: false,
@@ -208,7 +221,12 @@ export async function finalizeSaleAction(
     if ((e as { code?: string }).code === "P2002") {
       const dup = await prisma.sale.findUnique({ where: { token } });
       if (dup)
-        return { ok: true, total: dup.total, saleId: dup.id, change: dup.change };
+        return {
+          ok: true,
+          total: money(dup.total),
+          saleId: dup.id,
+          change: money(dup.change),
+        };
     }
     throw e;
   }

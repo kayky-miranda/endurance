@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireOrgAccess } from "@/lib/auth";
+import { money } from "@/lib/endurance/money";
 import ReceiptActions from "./receipt-actions";
 
 const brl = (n: number) =>
@@ -36,9 +37,10 @@ export default async function ReciboPage({
   // Vendas novas guardam o troco em sale.change e os pagamentos líquidos (o
   // dinheiro entregue é líquido + troco). Vendas antigas guardavam o valor
   // entregue cheio — o troco é derivado de paid - total nesse caso.
-  const paid = sale.payments.reduce((a, p) => a + p.amount, 0);
-  const troco = sale.change > 0 ? sale.change : Math.max(0, paid - sale.total);
-  const cashTendedExtra = sale.change > 0 ? sale.change : 0;
+  const change = money(sale.change);
+  const paid = sale.payments.reduce((a, p) => a + money(p.amount), 0);
+  const troco = change > 0 ? change : Math.max(0, paid - money(sale.total));
+  const cashTendedExtra = change > 0 ? change : 0;
   const firstCashId = sale.payments.find((p) => p.method === "dinheiro")?.id;
   const when = sale.createdAt.toLocaleString("pt-BR", {
     day: "2-digit",
@@ -94,12 +96,12 @@ export default async function ReciboPage({
                 <td className="py-0.5 pr-2">
                   {it.name}
                   <span className="block text-[10px] text-slate-400">
-                    {brl(it.unitPrice)} un.
+                    {brl(money(it.unitPrice))} un.
                   </span>
                 </td>
                 <td className="py-0.5 text-center">{it.quantity}</td>
                 <td className="py-0.5 text-right">
-                  {brl(it.unitPrice * it.quantity)}
+                  {brl(money(it.unitPrice) * it.quantity)}
                 </td>
               </tr>
             ))}
@@ -109,13 +111,13 @@ export default async function ReciboPage({
         <div className="my-3 border-t border-dashed border-slate-300" />
 
         <div className="space-y-0.5">
-          <Row label="Subtotal" value={brl(sale.subtotal)} />
-          {sale.discount > 0 && (
-            <Row label="Desconto" value={`- ${brl(sale.discount)}`} />
+          <Row label="Subtotal" value={brl(money(sale.subtotal))} />
+          {money(sale.discount) > 0 && (
+            <Row label="Desconto" value={`- ${brl(money(sale.discount))}`} />
           )}
           <div className="flex justify-between pt-1 text-sm font-bold">
             <span>TOTAL</span>
-            <span>{brl(sale.total)}</span>
+            <span>{brl(money(sale.total))}</span>
           </div>
         </div>
 
@@ -126,7 +128,9 @@ export default async function ReciboPage({
             <Row
               key={p.id}
               label={PAY_LABEL[p.method] ?? p.method}
-              value={brl(p.amount + (p.id === firstCashId ? cashTendedExtra : 0))}
+              value={brl(
+                money(p.amount) + (p.id === firstCashId ? cashTendedExtra : 0),
+              )}
             />
           ))}
           {cashTendedExtra > 0 && !firstCashId && (

@@ -18,6 +18,7 @@ import {
   modulePermission,
 } from "@/lib/endurance/permissions";
 import { getSalesSummary } from "@/lib/endurance/sales-analytics";
+import { money } from "@/lib/endurance/money";
 import { SalesByDayChart, PaymentMixChart } from "./m/reports-charts";
 
 const brl = (n: number) =>
@@ -220,7 +221,7 @@ export default async function EspacoPage({
                         .join(", ") || "—"}
                     </td>
                     <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-200">
-                      {brl(s.total)}
+                      {brl(money(s.total))}
                     </td>
                   </tr>
                 ))}

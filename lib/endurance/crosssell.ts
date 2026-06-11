@@ -1,6 +1,7 @@
 import "server-only";
 import { GoogleGenAI, Type } from "@google/genai";
 import { prisma } from "@/lib/db";
+import { money } from "./money";
 
 export interface Suggestion {
   id: string;
@@ -85,7 +86,7 @@ export async function suggestCrossSell(
               out.push({
                 id: p.id,
                 name: p.name,
-                price: p.price,
+                price: money(p.price),
                 reason: String(sug.reason || "").slice(0, 40),
               });
             }
@@ -111,7 +112,7 @@ export async function suggestCrossSell(
   return pick.map((p) => ({
     id: p.id,
     name: p.name,
-    price: p.price,
+    price: money(p.price),
     reason: "Leve também",
   }));
 }

@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { money } from "./money";
 
 export type Segment = "novo" | "ativo" | "em_risco" | "inativo";
 
@@ -47,7 +48,7 @@ export async function getCustomerInsights(orgId: string): Promise<CrmInsights> {
     const k = s.customerId as string;
     const e = agg.get(k) ?? { orders: 0, total: 0, dates: [] };
     e.orders += 1;
-    e.total += s.total;
+    e.total += money(s.total);
     e.dates.push(s.createdAt);
     agg.set(k, e);
   }

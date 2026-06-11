@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { money } from "./money";
 
 export type MarginLevel = "negativa" | "baixa" | "ok";
 
@@ -50,10 +51,11 @@ export async function getPricingAnalysis(
       sold.set(it.productId, (sold.get(it.productId) ?? 0) + it.quantity);
 
   const rows: PricingRow[] = products.map((p) => {
-    const cost = p.cost || 0;
-    const unitProfit = p.price - cost;
-    const margin = p.price > 0 ? (unitProfit / p.price) * 100 : 0;
-    const markup = cost > 0 ? (unitProfit / cost) * 100 : p.price > 0 ? 100 : 0;
+    const price = money(p.price);
+    const cost = money(p.cost);
+    const unitProfit = price - cost;
+    const margin = price > 0 ? (unitProfit / price) * 100 : 0;
+    const markup = cost > 0 ? (unitProfit / cost) * 100 : price > 0 ? 100 : 0;
     const soldQty = sold.get(p.id) ?? 0;
 
     let level: MarginLevel = "ok";
@@ -63,7 +65,7 @@ export async function getPricingAnalysis(
     return {
       id: p.id,
       name: p.name,
-      price: p.price,
+      price,
       cost,
       margin: round2(margin),
       markup: round2(markup),

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireOrgAccess } from "@/lib/auth";
 import { formatChave } from "@/lib/endurance/fiscal";
 import { PAY_LABEL } from "@/lib/endurance/fiscal-service";
+import { money } from "@/lib/endurance/money";
 import DanfeActions from "./danfe-actions";
 
 const brl = (n: number) =>
@@ -90,12 +91,12 @@ export default async function DanfePage({
                 <td className="py-0.5 pr-2">
                   {it.name}
                   <span className="block text-[10px] text-slate-400">
-                    {brl(it.unitPrice)} un.
+                    {brl(money(it.unitPrice))} un.
                   </span>
                 </td>
                 <td className="py-0.5 text-center">{it.quantity}</td>
                 <td className="py-0.5 text-right">
-                  {brl(it.unitPrice * it.quantity)}
+                  {brl(money(it.unitPrice) * it.quantity)}
                 </td>
               </tr>
             ))}
@@ -105,13 +106,13 @@ export default async function DanfePage({
         <div className="my-3 border-t border-dashed border-slate-300" />
 
         <div className="space-y-0.5">
-          <Row label="Subtotal" value={brl(sale.subtotal)} />
-          {sale.discount > 0 && (
-            <Row label="Desconto" value={`- ${brl(sale.discount)}`} />
+          <Row label="Subtotal" value={brl(money(sale.subtotal))} />
+          {money(sale.discount) > 0 && (
+            <Row label="Desconto" value={`- ${brl(money(sale.discount))}`} />
           )}
           <div className="flex justify-between pt-1 text-sm font-bold">
             <span>TOTAL</span>
-            <span>{brl(sale.total)}</span>
+            <span>{brl(money(sale.total))}</span>
           </div>
         </div>
 
@@ -122,7 +123,7 @@ export default async function DanfePage({
             <Row
               key={p.id}
               label={PAY_LABEL[p.method] ?? p.method}
-              value={brl(p.amount)}
+              value={brl(money(p.amount))}
             />
           ))}
         </div>

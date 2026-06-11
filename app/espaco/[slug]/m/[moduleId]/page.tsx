@@ -31,6 +31,7 @@ import { getSession } from "@/lib/auth";
 import { getWorkspace } from "@/lib/endurance/workspace";
 import { canAccessModule, type AccessRole } from "@/lib/endurance/catalog";
 import { modulePermission } from "@/lib/endurance/permissions";
+import { money } from "@/lib/endurance/money";
 import { sessionHasPermission } from "@/lib/auth";
 import { getSalesSummary } from "@/lib/endurance/sales-analytics";
 import {
@@ -635,7 +636,7 @@ export default async function ModulePage({
       name: p.name,
       barcode: p.barcode,
       category: p.category,
-      price: p.price,
+      price: money(p.price),
       stock: p.stock,
     }));
 
@@ -702,7 +703,7 @@ export default async function ModulePage({
     const products = rows.map((p) => ({
       id: p.id,
       name: p.name,
-      price: p.price,
+      price: money(p.price),
       category: p.category,
       barcode: p.barcode,
       stock: p.stock,

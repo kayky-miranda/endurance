@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { getReplenishment } from "./replenishment";
+import { money } from "./money";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -91,7 +92,7 @@ export async function getPurchasingOverview(
     code: `#${o.id.slice(-6).toUpperCase()}`,
     supplier: o.supplier.name,
     status: o.status as OrderRow["status"],
-    total: o.total,
+    total: money(o.total),
     itemsCount: o.items.length,
     createdAt: o.createdAt.toLocaleDateString("pt-BR", {
       day: "2-digit",
@@ -113,14 +114,14 @@ export async function getPurchasingOverview(
     items: o.items.map((it) => ({
       name: it.name,
       quantity: it.quantity,
-      unitCost: it.unitCost,
+      unitCost: money(it.unitCost),
     })),
   }));
 
   const pedidosAbertos = orders.filter((o) => o.status === "enviado");
   const recebidoMes = orders
     .filter((o) => o.status === "recebido" && o.receivedAt && o.receivedAt >= startMonth)
-    .reduce((a, o) => a + o.total, 0);
+    .reduce((a, o) => a + money(o.total), 0);
 
   return {
     suppliers: suppliers.map((s) => ({
@@ -135,7 +136,7 @@ export async function getPurchasingOverview(
     products: products.map((p) => ({
       id: p.id,
       name: p.name,
-      cost: p.cost,
+      cost: money(p.cost),
       stock: p.stock,
     })),
     suggestion: replen.items.map((i) => ({
@@ -147,7 +148,9 @@ export async function getPurchasingOverview(
     kpis: {
       fornecedores: suppliers.length,
       pedidosAbertos: pedidosAbertos.length,
-      valorAberto: round2(pedidosAbertos.reduce((a, o) => a + o.total, 0)),
+      valorAberto: round2(
+        pedidosAbertos.reduce((a, o) => a + money(o.total), 0),
+      ),
       recebidoMes: round2(recebidoMes),
     },
   };
@@ -179,7 +182,7 @@ export async function getPurchaseOrderDetail(
     id: o.id,
     code: `#${o.id.slice(-6).toUpperCase()}`,
     status: o.status,
-    total: o.total,
+    total: money(o.total),
     note: o.note,
     createdAt: o.createdAt.toLocaleString("pt-BR", {
       day: "2-digit",
@@ -211,7 +214,7 @@ export async function getPurchaseOrderDetail(
     items: o.items.map((it) => ({
       name: it.name,
       quantity: it.quantity,
-      unitCost: it.unitCost,
+      unitCost: money(it.unitCost),
     })),
   };
 }

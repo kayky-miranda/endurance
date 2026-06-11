@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { money } from "./money";
 import {
   buildAccessKey,
   buildQrCode,
@@ -147,13 +148,16 @@ export async function emitNfce(org: string, saleId: string): Promise<EmitResult>
     itens: sale.items.map((it) => ({
       nome: it.name,
       quantidade: it.quantity,
-      valorUnit: it.unitPrice,
+      valorUnit: money(it.unitPrice),
       codigo: it.productId ?? "",
     })),
-    subtotal: sale.subtotal,
-    desconto: sale.discount,
-    total: sale.total,
-    pagamentos: sale.payments.map((p) => ({ metodo: p.method, valor: p.amount })),
+    subtotal: money(sale.subtotal),
+    desconto: money(sale.discount),
+    total: money(sale.total),
+    pagamentos: sale.payments.map((p) => ({
+      metodo: p.method,
+      valor: money(p.amount),
+    })),
   });
   const protocolo = buildProtocolo(cfg.uf, emissao);
 
@@ -258,7 +262,7 @@ export async function getNfceOverview(org: string): Promise<NfceOverview> {
       numero: d?.numero ?? null,
       status,
       chave: d?.chave ?? null,
-      total: s.total,
+      total: money(s.total),
       cliente: s.customer?.name ?? "Consumidor não identificado",
       quando: s.createdAt.toLocaleString("pt-BR", {
         day: "2-digit",
@@ -282,7 +286,7 @@ export async function getNfceOverview(org: string): Promise<NfceOverview> {
   const mes = docs.filter((d) => d.dataEmissao >= startMonth);
   const kpis = {
     autorizadasMes: mes.length,
-    valorMes: mes.reduce((a, d) => a + d.valorTotal, 0),
+    valorMes: mes.reduce((a, d) => a + money(d.valorTotal), 0),
     emitidasHoje: docs.filter((d) => d.dataEmissao >= startDay).length,
     pendentes: rows.filter((r) => r.status === "pendente").length,
   };

@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { money } from "./money";
 import {
   buildAccessKey,
   buildQrCode,
@@ -95,13 +96,16 @@ export async function emitNfe(org: string, saleId: string): Promise<EmitNfeResul
     itens: sale.items.map((it) => ({
       nome: it.name,
       quantidade: it.quantity,
-      valorUnit: it.unitPrice,
+      valorUnit: money(it.unitPrice),
       codigo: it.productId ?? "",
     })),
-    subtotal: sale.subtotal,
-    desconto: sale.discount,
-    total: sale.total,
-    pagamentos: sale.payments.map((p) => ({ metodo: p.method, valor: p.amount })),
+    subtotal: money(sale.subtotal),
+    desconto: money(sale.discount),
+    total: money(sale.total),
+    pagamentos: sale.payments.map((p) => ({
+      metodo: p.method,
+      valor: money(p.amount),
+    })),
   }).replace("<mod>65</mod>", "<mod>55</mod>");
   const protocolo = buildProtocolo(cfg.uf, emissao);
 
@@ -200,7 +204,7 @@ export async function getNfeOverview(org: string): Promise<NfeOverview> {
         numero: d?.modelo === "55" ? d.numero : null,
         status,
         chave: d?.modelo === "55" ? d.chave : null,
-        total: s.total,
+        total: money(s.total),
         cliente: s.customer?.name ?? "—",
         documento: s.customer?.document ?? "",
         quando: s.createdAt.toLocaleString("pt-BR", {
@@ -230,7 +234,7 @@ export async function getNfeOverview(org: string): Promise<NfeOverview> {
     rows,
     kpis: {
       autorizadasMes: mes.length,
-      valorMes: mes.reduce((a, d) => a + d.valorTotal, 0),
+      valorMes: mes.reduce((a, d) => a + money(d.valorTotal), 0),
       emitidasHoje: docs.filter((d) => d.dataEmissao >= startDay).length,
       pendentes: rows.filter((r) => r.status === "pendente").length,
     },

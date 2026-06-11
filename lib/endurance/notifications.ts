@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { money } from "./money";
 import { getStockAlerts } from "./stock-alerts";
 import { getCustomerInsights } from "./crm";
 
@@ -71,7 +72,7 @@ export async function getNotifications(org: string): Promise<NotificationsData> 
       type: "financeiro",
       severity: atrasada ? "danger" : "warn",
       title: `${e.kind === "pagar" ? "Conta a pagar" : "Recebível"} ${atrasada ? "vencido" : "vence hoje"}`,
-      message: `${e.description} · ${brl(e.amount)} · vencimento ${venc}.`,
+      message: `${e.description} · ${brl(money(e.amount))} · vencimento ${venc}.`,
     });
   }
 

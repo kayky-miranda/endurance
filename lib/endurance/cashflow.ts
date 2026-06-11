@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { money } from "./money";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -70,13 +71,14 @@ export async function getCashflow(
   let totalSaidas = 0;
   for (const e of paid) {
     if (!e.paidAt) continue;
-    if (e.kind === "receber") totalEntradas += e.amount;
-    else totalSaidas += e.amount;
+    const amount = money(e.amount);
+    if (e.kind === "receber") totalEntradas += amount;
+    else totalSaidas += amount;
     const key = e.paidAt.toISOString().slice(0, 10);
     const slot = byDay.get(key);
     if (slot) {
-      if (e.kind === "receber") slot.entradas += e.amount;
-      else slot.saidas += e.amount;
+      if (e.kind === "receber") slot.entradas += amount;
+      else slot.saidas += amount;
     }
   }
   // Aplica os acumulados diários à série ordenada.
@@ -97,12 +99,12 @@ export async function getCashflow(
     where: { organizationId: org },
     select: { id: true, cost: true },
   });
-  const costById = new Map(products.map((p) => [p.id, p.cost]));
+  const costById = new Map(products.map((p) => [p.id, money(p.cost)]));
 
   let receita = 0;
   let cmv = 0;
   for (const s of sales) {
-    receita += s.total;
+    receita += money(s.total);
     for (const it of s.items) {
       const c = it.productId ? (costById.get(it.productId) ?? 0) : 0;
       cmv += c * it.quantity;
@@ -118,7 +120,7 @@ export async function getCashflow(
     where: { organizationId: org, kind: "pagar", dueDate: { gte: start, lte: now } },
     select: { amount: true },
   });
-  const despesas = round2(payables.reduce((a, p) => a + p.amount, 0));
+  const despesas = round2(payables.reduce((a, p) => a + money(p.amount), 0));
   const resultado = round2(lucroBruto - despesas);
 
   return {

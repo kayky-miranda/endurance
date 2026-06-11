@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { money } from "./money";
 
 export interface ParsedInvoice {
   chave: string;
@@ -177,7 +178,7 @@ export async function getImportedInvoices(
     modelo: r.modelo,
     numero: r.numero,
     emitNome: r.emitNome || "—",
-    total: r.total,
+    total: money(r.total),
     itemsCount: r.itemsCount,
     dhEmi: r.dhEmi.toLocaleDateString("pt-BR", {
       day: "2-digit",
