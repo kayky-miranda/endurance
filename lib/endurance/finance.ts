@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -29,9 +30,11 @@ export interface SaleReceivableInput {
 /**
  * Gera os recebíveis de uma venda. Dinheiro/Pix/Débito entram como já recebidos;
  * Crédito vira conta a receber com vencimento em 30 dias (compensação do cartão).
+ * Aceita um client de transação para rodar atomicamente com a venda.
  */
 export async function createReceivablesForSale(
   i: SaleReceivableInput,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<void> {
   const data = i.payments
     .filter((p) => p.amount > 0)
@@ -53,7 +56,7 @@ export async function createReceivablesForSale(
         paidAt: settled ? i.when : null,
       };
     });
-  if (data.length > 0) await prisma.financialEntry.createMany({ data });
+  if (data.length > 0) await db.financialEntry.createMany({ data });
 }
 
 export interface FinanceRow {

@@ -289,6 +289,7 @@ model Sale {
   subtotal       Float    @default(0)
   discount       Float    @default(0)
   total          Float
+  change         Float    @default(0) // troco devolvido em dinheiro
   itemsCount     Int
   createdAt      DateTime @default(now())
 

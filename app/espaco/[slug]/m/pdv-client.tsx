@@ -292,7 +292,7 @@ export default function PdvClient({
         setLastSale(
           `Venda finalizada — ${brl(res.total)}${
             customer ? ` · ${customer.name}` : ""
-          }${troco > 0 ? ` · troco ${brl(troco)}` : ""}.`,
+          }${res.change > 0 ? ` · troco ${brl(res.change)}` : ""}.`,
         );
         setLastSaleId(res.saleId);
         setActive(false);

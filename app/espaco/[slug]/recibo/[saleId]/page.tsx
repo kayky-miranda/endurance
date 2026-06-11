@@ -33,8 +33,13 @@ export default async function ReciboPage({
   });
   if (!sale || sale.organizationId !== session.org) notFound();
 
+  // Vendas novas guardam o troco em sale.change e os pagamentos líquidos (o
+  // dinheiro entregue é líquido + troco). Vendas antigas guardavam o valor
+  // entregue cheio — o troco é derivado de paid - total nesse caso.
   const paid = sale.payments.reduce((a, p) => a + p.amount, 0);
-  const troco = Math.max(0, paid - sale.total);
+  const troco = sale.change > 0 ? sale.change : Math.max(0, paid - sale.total);
+  const cashTendedExtra = sale.change > 0 ? sale.change : 0;
+  const firstCashId = sale.payments.find((p) => p.method === "dinheiro")?.id;
   const when = sale.createdAt.toLocaleString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
@@ -121,9 +126,12 @@ export default async function ReciboPage({
             <Row
               key={p.id}
               label={PAY_LABEL[p.method] ?? p.method}
-              value={brl(p.amount)}
+              value={brl(p.amount + (p.id === firstCashId ? cashTendedExtra : 0))}
             />
           ))}
+          {cashTendedExtra > 0 && !firstCashId && (
+            <Row label="Dinheiro" value={brl(cashTendedExtra)} />
+          )}
           {troco > 0 && <Row label="Troco" value={brl(troco)} />}
         </div>
 

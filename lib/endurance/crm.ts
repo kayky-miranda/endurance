@@ -7,6 +7,8 @@ export interface CustomerRow {
   id: string;
   name: string;
   phone: string;
+  email: string;
+  document: string;
   orders: number;
   totalSpent: number;
   avgTicket: number;
@@ -92,6 +94,8 @@ export async function getCustomerInsights(orgId: string): Promise<CrmInsights> {
       id: c.id,
       name: c.name,
       phone: c.phone,
+      email: c.email,
+      document: c.document,
       orders,
       totalSpent: total,
       avgTicket,

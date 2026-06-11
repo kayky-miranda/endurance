@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import {
-  getSession,
-  canManageTeamSession,
+  requirePermission,
   hashPassword,
   type SessionPayload,
 } from "@/lib/auth";
@@ -18,11 +17,6 @@ import {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type R = { ok: true } | { ok: false; error: string };
-
-const DENIED: R = {
-  ok: false,
-  error: "Você não tem permissão para gerenciar usuários.",
-};
 
 /** Grava uma entrada na trilha de auditoria. Best-effort (não quebra a ação). */
 async function logActivity(
@@ -78,9 +72,9 @@ export interface CreateUserInput {
 }
 
 export async function createUserAction(input: CreateUserInput): Promise<R> {
-  const session = await getSession();
-  if (!session) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeamSession(session)) return DENIED;
+  const gate = await requirePermission("team.manage");
+  if (!gate.ok) return gate;
+  const session = gate.session;
 
   const name = (input.name ?? "").trim();
   const email = (input.email ?? "").trim().toLowerCase();
@@ -136,9 +130,9 @@ export interface UpdateUserInput {
 }
 
 export async function updateUserAction(input: UpdateUserInput): Promise<R> {
-  const session = await getSession();
-  if (!session) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeamSession(session)) return DENIED;
+  const gate = await requirePermission("team.manage");
+  if (!gate.ok) return gate;
+  const session = gate.session;
 
   const target = await loadTarget(session, input.userId);
   if (!target) return { ok: false, error: "Usuário não encontrado." };
@@ -174,9 +168,9 @@ export async function setUserStatusAction(
   userId: string,
   status: "active" | "blocked",
 ): Promise<R> {
-  const session = await getSession();
-  if (!session) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeamSession(session)) return DENIED;
+  const gate = await requirePermission("team.manage");
+  if (!gate.ok) return gate;
+  const session = gate.session;
   if (userId === session.sub)
     return { ok: false, error: "Você não pode bloquear a si mesmo." };
 
@@ -205,9 +199,9 @@ export async function resetPasswordAction(
   userId: string,
   newPassword: string,
 ): Promise<R> {
-  const session = await getSession();
-  if (!session) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeamSession(session)) return DENIED;
+  const gate = await requirePermission("team.manage");
+  if (!gate.ok) return gate;
+  const session = gate.session;
 
   const password = newPassword ?? "";
   if (password.length < 6)
@@ -236,9 +230,9 @@ export async function resetPasswordAction(
 }
 
 export async function removeUserAction(userId: string): Promise<R> {
-  const session = await getSession();
-  if (!session) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeamSession(session)) return DENIED;
+  const gate = await requirePermission("team.manage");
+  if (!gate.ok) return gate;
+  const session = gate.session;
   if (userId === session.sub)
     return { ok: false, error: "Você não pode remover a si mesmo." };
 

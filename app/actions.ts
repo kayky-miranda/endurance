@@ -6,14 +6,14 @@ import { prisma } from "@/lib/db";
 import {
   createSession,
   destroySession,
-  getSession,
   hashPassword,
   verifyPassword,
-  canManageTeam,
+  requirePermission,
   type Role,
 } from "@/lib/auth";
 import { createWorkspace, EmailTakenError } from "@/lib/endurance/workspace";
 import { allPermissionIds } from "@/lib/endurance/permissions";
+import { hit, peek, record, clientIp } from "@/lib/rate-limit";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -35,6 +35,14 @@ export interface SignupInput {
 
 /** Cria o espaço + o usuário dono e já abre a sessão. */
 export async function signupAction(input: SignupInput): Promise<AuthResult> {
+  // Rate limit por IP: cadastro é caro (cria org + usuário) e alvo de bots.
+  const rl = hit(`signup:${await clientIp()}`, 5, 10 * 60_000);
+  if (!rl.ok)
+    return {
+      ok: false,
+      error: "Muitas tentativas de cadastro. Tente novamente em alguns minutos.",
+    };
+
   const ownerName = (input.ownerName ?? "").trim();
   const email = (input.email ?? "").trim().toLowerCase();
   const password = input.password ?? "";
@@ -83,12 +91,29 @@ export async function loginAction(
   if (!email || !password)
     return { ok: false, error: "Informe e-mail e senha." };
 
+  // Rate limit: por IP (rajada geral) e por e-mail (força bruta de senha —
+  // conta só tentativas FALHAS, então errar pouco não bloqueia ninguém).
+  if (!hit(`login:ip:${await clientIp()}`, 20, 60_000).ok)
+    return { ok: false, error: "Muitas tentativas. Aguarde um instante." };
+  const failKey = `login:fail:${email}`;
+  const lock = peek(failKey, 5);
+  if (!lock.ok)
+    return {
+      ok: false,
+      error: `Muitas tentativas para este e-mail. Aguarde ${Math.max(
+        1,
+        Math.ceil(lock.retryAfterSec / 60),
+      )} min.`,
+    };
+
   const user = await prisma.user.findUnique({
     where: { email },
     include: { organization: true },
   });
-  if (!user || !(await verifyPassword(password, user.passwordHash)))
+  if (!user || !(await verifyPassword(password, user.passwordHash))) {
+    record(failKey, 15 * 60_000);
     return { ok: false, error: "E-mail ou senha inválidos." };
+  }
 
   if (user.status === "blocked")
     return {
@@ -131,10 +156,9 @@ export interface AddMemberInput {
 export async function addMemberAction(
   input: AddMemberInput,
 ): Promise<SimpleResult> {
-  const session = await getSession();
-  if (!session) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeam(session.role))
-    return { ok: false, error: "Você não tem permissão para isso." };
+  const gate = await requirePermission("team.manage");
+  if (!gate.ok) return gate;
+  const session = gate.session;
 
   const name = (input.name ?? "").trim();
   const email = (input.email ?? "").trim().toLowerCase();
@@ -159,10 +183,9 @@ export async function addMemberAction(
 }
 
 export async function removeMemberAction(userId: string): Promise<SimpleResult> {
-  const session = await getSession();
-  if (!session) return { ok: false, error: "Sessão expirada." };
-  if (!canManageTeam(session.role))
-    return { ok: false, error: "Você não tem permissão para isso." };
+  const gate = await requirePermission("team.manage");
+  if (!gate.ok) return gate;
+  const session = gate.session;
   if (userId === session.sub)
     return { ok: false, error: "Você não pode remover a si mesmo." };
 

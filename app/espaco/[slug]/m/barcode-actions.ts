@@ -2,17 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { getSession, sessionHasPermission } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { internalEan13 } from "@/lib/endurance/barcode";
 
 type R = { ok: true; barcode: string } | { ok: false; error: string };
 
 /** Garante que o produto é do espaço e que o usuário pode gerenciar produtos. */
 async function guard(productId: string) {
-  const s = await getSession();
-  if (!s) return { ok: false as const, error: "Sessão expirada." };
-  if (!sessionHasPermission(s, "products.manage"))
-    return { ok: false as const, error: "Sem permissão para gerenciar produtos." };
+  const gate = await requirePermission("products.manage");
+  if (!gate.ok) return { ok: false as const, error: gate.error };
+  const s = gate.session;
   const p = await prisma.product.findUnique({ where: { id: productId } });
   if (!p || p.organizationId !== s.org)
     return { ok: false as const, error: "Produto não encontrado." };

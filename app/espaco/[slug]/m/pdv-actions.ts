@@ -8,7 +8,7 @@ import { getOpenSession } from "@/lib/endurance/cash";
 import { createReceivablesForSale } from "@/lib/endurance/finance";
 
 type Result =
-  | { ok: true; total: number; saleId: string }
+  | { ok: true; total: number; saleId: string; change: number }
   | { ok: false; error: string };
 
 export interface CartItem {
@@ -32,6 +32,13 @@ export interface FinalizeInput {
 const VALID_METHODS = ["dinheiro", "credito", "debito", "pix"];
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/** Aborta a transação quando o decremento condicional não encontra saldo. */
+class InsufficientStockError extends Error {
+  constructor(public productName: string) {
+    super(`Estoque insuficiente de "${productName}".`);
+  }
+}
+
 /**
  * Fecha a venda do PDV: valida estoque, aplica desconto, registra formas de
  * pagamento (split), baixa o saldo de cada produto e registra a venda — tudo
@@ -48,7 +55,12 @@ export async function finalizeSaleAction(
   if (!token) return { ok: false, error: "Token de venda ausente." };
   const existing = await prisma.sale.findUnique({ where: { token } });
   if (existing)
-    return { ok: true, total: existing.total, saleId: existing.id };
+    return {
+      ok: true,
+      total: existing.total,
+      saleId: existing.id,
+      change: existing.change,
+    };
 
   // Cliente (só se existir e for do mesmo espaço).
   let saleCustomerId: string | null = null;
@@ -99,19 +111,56 @@ export async function finalizeSaleAction(
       return { ok: false, error: "Pagamento insuficiente para o total." };
   }
 
+  // Troco: o excedente pago volta em dinheiro, então precisa estar coberto pelo
+  // que entrou em dinheiro (cartão/pix não geram troco). Os pagamentos são
+  // persistidos pelo valor LÍQUIDO — o que fica na gaveta — e o troco é
+  // registrado na venda, mantendo gaveta, recebíveis e fiscal consistentes.
+  const paidTotal = round2(payments.reduce((a, p) => a + p.amount, 0));
+  const change = round2(Math.max(0, paidTotal - total));
+  if (change > 0) {
+    const cashPaid = round2(
+      payments
+        .filter((p) => p.method === "dinheiro")
+        .reduce((a, p) => a + p.amount, 0),
+    );
+    if (cashPaid + 0.01 < change)
+      return {
+        ok: false,
+        error: "Troco maior que o recebido em dinheiro — ajuste os valores.",
+      };
+    let toDeduct = change;
+    payments = payments
+      .map((p) => {
+        if (p.method !== "dinheiro" || toDeduct <= 0) return p;
+        const d = Math.min(p.amount, toDeduct);
+        toDeduct = round2(toDeduct - d);
+        return { ...p, amount: round2(p.amount - d) };
+      })
+      .filter((p) => p.amount > 0);
+  }
+
   // Vincula a venda ao caixa aberto DO OPERADOR (multi-caixa por operador).
   const openSession = await getOpenSession(s.org, s.sub);
 
   let saleId = "";
   try {
-    const results = await prisma.$transaction([
-      ...clean.map((it) =>
-        prisma.product.update({
-          where: { id: it.productId },
+    saleId = await prisma.$transaction(async (tx) => {
+      // Baixa condicional: só decrementa se ainda houver saldo (stock >= qty).
+      // É o guard definitivo contra corrida — a checagem acima é só fast-fail.
+      for (const it of clean) {
+        const updated = await tx.product.updateMany({
+          where: {
+            id: it.productId,
+            organizationId: s.org,
+            stock: { gte: it.qty },
+          },
           data: { stock: { decrement: it.qty } },
-        }),
-      ),
-      prisma.sale.create({
+        });
+        if (updated.count === 0)
+          throw new InsufficientStockError(byId.get(it.productId)!.name);
+      }
+
+      const sale = await tx.sale.create({
         data: {
           organizationId: s.org,
           customerId: saleCustomerId,
@@ -121,6 +170,7 @@ export async function finalizeSaleAction(
           subtotal,
           discount,
           total,
+          change,
           itemsCount,
           items: {
             create: clean.map((it) => {
@@ -135,25 +185,33 @@ export async function finalizeSaleAction(
           },
           payments: { create: payments },
         },
-      }),
-    ]);
-    saleId = (results[results.length - 1] as { id: string }).id;
+      });
+
+      // Recebíveis na MESMA transação: venda sem lançamento financeiro (ou
+      // vice-versa) nunca persiste.
+      await createReceivablesForSale(
+        {
+          organizationId: s.org,
+          saleId: sale.id,
+          saleCode: `#${sale.id.slice(-6).toUpperCase()}`,
+          when: new Date(),
+          payments,
+        },
+        tx,
+      );
+
+      return sale.id;
+    });
   } catch (e) {
+    if (e instanceof InsufficientStockError)
+      return { ok: false, error: e.message };
     if ((e as { code?: string }).code === "P2002") {
       const dup = await prisma.sale.findUnique({ where: { token } });
-      if (dup) return { ok: true, total: dup.total, saleId: dup.id };
+      if (dup)
+        return { ok: true, total: dup.total, saleId: dup.id, change: dup.change };
     }
     throw e;
   }
-
-  // Gera os recebíveis financeiros da venda (cartão vira conta a receber).
-  await createReceivablesForSale({
-    organizationId: s.org,
-    saleId,
-    saleCode: `#${saleId.slice(-6).toUpperCase()}`,
-    when: new Date(),
-    payments,
-  });
 
   revalidatePath(`/espaco/${s.slug}/m/pdv`);
   revalidatePath(`/espaco/${s.slug}/m/produtos`);
@@ -161,7 +219,7 @@ export async function finalizeSaleAction(
   revalidatePath(`/espaco/${s.slug}/m/caixa`);
   revalidatePath(`/espaco/${s.slug}/m/financeiro`);
   revalidatePath(`/espaco/${s.slug}`);
-  return { ok: true, total, saleId };
+  return { ok: true, total, saleId, change };
 }
 
 export interface CustomerInput {

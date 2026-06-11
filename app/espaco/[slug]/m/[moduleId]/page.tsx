@@ -41,7 +41,8 @@ import ProductsClient, { type Product } from "../products-client";
 import PdvClient from "../pdv-client";
 import InsightsPanel from "../insights-panel";
 import StockAdvicePanel from "../stock-advice-panel";
-import { getCustomerInsights, type CustomerRow } from "@/lib/endurance/crm";
+import { getCustomerInsights } from "@/lib/endurance/crm";
+import CrmCustomersTable from "../crm-client";
 import CampaignsPanel from "../campaigns-panel";
 import { getPricingAnalysis, type PricingRow } from "@/lib/endurance/pricing";
 import PricingAdvicePanel from "../pricing-advice-panel";
@@ -344,7 +345,7 @@ export default async function ModulePage({
               />
             )}
 
-            <CustomerTable rows={ci.customers} />
+            <CrmCustomersTable rows={ci.customers} />
           </>
         )}
       </div>
@@ -868,89 +869,6 @@ function MarginTable({ rows }: { rows: PricingRow[] }) {
                   </td>
                   <td className="px-5 py-3 text-slate-600 dark:text-slate-300">
                     {brl(r.profit)}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${st.cls}`}
-                    >
-                      {st.label}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-const SEGMENT_STYLE: Record<string, { label: string; cls: string }> = {
-  novo: {
-    label: "Novo",
-    cls: "bg-slate-400/15 text-slate-500 dark:text-slate-400",
-  },
-  ativo: {
-    label: "Ativo",
-    cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-  },
-  em_risco: {
-    label: "Em risco",
-    cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-  },
-  inativo: {
-    label: "Inativo",
-    cls: "bg-red-500/15 text-red-600 dark:text-red-400",
-  },
-};
-
-function CustomerTable({ rows }: { rows: CustomerRow[] }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-ink-700 dark:bg-ink-900">
-      <p className="px-5 py-3 text-sm font-semibold text-slate-800 dark:text-slate-100">
-        Clientes ({rows.length})
-      </p>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-y border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400 dark:border-ink-800">
-              <th className="px-5 py-2.5 font-medium">Cliente</th>
-              <th className="px-5 py-2.5 font-medium">Compras</th>
-              <th className="px-5 py-2.5 font-medium">Total gasto</th>
-              <th className="px-5 py-2.5 font-medium">Última compra</th>
-              <th className="px-5 py-2.5 font-medium">Segmento</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((c) => {
-              const st = SEGMENT_STYLE[c.segment] ?? SEGMENT_STYLE.novo;
-              return (
-                <tr
-                  key={c.id}
-                  className="border-b border-slate-100 last:border-0 dark:border-ink-800"
-                >
-                  <td className="px-5 py-3">
-                    <p className="font-medium text-slate-700 dark:text-slate-200">
-                      {c.name}
-                      {c.dueRepurchase && (
-                        <span className="ml-2 rounded-full bg-brand-500/15 px-2 py-0.5 text-[10px] font-medium text-brand-600 dark:text-brand-300">
-                          recompra
-                        </span>
-                      )}
-                    </p>
-                    {c.phone && (
-                      <p className="text-xs text-slate-400">{c.phone}</p>
-                    )}
-                  </td>
-                  <td className="px-5 py-3 text-slate-600 dark:text-slate-300">
-                    {c.orders}
-                  </td>
-                  <td className="px-5 py-3 text-slate-700 dark:text-slate-200">
-                    {brl(c.totalSpent)}
-                  </td>
-                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">
-                    {c.lastDays === null ? "—" : `há ${c.lastDays} dias`}
                   </td>
                   <td className="px-5 py-3">
                     <span
