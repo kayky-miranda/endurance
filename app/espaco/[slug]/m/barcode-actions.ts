@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
 import { internalEan13 } from "@/lib/endurance/barcode";
+import { logActivity } from "@/lib/endurance/activity-log";
 
 type R = { ok: true; barcode: string } | { ok: false; error: string };
 
@@ -42,6 +43,12 @@ export async function generateBarcodeAction(productId: string): Promise<R> {
 
   await prisma.product.update({ where: { id: g.p.id }, data: { barcode } });
   revalidatePath(`/espaco/${g.s.slug}/m/codigo_barras`);
+  await logActivity(
+    g.s,
+    "barcode.generate",
+    `Gerou código de barras ${barcode} para ${g.p.name}`,
+    g.p.id,
+  );
   return { ok: true, barcode };
 }
 
@@ -63,5 +70,11 @@ export async function setBarcodeAction(
 
   await prisma.product.update({ where: { id: g.p.id }, data: { barcode } });
   revalidatePath(`/espaco/${g.s.slug}/m/codigo_barras`);
+  await logActivity(
+    g.s,
+    "barcode.set",
+    `Definiu código de barras ${barcode} para ${g.p.name}`,
+    g.p.id,
+  );
   return { ok: true, barcode };
 }

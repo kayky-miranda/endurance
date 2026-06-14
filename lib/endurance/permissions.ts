@@ -269,15 +269,17 @@ export function effectivePermissions(
 }
 
 // ---------------------------------------------------------------------------
-// Mapa módulo → permissão exigida para navegar. Módulos ausentes do mapa são
-// liberados a quem já tem acesso ao módulo pelo papel. Ponto de extensão para
-// novos módulos: basta adicionar a linha aqui.
+// Mapa módulo → permissão exigida para navegar. É a fonte da verdade única do
+// gating de módulos (substituiu o antigo ADMIN_MODULES por papel). Módulos
+// ausentes do mapa são liberados a qualquer usuário autenticado do espaço.
+// Ponto de extensão para novos módulos: basta adicionar a linha aqui.
 // ---------------------------------------------------------------------------
 export const MODULE_PERMISSION: Record<string, PermissionId> = {
   relatorios: "finance.reports",
   financeiro: "finance.reports",
   produtos: "products.manage",
   precificacao: "products.manage",
+  codigo_barras: "products.manage",
   estoque: "stock.manage",
   caixa: "pdv.sell",
   pdv: "pdv.sell",
@@ -286,9 +288,28 @@ export const MODULE_PERMISSION: Record<string, PermissionId> = {
   nfce: "fiscal.manage",
   nfe: "fiscal.manage",
   acesso: "team.manage",
+  notificacoes: "integrations.config",
   importacao: "settings.general",
+  // Nichos academia/salão: cobrança e comissões são financeiro; planos é
+  // catálogo de preços (mesma permissão da precificação).
+  mensalidades: "finance.reports",
+  comissoes: "finance.reports",
+  planos: "products.manage",
 };
 
 export function modulePermission(moduleId: string): PermissionId | null {
   return MODULE_PERMISSION[moduleId] ?? null;
+}
+
+/**
+ * Acesso a um módulo = ter a permissão que ele exige (módulos sem permissão
+ * mapeada são livres). Verificação única usada pela navegação e pelas páginas.
+ */
+export function canAccessModule(
+  role: string,
+  permissions: string[] | undefined,
+  moduleId: string,
+): boolean {
+  const required = modulePermission(moduleId);
+  return required ? hasPermission(role, permissions, required) : true;
 }

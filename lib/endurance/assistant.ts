@@ -4,12 +4,14 @@ import {
   Type,
   type Content,
   type Part,
+  type FunctionCall,
   type FunctionDeclaration,
 } from "@google/genai";
 import { prisma } from "@/lib/db";
 import { money } from "./money";
 import { getStockAlerts } from "./stock-alerts";
 import { getFinanceOverview } from "./finance";
+import { recordAiUsage } from "./ai-telemetry";
 
 const GEMINI_MODELS = process.env.GEMINI_MODEL
   ? [process.env.GEMINI_MODEL]
@@ -58,9 +60,21 @@ export type Widget =
     }
   | { type: "bars"; title: string; bars: { label: string; value: number; display: string }[] };
 
-type Result =
-  | { ok: true; reply: string; widgets: Widget[] }
-  | { ok: false; error: string };
+/**
+ * Eventos do assistente em streaming (NDJSON na rota /api/assistant):
+ *  - "tool": o agente vai consultar uma ferramenta (a UI mostra o status);
+ *  - "widget": dado estruturado pronto para renderizar;
+ *  - "delta": pedaço do texto da resposta;
+ *  - "reset": descarta o texto parcial (retry ou texto antes de ferramenta);
+ *  - "done" / "error": fim do turno.
+ */
+export type AssistantEvent =
+  | { type: "tool"; name: string }
+  | { type: "widget"; widget: Widget }
+  | { type: "delta"; text: string }
+  | { type: "reset" }
+  | { type: "done" }
+  | { type: "error"; error: string };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const brl = (n: number) =>
@@ -615,17 +629,78 @@ function isNetworkError(e: unknown): boolean {
   );
 }
 
-/** Agente do assistente: function calling do Gemini sobre os dados do negócio. */
-export async function askAssistant(
+/** Resultado agregado de um turno do modelo consumido em streaming. */
+interface Turn {
+  parts: Part[];
+  calls: FunctionCall[];
+  text: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/**
+ * Um turno do modelo via generateContentStream: emite "delta" para cada pedaço
+ * de texto e devolve o agregado (partes, chamadas de função e tokens).
+ */
+async function* streamTurn(
+  ai: GoogleGenAI,
+  model: string,
+  contents: Content[],
+  systemInstruction: string,
+): AsyncGenerator<AssistantEvent, Turn, void> {
+  const stream = await ai.models.generateContentStream({
+    model,
+    contents,
+    config: {
+      systemInstruction,
+      temperature: 0.3,
+      maxOutputTokens: 1200,
+      tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
+    },
+  });
+
+  const parts: Part[] = [];
+  const calls: FunctionCall[] = [];
+  let text = "";
+  let inputTokens = 0;
+  let outputTokens = 0;
+
+  for await (const chunk of stream) {
+    for (const p of chunk.candidates?.[0]?.content?.parts ?? []) {
+      parts.push(p);
+      if (p.functionCall) calls.push(p.functionCall);
+      else if (p.text && !p.thought) {
+        text += p.text;
+        yield { type: "delta", text: p.text };
+      }
+    }
+    // usageMetadata chega no último chunk com os totais do turno.
+    const u = chunk.usageMetadata;
+    if (u) {
+      inputTokens = u.promptTokenCount ?? 0;
+      outputTokens = (u.candidatesTokenCount ?? 0) + (u.thoughtsTokenCount ?? 0);
+    }
+  }
+  return { parts, calls, text, inputTokens, outputTokens };
+}
+
+/**
+ * Agente do assistente em STREAMING: function calling do Gemini sobre os dados
+ * do negócio, emitindo eventos conforme as ferramentas rodam e o texto chega.
+ * Registra a telemetria (tokens/latência/resultado) por organização ao final.
+ */
+export async function* askAssistantStream(
   ctx: AssistantContext,
   messages: ChatMsg[],
-): Promise<Result> {
+): AsyncGenerator<AssistantEvent, void, void> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!apiKey)
-    return {
-      ok: false,
+  if (!apiKey) {
+    yield {
+      type: "error",
       error: "O assistente precisa de uma chave de IA (GEMINI_API_KEY) configurada.",
     };
+    return;
+  }
 
   const contents: Content[] = messages
     .slice(-12)
@@ -634,10 +709,30 @@ export async function askAssistant(
       parts: [{ text: m.content }],
     }));
   while (contents.length && contents[0].role === "model") contents.shift();
-  if (contents.length === 0) return { ok: false, error: "Envie uma pergunta." };
+  if (contents.length === 0) {
+    yield { type: "error", error: "Envie uma pergunta." };
+    return;
+  }
 
-  const widgets: Widget[] = [];
+  let widgetCount = 0;
   let rateLimited = false;
+  const startedAt = Date.now();
+  let usedModel = "";
+  let inputTokens = 0;
+  let outputTokens = 0;
+
+  const telemetry = (ok: boolean, error = "") =>
+    recordAiUsage({
+      organizationId: ctx.orgId,
+      feature: "assistant",
+      provider: "gemini",
+      model: usedModel,
+      inputTokens,
+      outputTokens,
+      latencyMs: Date.now() - startedAt,
+      ok,
+      error,
+    });
 
   try {
     const ai = new GoogleGenAI({ apiKey });
@@ -646,26 +741,16 @@ export async function askAssistant(
       try {
         // Laço de agente: o modelo pode chamar ferramentas várias vezes.
         for (let step = 0; step < 5; step++) {
-          // Re-tenta em erros transitórios de rede/limite (o tier grátis e a
-          // conexão ao Gemini às vezes oscilam).
-          let resp;
-          let lastErr: unknown;
+          // Re-tenta em erros transitórios de rede (o tier grátis e a conexão
+          // ao Gemini às vezes oscilam). Texto parcial já emitido é descartado
+          // no cliente com "reset".
+          let turn: Turn | null = null;
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
-              resp = await ai.models.generateContent({
-                model,
-                contents,
-                config: {
-                  systemInstruction: SYSTEM(ctx),
-                  temperature: 0.3,
-                  maxOutputTokens: 1200,
-                  tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
-                },
-              });
-              lastErr = null;
+              turn = yield* streamTurn(ai, model, contents, SYSTEM(ctx));
               break;
             } catch (e) {
-              lastErr = e;
+              yield { type: "reset" };
               if (isNetworkError(e) && attempt < 2) {
                 await sleep(700 * (attempt + 1));
                 continue;
@@ -673,48 +758,63 @@ export async function askAssistant(
               throw e;
             }
           }
-          if (!resp) throw lastErr;
+          if (!turn) throw new Error("sem resposta do modelo");
+          usedModel = model;
+          inputTokens += turn.inputTokens;
+          outputTokens += turn.outputTokens;
 
-          const calls = resp.functionCalls ?? [];
-          if (calls.length > 0) {
-            // Registra o turno do modelo (com as chamadas de função).
-            const modelContent = resp.candidates?.[0]?.content;
-            if (modelContent) contents.push(modelContent);
+          if (turn.calls.length > 0) {
+            // Texto emitido antes das chamadas não é a resposta final.
+            if (turn.text) yield { type: "reset" };
+            contents.push({ role: "model", parts: turn.parts });
 
             const responseParts: Part[] = [];
-            for (const call of calls) {
-              const fn = TOOLS[call.name ?? ""];
+            for (const call of turn.calls) {
+              const name = call.name ?? "";
+              yield { type: "tool", name };
+              const fn = TOOLS[name];
               let out: ToolOut;
               try {
                 out = fn
                   ? await fn(ctx.orgId, (call.args ?? {}) as Record<string, unknown>)
                   : { data: { erro: "ferramenta desconhecida" } };
               } catch (e) {
-                console.error("[assistant:tool]", call.name, e);
+                console.error("[assistant:tool]", name, e);
                 out = { data: { erro: "falha ao consultar" } };
               }
-              if (out.widget) widgets.push(out.widget);
+              if (out.widget) {
+                widgetCount++;
+                yield { type: "widget", widget: out.widget };
+              }
               responseParts.push({
-                functionResponse: {
-                  name: call.name ?? "",
-                  response: { result: out.data },
-                },
+                functionResponse: { name, response: { result: out.data } },
               });
             }
             contents.push({ role: "user", parts: responseParts });
             continue; // volta ao modelo com os resultados
           }
 
-          // Sem chamadas → resposta final em texto.
-          const reply = (resp.text || "").trim();
-          if (reply) return { ok: true, reply, widgets };
-          // Modelo não respondeu texto mas trouxe widgets → devolve mesmo assim.
-          if (widgets.length > 0)
-            return { ok: true, reply: "Aqui está o que encontrei:", widgets };
+          // Sem chamadas → o texto transmitido é a resposta final.
+          if (turn.text.trim()) {
+            telemetry(true);
+            yield { type: "done" };
+            return;
+          }
+          // Modelo não respondeu texto mas trouxe widgets → fecha mesmo assim.
+          if (widgetCount > 0) {
+            yield { type: "delta", text: "Aqui está o que encontrei:" };
+            telemetry(true);
+            yield { type: "done" };
+            return;
+          }
           break; // resposta vazia deste modelo → sai do laço de passos
         }
-        if (widgets.length > 0)
-          return { ok: true, reply: "Aqui está o que encontrei:", widgets };
+        if (widgetCount > 0) {
+          yield { type: "delta", text: "Aqui está o que encontrei:" };
+          telemetry(true);
+          yield { type: "done" };
+          return;
+        }
         // Resposta vazia: tenta o PRÓXIMO modelo em vez de desistir.
         continue;
       } catch (e) {
@@ -727,18 +827,15 @@ export async function askAssistant(
         throw e;
       }
     }
-    if (rateLimited)
-      return {
-        ok: false,
-        error:
-          "Limite de uso da IA atingido (cota gratuita do Gemini). Aguarde cerca de um minuto e tente de novo — ou configure uma chave com mais cota no .env.",
-      };
-    return {
-      ok: false,
-      error: "Não consegui responder agora. Tente novamente em instantes.",
-    };
+
+    const error = rateLimited
+      ? "Limite de uso da IA atingido (cota gratuita do Gemini). Aguarde cerca de um minuto e tente de novo — ou configure uma chave com mais cota no .env."
+      : "Não consegui responder agora. Tente novamente em instantes.";
+    telemetry(false, error);
+    yield { type: "error", error };
   } catch (err) {
     console.error("[assistant] erro:", err);
-    return { ok: false, error: "Falha ao falar com a IA." };
+    telemetry(false, String((err as Error)?.message ?? err));
+    yield { type: "error", error: "Falha ao falar com a IA." };
   }
 }

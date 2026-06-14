@@ -93,6 +93,7 @@ export default function Shell({
   modules,
   userName,
   canManage,
+  canManageBilling = false,
   canViewDashboard = true,
   children,
 }: {
@@ -102,6 +103,7 @@ export default function Shell({
   modules: ShellModule[];
   userName: string;
   canManage: boolean;
+  canManageBilling?: boolean;
   canViewDashboard?: boolean;
   children: React.ReactNode;
 }) {
@@ -294,14 +296,24 @@ export default function Shell({
               </NavGroup>
             )}
 
-            {canManage && (
+            {(canManage || canManageBilling) && (
               <NavGroup title="Gestão">
-                <NavItem
-                  href={`${base}/equipe`}
-                  icon={Users}
-                  label="Usuários"
-                  active={pathname === `${base}/equipe`}
-                />
+                {canManage && (
+                  <NavItem
+                    href={`${base}/equipe`}
+                    icon={Users}
+                    label="Usuários"
+                    active={pathname === `${base}/equipe`}
+                  />
+                )}
+                {canManageBilling && (
+                  <NavItem
+                    href={`${base}/assinatura`}
+                    icon={CreditCard}
+                    label="Plano e cobrança"
+                    active={pathname === `${base}/assinatura`}
+                  />
+                )}
               </NavGroup>
             )}
           </nav>

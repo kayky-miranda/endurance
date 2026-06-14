@@ -13,33 +13,11 @@ import {
   permissionsForProfile,
   type Role,
 } from "@/lib/endurance/permissions";
+import { logActivity } from "@/lib/endurance/activity-log";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type R = { ok: true } | { ok: false; error: string };
-
-/** Grava uma entrada na trilha de auditoria. Best-effort (não quebra a ação). */
-async function logActivity(
-  session: SessionPayload,
-  action: string,
-  detail: string,
-  targetId?: string,
-): Promise<void> {
-  try {
-    await prisma.activityLog.create({
-      data: {
-        organizationId: session.org,
-        actorId: session.sub,
-        actorName: session.name,
-        action,
-        detail,
-        targetId: targetId ?? null,
-      },
-    });
-  } catch (e) {
-    console.error("[audit] falha ao registrar atividade:", e);
-  }
-}
 
 /**
  * Resolve papel-base + permissões a partir do perfil escolhido e da lista

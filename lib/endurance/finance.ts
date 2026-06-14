@@ -2,6 +2,12 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import { money } from "./money";
+import {
+  PAGE_SIZE,
+  clampPage,
+  pageMeta,
+  type PageMeta,
+} from "./pagination";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -82,6 +88,8 @@ export interface FinanceOverview {
   };
   receber: FinanceRow[];
   pagar: FinanceRow[];
+  receberMeta: PageMeta;
+  pagarMeta: PageMeta;
 }
 
 function toRow(e: {
@@ -111,56 +119,71 @@ function toRow(e: {
   };
 }
 
-export async function getFinanceOverview(org: string): Promise<FinanceOverview> {
-  const entries = await prisma.financialEntry.findMany({
-    where: { organizationId: org },
-    orderBy: [{ status: "asc" }, { dueDate: "asc" }],
-  });
-
+export async function getFinanceOverview(
+  org: string,
+  pages: { receber?: number; pagar?: number } = {},
+): Promise<FinanceOverview> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const startMonth = new Date();
   startMonth.setDate(1);
   startMonth.setHours(0, 0, 0, 0);
 
-  let aReceber = 0;
-  let aPagar = 0;
-  let vencidos = 0;
-  let recebidoMes = 0;
-  let pagoMes = 0;
-  for (const e of entries) {
-    const pend = e.status === "pendente";
-    const amount = money(e.amount);
-    if (e.kind === "receber") {
-      if (pend) aReceber += amount;
-      else if (e.paidAt && e.paidAt >= startMonth) recebidoMes += amount;
-    } else {
-      if (pend) aPagar += amount;
-      else if (e.paidAt && e.paidAt >= startMonth) pagoMes += amount;
-    }
-    if (pend && e.dueDate < today) vencidos++;
-  }
+  // KPIs agregados no banco — nada de carregar todos os lançamentos.
+  const [pendentes, pagosMes, vencidos, receberTotal, pagarTotal] =
+    await Promise.all([
+      prisma.financialEntry.groupBy({
+        by: ["kind"],
+        where: { organizationId: org, status: "pendente" },
+        _sum: { amount: true },
+      }),
+      prisma.financialEntry.groupBy({
+        by: ["kind"],
+        where: { organizationId: org, status: "pago", paidAt: { gte: startMonth } },
+        _sum: { amount: true },
+      }),
+      prisma.financialEntry.count({
+        where: { organizationId: org, status: "pendente", dueDate: { lt: today } },
+      }),
+      prisma.financialEntry.count({
+        where: { organizationId: org, kind: "receber" },
+      }),
+      prisma.financialEntry.count({
+        where: { organizationId: org, kind: "pagar" },
+      }),
+    ]);
+  const sumOf = (rows: typeof pendentes, kind: string) =>
+    money(rows.find((r) => r.kind === kind)?._sum.amount);
+  const aReceber = sumOf(pendentes, "receber");
+  const aPagar = sumOf(pendentes, "pagar");
 
-  const receber = entries
-    .filter((e) => e.kind === "receber")
-    .map((e) => toRow({ ...e, amount: money(e.amount) }))
-    .slice(0, 40);
-  const pagar = entries
-    .filter((e) => e.kind === "pagar")
-    .map((e) => toRow({ ...e, amount: money(e.amount) }))
-    .slice(0, 40);
+  const receberPage = clampPage(pages.receber, receberTotal);
+  const pagarPage = clampPage(pages.pagar, pagarTotal);
+  const list = (kind: string, page: number) =>
+    prisma.financialEntry.findMany({
+      where: { organizationId: org, kind },
+      orderBy: [{ status: "asc" }, { dueDate: "asc" }],
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+    });
+  const [receberRows, pagarRows] = await Promise.all([
+    list("receber", receberPage),
+    list("pagar", pagarPage),
+  ]);
 
   return {
     kpis: {
-      aReceber: round2(aReceber),
-      aPagar: round2(aPagar),
+      aReceber,
+      aPagar,
       saldoPrevisto: round2(aReceber - aPagar),
       vencidos,
-      recebidoMes: round2(recebidoMes),
-      pagoMes: round2(pagoMes),
+      recebidoMes: sumOf(pagosMes, "receber"),
+      pagoMes: sumOf(pagosMes, "pagar"),
     },
-    receber,
-    pagar,
+    receber: receberRows.map((e) => toRow({ ...e, amount: money(e.amount) })),
+    pagar: pagarRows.map((e) => toRow({ ...e, amount: money(e.amount) })),
+    receberMeta: pageMeta(receberPage, receberTotal),
+    pagarMeta: pageMeta(pagarPage, pagarTotal),
   };
 }
 

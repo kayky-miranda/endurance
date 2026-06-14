@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireOrgAccess } from "@/lib/auth";
-import { canAccessModule, type AccessRole } from "@/lib/endurance/catalog";
+import { requireOrgAccess, sessionHasPermission } from "@/lib/auth";
 import { getPurchaseOrderDetail } from "@/lib/endurance/purchasing";
 import PedidoShare from "./pedido-share";
 
@@ -14,7 +13,7 @@ export default async function PedidoPage({
 }) {
   const { slug, orderId } = await params;
   const session = await requireOrgAccess(slug);
-  if (!canAccessModule(session.role as AccessRole, "fornecedores")) notFound();
+  if (!sessionHasPermission(session, "suppliers.manage")) notFound();
 
   const o = await getPurchaseOrderDetail(session.org, orderId);
   if (!o) notFound();

@@ -2,10 +2,27 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus, Check, CheckCircle2, Download, FileText } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  Check,
+  CheckCircle2,
+  Download,
+  FileText,
+  Link2,
+  AlertTriangle,
+  Clock,
+} from "lucide-react";
 import Link from "next/link";
-import { markPaidAction, createEntryAction } from "./finance-actions";
+import {
+  markPaidAction,
+  createEntryAction,
+  markReconciledAction,
+} from "./finance-actions";
 import type { FinanceRow } from "@/lib/endurance/finance";
+import type { ReconOverview, ReconStatus } from "@/lib/endurance/reconciliation";
+import type { PageMeta } from "@/lib/endurance/pagination";
+import Pager from "./pager";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -17,18 +34,25 @@ export default function FinanceClient({
   slug,
   receber,
   pagar,
+  receberMeta,
+  pagarMeta,
+  conciliacao,
 }: {
   slug: string;
   receber: FinanceRow[];
   pagar: FinanceRow[];
+  receberMeta: PageMeta;
+  pagarMeta: PageMeta;
+  conciliacao: ReconOverview | null;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"receber" | "pagar">("receber");
+  const [tab, setTab] = useState<"receber" | "pagar" | "conciliacao">("receber");
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   const rows = tab === "receber" ? receber : pagar;
+  const meta = tab === "receber" ? receberMeta : pagarMeta;
 
   async function markPaid(id: string) {
     setBusy(id);
@@ -49,7 +73,7 @@ export default function FinanceClient({
 
       <div className="flex items-center justify-between">
         <div className="inline-flex rounded-xl border border-slate-200 p-1 dark:border-ink-700">
-          {(["receber", "pagar"] as const).map((t) => (
+          {(["receber", "pagar", "conciliacao"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -59,11 +83,17 @@ export default function FinanceClient({
                   : "text-slate-500 hover:text-brand-500 dark:text-slate-400"
               }`}
             >
-              {t === "receber" ? "A receber" : "A pagar"}
+              {t === "receber"
+                ? "A receber"
+                : t === "pagar"
+                  ? "A pagar"
+                  : "Conciliação PIX"}
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div
+          className={`flex items-center gap-2 ${tab === "conciliacao" ? "hidden" : ""}`}
+        >
           <Link
             href={`/espaco/${slug}/relatorio/financeiro`}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:text-slate-300"
@@ -88,6 +118,10 @@ export default function FinanceClient({
         </div>
       </div>
 
+      {tab === "conciliacao" ? (
+        <ReconPanel data={conciliacao} />
+      ) : (
+        <>
       {showForm && (
         <EntryForm
           defaultKind={tab}
@@ -177,6 +211,187 @@ export default function FinanceClient({
           </table>
         </div>
       </div>
+
+      <Pager param={tab === "receber" ? "rec" : "pag"} meta={meta} />
+        </>
+      )}
+    </div>
+  );
+}
+
+const RECON_BADGE: Record<
+  ReconStatus,
+  { label: string; cls: string }
+> = {
+  conciliado: {
+    label: "Conciliado",
+    cls: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+  },
+  divergente: {
+    label: "Divergente",
+    cls: "bg-red-500/15 text-red-600 dark:text-red-400",
+  },
+  pago_sem_venda: {
+    label: "Pago sem venda",
+    cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+  },
+  pendente: {
+    label: "Pendente",
+    cls: "bg-slate-500/15 text-slate-500 dark:text-slate-400",
+  },
+  expirado: {
+    label: "Expirado",
+    cls: "bg-slate-500/15 text-slate-400",
+  },
+  cancelado: {
+    label: "Cancelado",
+    cls: "bg-slate-500/15 text-slate-400",
+  },
+};
+
+/** Painel de conciliação PIX: cobranças × vendas × recebíveis. */
+function ReconPanel({ data }: { data: ReconOverview | null }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<string | null>(null);
+
+  if (!data) return null;
+
+  async function reconcile(id: string) {
+    setBusy(id);
+    await markReconciledAction(id);
+    setBusy(null);
+    router.refresh();
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ReconKpi
+          icon={CheckCircle2}
+          label="Recebido em PIX"
+          value={brl(data.kpis.recebidoPix)}
+          tone="text-emerald-600 dark:text-emerald-400"
+        />
+        <ReconKpi
+          icon={Link2}
+          label="Conciliados"
+          value={String(data.kpis.conciliados)}
+          tone="text-slate-700 dark:text-slate-200"
+        />
+        <ReconKpi
+          icon={AlertTriangle}
+          label="Pago sem venda"
+          value={String(data.kpis.pagoSemVenda)}
+          tone="text-amber-600 dark:text-amber-400"
+        />
+        <ReconKpi
+          icon={Clock}
+          label="Aguardando"
+          value={String(data.kpis.pendentes)}
+          tone="text-slate-500 dark:text-slate-400"
+        />
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-ink-700 dark:bg-ink-900">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400 dark:border-ink-800">
+                <th className="px-5 py-2.5 font-medium">Criada</th>
+                <th className="px-5 py-2.5 font-medium">Venda</th>
+                <th className="px-5 py-2.5 font-medium">Provedor</th>
+                <th className="px-5 py-2.5 font-medium">Valor</th>
+                <th className="px-5 py-2.5 font-medium">Status</th>
+                <th className="px-5 py-2.5 text-right font-medium">Ação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="px-5 py-10 text-center text-slate-400">
+                    Nenhuma cobrança PIX ainda.
+                  </td>
+                </tr>
+              )}
+              {data.rows.map((r) => {
+                const badge = RECON_BADGE[r.status];
+                const divergente = r.status === "divergente";
+                return (
+                  <tr
+                    key={r.id}
+                    className="border-b border-slate-100 last:border-0 dark:border-ink-800"
+                  >
+                    <td className="px-5 py-3 text-slate-500 dark:text-slate-400">
+                      {r.createdAt}
+                    </td>
+                    <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-200">
+                      {r.saleCode ?? "—"}
+                    </td>
+                    <td className="px-5 py-3 capitalize text-slate-500 dark:text-slate-400">
+                      {r.provider}
+                    </td>
+                    <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-200">
+                      {brl(r.amount)}
+                      {divergente && r.receivableAmount != null && (
+                        <span className="ml-1 text-xs text-red-500">
+                          (venda {brl(r.receivableAmount)})
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${badge.cls}`}
+                      >
+                        {badge.label}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      {r.status === "pago_sem_venda" && (
+                        <button
+                          onClick={() => reconcile(r.id)}
+                          disabled={busy === r.id}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 transition hover:border-brand-500 hover:text-brand-500 disabled:opacity-40 dark:border-ink-600 dark:text-slate-300"
+                        >
+                          {busy === r.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Check className="h-3.5 w-3.5" />
+                          )}
+                          Conciliar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <Pager param="con" meta={data.meta} />
+    </div>
+  );
+}
+
+function ReconKpi({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: typeof CheckCircle2;
+  label: string;
+  value: string;
+  tone: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-ink-700 dark:bg-ink-900">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-400">
+        <Icon className="h-4 w-4" />
+        {label}
+      </div>
+      <p className={`mt-1 text-xl font-bold ${tone}`}>{value}</p>
     </div>
   );
 }

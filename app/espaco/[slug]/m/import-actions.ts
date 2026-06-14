@@ -8,6 +8,7 @@ import {
   type ValidateResult,
   type CommitResult,
 } from "@/lib/endurance/import-service";
+import { logActivity } from "@/lib/endurance/activity-log";
 
 export async function validateImportAction(
   entity: string,
@@ -32,6 +33,11 @@ export async function commitImportAction(
     revalidatePath(`/espaco/${s.slug}/m/crm`);
     revalidatePath(`/espaco/${s.slug}/m/fornecedores`);
     revalidatePath(`/espaco/${s.slug}/m/financeiro`);
+    await logActivity(
+      s,
+      "data.import",
+      `Importou ${entity} em massa (${res.imported ?? 0} importados, ${res.skipped ?? 0} ignorados)`,
+    );
   }
   return res;
 }

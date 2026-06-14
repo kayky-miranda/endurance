@@ -77,7 +77,7 @@ export async function getNotifications(org: string): Promise<NotificationsData> 
   }
 
   // --- Clientes a recomprar ---
-  for (const c of crm.dueList.slice(0, 12)) {
+  for (const c of crm.dueTop) {
     items.push({
       id: `cli-${c.id}`,
       type: "clientes",

@@ -13,10 +13,22 @@ import {
   CircleDollarSign,
   BarChart3,
 } from "lucide-react";
-import { assistantAction } from "./assistant-actions";
-import type { Widget } from "@/lib/endurance/assistant";
+import type { AssistantEvent, Widget } from "@/lib/endurance/assistant";
 
 type Msg = { role: "user" | "assistant"; content: string; widgets?: Widget[] };
+
+/** Rótulo amigável para o status "consultando ferramenta X". */
+const TOOL_LABEL: Record<string, string> = {
+  consultar_vendas: "consultando as vendas",
+  consultar_lucro: "calculando o lucro",
+  comparar_vendas: "comparando períodos",
+  produtos_mais_vendidos: "buscando os mais vendidos",
+  melhores_clientes: "buscando os melhores clientes",
+  estoque_critico: "checando o estoque",
+  pedidos_pendentes_fornecedores: "checando os fornecedores",
+  contas_a_vencer: "buscando as contas",
+  resumo_financeiro: "consultando o financeiro",
+};
 
 const SUGGESTIONS = [
   "Qual foi meu faturamento ontem?",
@@ -34,12 +46,13 @@ export default function AssistantWidget() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState(""); // "consultando as vendas…"
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [msgs, busy, open]);
+  }, [msgs, busy, status, open]);
 
   async function send(text?: string) {
     const content = (text ?? input).trim();
@@ -48,15 +61,73 @@ export default function AssistantWidget() {
     setMsgs(next);
     setInput("");
     setBusy(true);
+    setStatus("");
+
+    // Atualiza a mensagem do assistente em construção; cria no 1º evento.
+    let started = false;
+    const patch = (fn: (last: Msg) => Msg) =>
+      setMsgs((m) => {
+        const copy = [...m];
+        if (!started || copy[copy.length - 1]?.role !== "assistant") {
+          started = true;
+          copy.push({ role: "assistant", content: "", widgets: [] });
+        }
+        copy[copy.length - 1] = fn(copy[copy.length - 1]);
+        return copy;
+      });
+
     try {
       // Envia só role+content para o agente (widgets ficam só na UI).
-      const res = await assistantAction(next.map((m) => ({ role: m.role, content: m.content })));
-      setMsgs((m) => [
-        ...m,
-        res.ok
-          ? { role: "assistant", content: res.reply, widgets: res.widgets }
-          : { role: "assistant", content: res.error },
-      ]);
+      const res = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: next.map((m) => ({ role: m.role, content: m.content })),
+        }),
+      });
+      if (!res.ok || !res.body) throw new Error(String(res.status));
+
+      // Consome o NDJSON do streaming linha a linha.
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const ln of lines) {
+          if (!ln.trim()) continue;
+          let ev: AssistantEvent;
+          try {
+            ev = JSON.parse(ln) as AssistantEvent;
+          } catch {
+            continue;
+          }
+          if (ev.type === "tool") {
+            setStatus(`${TOOL_LABEL[ev.name] ?? "consultando os dados"}…`);
+          } else if (ev.type === "widget") {
+            const w = ev.widget;
+            patch((last) => ({ ...last, widgets: [...(last.widgets ?? []), w] }));
+          } else if (ev.type === "delta") {
+            setStatus("");
+            const t = ev.text;
+            patch((last) => ({ ...last, content: last.content + t }));
+          } else if (ev.type === "reset") {
+            if (started) patch((last) => ({ ...last, content: "" }));
+          } else if (ev.type === "error") {
+            const e = ev.error;
+            patch((last) => ({ ...last, content: e }));
+          }
+        }
+      }
+      if (!started) {
+        setMsgs((m) => [
+          ...m,
+          { role: "assistant", content: "Não consegui responder agora." },
+        ]);
+      }
     } catch {
       setMsgs((m) => [
         ...m,
@@ -64,6 +135,7 @@ export default function AssistantWidget() {
       ]);
     } finally {
       setBusy(false);
+      setStatus("");
     }
   }
 
@@ -129,7 +201,10 @@ export default function AssistantWidget() {
               <MessageRow key={i} msg={m} />
             ))}
 
-            {busy && <TypingIndicator />}
+            {busy &&
+              (msgs[msgs.length - 1]?.role !== "assistant" || status) && (
+                <TypingIndicator status={status} />
+              )}
             <div ref={endRef} />
           </div>
 
@@ -231,13 +306,18 @@ function MessageRow({ msg }: { msg: Msg }) {
   );
 }
 
-function TypingIndicator() {
+function TypingIndicator({ status }: { status?: string }) {
   return (
     <div className="flex gap-2.5">
       <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-500/15 text-brand-500 ring-1 ring-brand-500/20">
         <Sparkles className="h-3.5 w-3.5" />
       </div>
-      <div className="flex items-center gap-1 rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 dark:bg-ink-800">
+      <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 dark:bg-ink-800">
+        {status ? (
+          <span className="text-xs text-slate-500 dark:text-slate-400">
+            {status}
+          </span>
+        ) : null}
         <Dot delay="0ms" />
         <Dot delay="150ms" />
         <Dot delay="300ms" />

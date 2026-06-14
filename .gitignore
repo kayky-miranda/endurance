@@ -28,3 +28,8 @@ next-env.d.ts
 # prisma (banco local sqlite)
 /prisma/dev.db
 /prisma/dev.db-journal
+
+# playwright (artefatos de teste)
+/test-results/
+/playwright-report/
+/pix-screens/

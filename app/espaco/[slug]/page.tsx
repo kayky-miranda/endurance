@@ -12,7 +12,6 @@ import type { LucideIcon } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getWorkspace } from "@/lib/endurance/workspace";
 import { getSession } from "@/lib/auth";
-import { canAccessModule, type AccessRole } from "@/lib/endurance/catalog";
 import {
   effectivePermissions,
   modulePermission,
@@ -42,13 +41,12 @@ export default async function EspacoPage({
   const session = await getSession();
   const firstName = (session?.name || "").split(" ")[0];
 
-  // Módulos que o usuário pode acessar (RBAC por papel + permissão).
+  // Módulos que o usuário pode acessar (RBAC granular por permissão).
   const perms = new Set(
     effectivePermissions(session?.role ?? "MEMBER", session?.permissions),
   );
   const visible = ws.modules.filter((m) => {
     if (!session) return true;
-    if (!canAccessModule(session.role as AccessRole, m.id)) return false;
     const required = modulePermission(m.id);
     return required ? perms.has(required) : true;
   });
@@ -68,11 +66,11 @@ export default async function EspacoPage({
   }
 
   const orgId = session?.org ?? "";
-  const summary = orgId
-    ? await getSalesSummary(orgId, 30)
-    : null;
-  const [recent, customerCount] = orgId
+  // As três consultas são independentes → buscam em paralelo (1 round-trip de
+  // latência somada vira o tempo da mais lenta, não a soma das três).
+  const [summary, recent, customerCount] = orgId
     ? await Promise.all([
+        getSalesSummary(orgId, 30),
         prisma.sale.findMany({
           where: { organizationId: orgId },
           include: { customer: true, payments: true },
@@ -81,7 +79,7 @@ export default async function EspacoPage({
         }),
         prisma.customer.count({ where: { organizationId: orgId } }),
       ])
-    : [[], 0];
+    : [null, [], 0];
 
   const core = visible.filter((m) => m.core);
   const niche = visible.filter((m) => !m.core);

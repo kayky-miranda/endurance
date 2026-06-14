@@ -28,7 +28,7 @@ export async function generateCrmCampaigns(
       source: "heuristic",
     };
 
-  const summary = `Base de clientes: ${ci.total} no total. Segmentos: ${ci.counts.ativo} ativos, ${ci.counts.em_risco} em risco (30-60d sem comprar), ${ci.counts.inativo} inativos (>60d), ${ci.counts.novo} sem compras. Ticket médio por cliente: R$${ci.ticketMedio}. Previstos para recompra agora: ${ci.dueList.length}.`;
+  const summary = `Base de clientes: ${ci.total} no total. Segmentos: ${ci.counts.ativo} ativos, ${ci.counts.em_risco} em risco (30-60d sem comprar), ${ci.counts.inativo} inativos (>60d), ${ci.counts.novo} sem compras. Ticket médio por cliente: R$${ci.ticketMedio}. Previstos para recompra agora: ${ci.dueCount}.`;
 
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (apiKey) {
@@ -95,11 +95,11 @@ export async function generateCrmCampaigns(
   }
 
   const out: Insight[] = [];
-  if (ci.dueList.length)
+  if (ci.dueCount)
     out.push({
       kind: "oportunidade",
       title: "Estimular recompra",
-      text: `${ci.dueList.length} cliente(s) estão na hora de recomprar — envie lembrete ou oferta personalizada.`,
+      text: `${ci.dueCount} cliente(s) estão na hora de recomprar — envie lembrete ou oferta personalizada.`,
     });
   if (ci.counts.em_risco)
     out.push({

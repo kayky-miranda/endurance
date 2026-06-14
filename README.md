@@ -124,7 +124,8 @@ modelo, ou algo volátil entrou no system prompt e invalidou o prefixo.
 ## Testando o onboarding direto
 
 ```bash
-curl -s http://localhost:3000/api/onboarding \
+curl -s 
+api/onboarding \
   -H "Content-Type: application/json" \
   -d '{"description":"Tenho um mercadinho de bairro em Campinas, SP."}'
 ```

@@ -8,13 +8,17 @@ import {
   cancelNfce,
   type EmitResult,
 } from "@/lib/endurance/fiscal-service";
+import { logActivity } from "@/lib/endurance/activity-log";
 
 export async function emitNfceAction(saleId: string): Promise<EmitResult> {
   const gate = await requirePermission("fiscal.manage");
   if (!gate.ok) return gate;
   const s = gate.session;
   const res = await emitNfce(s.org, saleId);
-  if (res.ok) revalidatePath(`/espaco/${s.slug}/m/nfce`);
+  if (res.ok) {
+    revalidatePath(`/espaco/${s.slug}/m/nfce`);
+    await logActivity(s, "nfce.emit", `Emitiu NFC-e nº ${res.numero}`, res.docId);
+  }
   return res;
 }
 
@@ -26,7 +30,15 @@ export async function cancelNfceAction(
   if (!gate.ok) return gate;
   const s = gate.session;
   const res = await cancelNfce(s.org, docId, motivo);
-  if (res.ok) revalidatePath(`/espaco/${s.slug}/m/nfce`);
+  if (res.ok) {
+    revalidatePath(`/espaco/${s.slug}/m/nfce`);
+    await logActivity(
+      s,
+      "nfce.cancel",
+      `Cancelou NFC-e${motivo ? ` (motivo: ${motivo.trim().slice(0, 80)})` : ""}`,
+      docId,
+    );
+  }
   return res;
 }
 
@@ -43,6 +55,8 @@ export interface FiscalConfigInput {
   ambiente: string;
   cscId: string;
   csc: string;
+  provider: string;
+  defaultNcm: string;
 }
 
 export async function saveFiscalConfigAction(
@@ -65,6 +79,8 @@ export async function saveFiscalConfigAction(
     ambiente: input.ambiente === "1" ? "1" : "2",
     cscId: (input.cscId ?? "000001").replace(/\D/g, "").slice(0, 6) || "000001",
     csc: (input.csc ?? "").trim().slice(0, 64),
+    provider: input.provider === "focusnfe" ? "focusnfe" : "",
+    defaultNcm: (input.defaultNcm ?? "").replace(/\D/g, "").slice(0, 8),
   };
   if (!data.cnpj || data.cnpj.length !== 14)
     return { ok: false, error: "Informe um CNPJ válido (14 dígitos)." };
@@ -77,5 +93,10 @@ export async function saveFiscalConfigAction(
     update: data,
   });
   revalidatePath(`/espaco/${s.slug}/m/nfce`);
+  await logActivity(
+    s,
+    "fiscal.config_save",
+    `Atualizou a configuração fiscal (${data.razaoSocial})`,
+  );
   return { ok: true };
 }

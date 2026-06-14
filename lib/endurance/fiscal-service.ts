@@ -2,12 +2,25 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { money } from "./money";
 import {
+  PAGE_SIZE,
+  clampPage,
+  pageMeta,
+  type PageMeta,
+} from "./pagination";
+import {
   buildAccessKey,
   buildQrCode,
   buildNfceXml,
   buildProtocolo,
   randomCNF,
 } from "./fiscal";
+import {
+  resolveFiscalProvider,
+  type FiscalAmbiente,
+  type FiscalProvider,
+  type NfceEmitInput,
+} from "./fiscal-provider";
+import type { Prisma } from "@prisma/client";
 
 export interface FiscalConfigView {
   cnpj: string;
@@ -23,6 +36,8 @@ export interface FiscalConfigView {
   ambiente: string;
   cscId: string;
   csc: string;
+  provider: string;
+  defaultNcm: string;
   configured: boolean;
 }
 
@@ -60,6 +75,8 @@ export async function getFiscalConfigView(org: string): Promise<FiscalConfigView
     ambiente: c.ambiente,
     cscId: c.cscId,
     csc: c.csc,
+    provider: c.provider,
+    defaultNcm: c.defaultNcm,
     configured: Boolean(c.cnpj && c.razaoSocial),
   };
 }
@@ -75,9 +92,15 @@ const PAY_LABEL: Record<string, string> = {
   pix: "Pix",
 };
 
+type SaleWithRelations = Prisma.SaleGetPayload<{
+  include: { items: true; payments: true; customer: true; fiscalDoc: true };
+}>;
+type FiscalCfg = Awaited<ReturnType<typeof ensureFiscalConfig>>;
+
 /**
- * Emite a NFC-e de uma venda: reserva o número (incremento atômico), monta a
- * chave/QR/XML e grava o documento. A autorização SEFAZ é simulada (protocolo).
+ * Emite a NFC-e de uma venda. Despacha entre:
+ *  - emissão REAL via provedor homologado (cfg.provider = "focusnfe"); ou
+ *  - emissão SIMULADA (protótipo), quando nenhum provedor está configurado.
  * Idempotente: se a venda já tem documento ativo, retorna o existente.
  */
 export async function emitNfce(org: string, saleId: string): Promise<EmitResult> {
@@ -102,6 +125,116 @@ export async function emitNfce(org: string, saleId: string): Promise<EmitResult>
       error: "Complete os dados fiscais (CNPJ e razão social) antes de emitir.",
     };
 
+  const resolution = resolveFiscalProvider(cfg);
+  if (resolution.kind === "error") return { ok: false, error: resolution.error };
+  if (resolution.kind === "provider")
+    return emitNfceViaProvider(
+      org,
+      sale,
+      cfg,
+      resolution.ambiente,
+      resolution.provider,
+    );
+  return emitNfceSimulated(org, sale, cfg);
+}
+
+/** Emissão real via provedor: o provedor assina/transmite e devolve a chave. */
+async function emitNfceViaProvider(
+  org: string,
+  sale: SaleWithRelations,
+  cfg: FiscalCfg,
+  ambiente: FiscalAmbiente,
+  provider: FiscalProvider,
+): Promise<EmitResult> {
+  const ncm = (cfg.defaultNcm ?? "").replace(/\D/g, "");
+  if (ncm.length !== 8)
+    return {
+      ok: false,
+      error:
+        "Configure o NCM padrão (8 dígitos) dos produtos antes de emitir com o provedor real.",
+    };
+
+  const emissao = new Date();
+  const input: NfceEmitInput = {
+    ref: sale.id,
+    ambiente,
+    emissao,
+    emit: { cnpj: cfg.cnpj, ie: cfg.ie, crt: cfg.crt, uf: cfg.uf },
+    dest: sale.customer?.document
+      ? { nome: sale.customer.name, doc: sale.customer.document }
+      : null,
+    itens: sale.items.map((it) => ({
+      codigo: it.productId ?? "",
+      descricao: it.name,
+      ncm,
+      cfop: "5102",
+      unidade: "UN",
+      quantidade: it.quantity,
+      valorUnitario: money(it.unitPrice),
+    })),
+    pagamentos: sale.payments.map((p) => ({
+      metodo: p.method,
+      valor: money(p.amount),
+    })),
+    subtotal: money(sale.subtotal),
+    desconto: money(sale.discount),
+    total: money(sale.total),
+  };
+
+  const r = await provider.emitNfce(input);
+  if (r.status !== "autorizado") {
+    const fallback =
+      r.status === "processando"
+        ? "Emissão em processamento na SEFAZ. Aguarde alguns instantes e tente novamente."
+        : r.status === "rejeitado"
+          ? "NFC-e rejeitada pela SEFAZ."
+          : "Falha na emissão fiscal.";
+    return { ok: false, error: r.mensagem ?? fallback };
+  }
+  if (!r.chave)
+    return {
+      ok: false,
+      error: "O provedor autorizou a nota mas não retornou a chave de acesso.",
+    };
+
+  const numero = r.numero ?? 0;
+  const data = {
+    organizationId: org,
+    saleId: sale.id,
+    modelo: "65",
+    serie: r.serie ?? cfg.serie,
+    numero,
+    chave: r.chave,
+    status: "autorizada",
+    ambiente: cfg.ambiente,
+    protocolo: r.protocolo ?? "",
+    qrCode: r.qrCodeUrl ?? "",
+    xml: "",
+    valorTotal: sale.total,
+    provider: provider.id,
+    providerRef: sale.id,
+    danfeUrl: r.danfeUrl ?? "",
+    dataEmissao: emissao,
+    dataAutorizacao: new Date(),
+  };
+  try {
+    const doc = await prisma.fiscalDocument.upsert({
+      where: { saleId: sale.id },
+      create: data,
+      update: { ...data, motivoCancel: "", dataCancel: null },
+    });
+    return { ok: true, docId: doc.id, chave: r.chave, numero };
+  } catch {
+    return { ok: false, error: "Falha ao gravar o documento fiscal." };
+  }
+}
+
+/** Emissão simulada (protótipo): monta chave/QR/XML e marca como autorizada. */
+async function emitNfceSimulated(
+  org: string,
+  sale: SaleWithRelations,
+  cfg: FiscalCfg,
+): Promise<EmitResult> {
   // Reserva o número da nota de forma atômica.
   const updated = await prisma.fiscalConfig.update({
     where: { organizationId: org },
@@ -163,10 +296,10 @@ export async function emitNfce(org: string, saleId: string): Promise<EmitResult>
 
   try {
     const doc = await prisma.fiscalDocument.upsert({
-      where: { saleId },
+      where: { saleId: sale.id },
       create: {
         organizationId: org,
-        saleId,
+        saleId: sale.id,
         modelo: "65",
         serie: cfg.serie,
         numero,
@@ -213,6 +346,26 @@ export async function cancelNfce(
   const m = (motivo ?? "").trim();
   if (m.length < 15)
     return { ok: false, error: "A justificativa precisa ter ao menos 15 caracteres." };
+
+  // Documento emitido por provedor real: o cancelamento precisa passar pela
+  // SEFAZ via provedor. Sem provedor disponível, não cancelamos localmente
+  // (evita o documento ficar "cancelado" aqui e "autorizado" na SEFAZ).
+  if (doc.provider === "focusnfe") {
+    const cfg = await ensureFiscalConfig(org);
+    const resolution = resolveFiscalProvider(cfg);
+    if (resolution.kind !== "provider")
+      return {
+        ok: false,
+        error:
+          resolution.kind === "error"
+            ? resolution.error
+            : "Provedor fiscal indisponível para cancelar este documento.",
+      };
+    const c = await resolution.provider.cancelNfce(doc.providerRef, m);
+    if (!c.ok)
+      return { ok: false, error: c.mensagem ?? "Falha ao cancelar na SEFAZ." };
+  }
+
   await prisma.fiscalDocument.update({
     where: { id: docId },
     data: { status: "cancelada", motivoCancel: m, dataCancel: new Date() },
@@ -234,6 +387,7 @@ export interface NfceRow {
 export interface NfceOverview {
   config: FiscalConfigView;
   rows: NfceRow[];
+  pageMeta: PageMeta;
   kpis: {
     autorizadasMes: number;
     valorMes: number;
@@ -242,12 +396,51 @@ export interface NfceOverview {
   };
 }
 
-export async function getNfceOverview(org: string): Promise<NfceOverview> {
+export async function getNfceOverview(
+  org: string,
+  rawPage = 1,
+): Promise<NfceOverview> {
   const config = await getFiscalConfigView(org);
+
+  const startMonth = new Date();
+  startMonth.setDate(1);
+  startMonth.setHours(0, 0, 0, 0);
+  const startDay = new Date();
+  startDay.setHours(0, 0, 0, 0);
+
+  // KPIs agregados no banco (contagens/somas globais, não da página atual).
+  const [salesTotal, mes, emitidasHoje, pendentes] = await Promise.all([
+    prisma.sale.count({ where: { organizationId: org } }),
+    prisma.fiscalDocument.aggregate({
+      where: {
+        organizationId: org,
+        status: "autorizada",
+        dataEmissao: { gte: startMonth },
+      },
+      _count: true,
+      _sum: { valorTotal: true },
+    }),
+    prisma.fiscalDocument.count({
+      where: {
+        organizationId: org,
+        status: "autorizada",
+        dataEmissao: { gte: startDay },
+      },
+    }),
+    prisma.sale.count({
+      where: {
+        organizationId: org,
+        OR: [{ fiscalDoc: { is: null } }, { fiscalDoc: { status: "cancelada" } }],
+      },
+    }),
+  ]);
+
+  const page = clampPage(rawPage, salesTotal);
   const sales = await prisma.sale.findMany({
     where: { organizationId: org },
     orderBy: { createdAt: "desc" },
-    take: 40,
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
     include: { fiscalDoc: true, customer: true },
   });
 
@@ -273,25 +466,17 @@ export async function getNfceOverview(org: string): Promise<NfceOverview> {
     };
   });
 
-  const startMonth = new Date();
-  startMonth.setDate(1);
-  startMonth.setHours(0, 0, 0, 0);
-  const startDay = new Date();
-  startDay.setHours(0, 0, 0, 0);
-
-  const docs = await prisma.fiscalDocument.findMany({
-    where: { organizationId: org, status: "autorizada" },
-    select: { valorTotal: true, dataEmissao: true },
-  });
-  const mes = docs.filter((d) => d.dataEmissao >= startMonth);
-  const kpis = {
-    autorizadasMes: mes.length,
-    valorMes: mes.reduce((a, d) => a + money(d.valorTotal), 0),
-    emitidasHoje: docs.filter((d) => d.dataEmissao >= startDay).length,
-    pendentes: rows.filter((r) => r.status === "pendente").length,
+  return {
+    config,
+    rows,
+    pageMeta: pageMeta(page, salesTotal),
+    kpis: {
+      autorizadasMes: mes._count,
+      valorMes: money(mes._sum.valorTotal),
+      emitidasHoje,
+      pendentes,
+    },
   };
-
-  return { config, rows, kpis };
 }
 
 export { PAY_LABEL };
