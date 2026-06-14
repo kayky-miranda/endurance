@@ -21,6 +21,8 @@ import {
   Printer,
   QrCode,
   Copy,
+  MessageCircle,
+  Send,
 } from "lucide-react";
 import type { Product } from "./products-client";
 import {
@@ -35,6 +37,7 @@ import {
   confirmSimulatedPixAction,
   cancelPixChargeAction,
 } from "./pix-actions";
+import { sendSaleReceiptAction } from "./whatsapp-actions";
 import type { PixChargeView } from "@/lib/endurance/pix-service";
 
 type Suggestion = { id: string; name: string; price: number; reason: string };
@@ -74,6 +77,8 @@ export default function PdvClient({
   const router = useRouter();
   const [active, setActive] = useState(false);
   const [lastSaleId, setLastSaleId] = useState("");
+  const [lastSalePhone, setLastSalePhone] = useState("");
+  const [lastSaleName, setLastSaleName] = useState("");
   const [cart, setCart] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
@@ -405,6 +410,8 @@ export default function PdvClient({
           }${res.change > 0 ? ` · troco ${brl(res.change)}` : ""}.`,
         );
         setLastSaleId(res.saleId);
+        setLastSalePhone(customer?.phone ?? "");
+        setLastSaleName(customer?.name ?? "");
         setActive(false);
         setCart({});
         setCustomer(null);
@@ -465,15 +472,23 @@ export default function PdvClient({
               {lastSale}
             </div>
             {lastSaleId && (
-              <a
-                href={`/espaco/${slug}/recibo/${lastSaleId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:text-slate-300"
-              >
-                <Printer className="h-3.5 w-3.5" />
-                Imprimir recibo
-              </a>
+              <div className="flex flex-col items-center gap-2">
+                <a
+                  href={`/espaco/${slug}/recibo/${lastSaleId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:text-slate-300"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Imprimir recibo
+                </a>
+                <ReceiptSender
+                  key={lastSaleId}
+                  saleId={lastSaleId}
+                  defaultPhone={lastSalePhone}
+                  defaultName={lastSaleName}
+                />
+              </div>
             )}
           </div>
         )}
@@ -1024,6 +1039,77 @@ export default function PdvClient({
         </div>
       )}
     </>
+  );
+}
+
+/** Envia o recibo da venda por WhatsApp; o telefone informado cadastra o cliente. */
+function ReceiptSender({
+  saleId,
+  defaultPhone,
+  defaultName,
+}: {
+  saleId: string;
+  defaultPhone: string;
+  defaultName: string;
+}) {
+  const [phone, setPhone] = useState(defaultPhone);
+  const [pending, setPending] = useState(false);
+  const [result, setResult] = useState<
+    null | { ok: boolean; simulated?: boolean; error?: string }
+  >(null);
+
+  async function send() {
+    if (pending || !phone.trim()) return;
+    setPending(true);
+    setResult(null);
+    const res = await sendSaleReceiptAction({
+      saleId,
+      phone: phone.trim(),
+      name: defaultName,
+    });
+    setPending(false);
+    setResult({ ok: res.ok, simulated: res.simulated, error: res.error });
+  }
+
+  if (result?.ok)
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+        <MessageCircle className="h-3.5 w-3.5" />
+        Recibo {result.simulated ? "registrado" : "enviado"} no WhatsApp
+      </span>
+    );
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="flex items-center gap-1.5">
+        <input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          inputMode="tel"
+          placeholder="WhatsApp do cliente"
+          className="w-44 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+        />
+        <button
+          onClick={send}
+          disabled={pending || !phone.trim()}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-40"
+        >
+          {pending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Send className="h-3.5 w-3.5" />
+          )}
+          Enviar recibo
+        </button>
+      </div>
+      {result?.error ? (
+        <span className="text-xs text-red-500">{result.error}</span>
+      ) : !defaultPhone ? (
+        <span className="text-[11px] text-slate-400">
+          Envie o recibo e já cadastre o cliente no estabelecimento.
+        </span>
+      ) : null}
+    </div>
   );
 }
 

@@ -122,7 +122,7 @@ describe("Mercado Pago Point (maquininha)", () => {
           body: {
             devices: [
               { id: "PAX_A910__SMARTPOS123", operating_mode: "PDV" },
-              { id: "no-id-skip" === "" ? "" : "GERTEC__456" },
+              { operating_mode: "STANDALONE" }, // sem id → deve ser filtrado
             ],
           },
         };
