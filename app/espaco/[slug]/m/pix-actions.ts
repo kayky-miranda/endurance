@@ -21,6 +21,7 @@ export async function createPixChargeAction(input: {
   token: string;
   amount: number;
   customerId?: string | null;
+  terminal?: boolean;
 }): Promise<PixChargeResult> {
   const gate = await requirePermission("pdv.sell");
   if (!gate.ok) return gate as Fail;
@@ -28,6 +29,7 @@ export async function createPixChargeAction(input: {
     token: input.token,
     amount: input.amount,
     customerId: input.customerId ?? null,
+    terminal: Boolean(input.terminal),
   });
 }
 

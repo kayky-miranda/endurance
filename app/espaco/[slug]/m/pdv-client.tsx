@@ -65,9 +65,11 @@ function norm(s: string) {
 export default function PdvClient({
   products,
   slug,
+  pixHasDevice = false,
 }: {
   products: Product[];
   slug: string;
+  pixHasDevice?: boolean;
 }) {
   const router = useRouter();
   const [active, setActive] = useState(false);
@@ -103,6 +105,7 @@ export default function PdvClient({
   const [pixBusy, setPixBusy] = useState(false);
   const [pixError, setPixError] = useState("");
   const [pixCopied, setPixCopied] = useState(false);
+  const [pixTerminal, setPixTerminal] = useState(false); // cobrar na maquininha
 
   // IA
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -218,6 +221,7 @@ export default function PdvClient({
     setPixBusy(false);
     setPixError("");
     setPixCopied(false);
+    setPixTerminal(false);
   }
 
   function addToCart(id: string) {
@@ -332,6 +336,7 @@ export default function PdvClient({
       token: tokenRef.current,
       amount,
       customerId: customer?.id ?? null,
+      terminal: pixHasDevice && pixTerminal,
     });
     setPixBusy(false);
     if (!res.ok) {
@@ -814,6 +819,18 @@ export default function PdvClient({
                 </button>
               ))}
             </div>
+            {pixHasDevice && (
+              <label className="mt-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={pixTerminal}
+                  onChange={(e) => setPixTerminal(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-brand-500"
+                />
+                <QrCode className="h-3.5 w-3.5" />
+                Cobrar PIX na maquininha
+              </label>
+            )}
             {payments.length > 0 && (
               <div className="mt-2 space-y-1.5">
                 {payments.map((p, i) => (
@@ -934,6 +951,37 @@ export default function PdvClient({
                     <CheckCircle2 className="h-6 w-6" />
                     Pagamento confirmado
                   </div>
+                ) : pixCharge.terminal ? (
+                  <>
+                    <div className="grid place-items-center gap-2 py-4">
+                      <div className="grid h-16 w-16 place-items-center rounded-2xl bg-brand-500/10 text-brand-500">
+                        <QrCode className="h-8 w-8" />
+                      </div>
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                        Cobrança enviada para a maquininha
+                      </p>
+                      <p className="px-2 text-xs text-slate-500 dark:text-slate-400">
+                        Peça para o cliente escanear o QR PIX na tela do aparelho.
+                      </p>
+                    </div>
+                    <p className="flex items-center justify-center gap-1.5 text-xs text-slate-400">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Aguardando pagamento…
+                    </p>
+                    {pixCharge.simulate && (
+                      <button
+                        onClick={confirmSimulated}
+                        disabled={pixBusy}
+                        className="w-full rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-brand-400 disabled:opacity-40"
+                      >
+                        {pixBusy ? (
+                          <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                        ) : (
+                          "Confirmar pagamento (simulado)"
+                        )}
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <>
                     {pixCharge.qrImage ? (

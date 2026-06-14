@@ -45,7 +45,17 @@ export interface PixChargeStatusResult {
   status: PixStatus;
   e2eId?: string;
   paidAt?: Date;
+  /** Quando a payment-intent do terminal vira pagamento, o id do pagamento. */
+  paymentRef?: string;
   mensagem?: string;
+}
+
+/** Maquininha (terminal) pareada ao PSP. */
+export interface PixDevice {
+  id: string;
+  name: string;
+  /** Modo operacional do aparelho (ex.: PDV / STANDALONE). */
+  mode?: string;
 }
 
 export interface PixProvider {
@@ -54,6 +64,22 @@ export interface PixProvider {
   /** Consulta por `providerRef` (id do PSP). */
   getCharge(providerRef: string): Promise<PixChargeStatusResult>;
   cancelCharge(providerRef: string): Promise<{ ok: boolean; mensagem?: string }>;
+
+  // --- Maquininha (terminal) ---
+  /** Lista as maquininhas pareadas (para configurar o aparelho). */
+  listDevices(): Promise<PixDevice[]>;
+  /** Cria a cobrança PIX na tela do terminal; devolve o id da payment-intent. */
+  createDeviceCharge(
+    deviceId: string,
+    input: PixChargeInput,
+  ): Promise<PixChargeResult>;
+  /** Consulta a payment-intent do terminal por id. */
+  getDeviceCharge(intentId: string): Promise<PixChargeStatusResult>;
+  /** Cancela a cobrança em aberto no terminal. */
+  cancelDeviceCharge(
+    deviceId: string,
+    intentId: string,
+  ): Promise<{ ok: boolean; mensagem?: string }>;
 }
 
 export interface PixConfigLike {

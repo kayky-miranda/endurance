@@ -17,6 +17,7 @@ import { sendWhatsAppAction } from "./whatsapp-actions";
 import {
   savePixConfigAction,
   saveWhatsAppConfigAction,
+  listPixDevicesAction,
 } from "./integracoes-actions";
 import type { PixConfigView } from "@/lib/endurance/pix-service";
 import type { WhatsAppConfigView } from "@/lib/endurance/whatsapp-service";
@@ -265,8 +266,25 @@ function IntegrationsPanel({
   const [pixKey, setPixKey] = useState(pix.pixKey);
   const [pixNome, setPixNome] = useState(pix.beneficiario);
   const [pixCidade, setPixCidade] = useState(pix.cidade);
+  const [pixDevice, setPixDevice] = useState(pix.deviceId);
   const [pixSaving, pixStart] = useTransition();
   const [pixOk, setPixOk] = useState(false);
+  const [devices, setDevices] = useState<{ id: string; name: string }[]>([]);
+  const [devBusy, setDevBusy] = useState(false);
+  const [devMsg, setDevMsg] = useState("");
+
+  async function buscarMaquininhas() {
+    setDevMsg("");
+    setDevBusy(true);
+    const res = await listPixDevicesAction();
+    setDevBusy(false);
+    if (res.ok) {
+      setDevices(res.devices);
+      if (res.devices.length === 0) setDevMsg("Nenhuma maquininha pareada.");
+    } else {
+      setDevMsg(res.error);
+    }
+  }
 
   // WhatsApp
   const [waProvider, setWaProvider] = useState(whatsapp.provider);
@@ -284,6 +302,7 @@ function IntegrationsPanel({
         pixKey,
         beneficiario: pixNome,
         cidade: pixCidade,
+        deviceId: pixDevice,
       });
       setPixOk(res.ok);
     });
@@ -352,6 +371,43 @@ function IntegrationsPanel({
                 className={inputCls}
               />
             </div>
+            {/* Maquininha (Mercado Pago Point) */}
+            <div className="flex gap-2">
+              <input
+                value={pixDevice}
+                onChange={(e) => setPixDevice(e.target.value)}
+                placeholder="ID da maquininha (opcional)"
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={buscarMaquininhas}
+                disabled={devBusy}
+                title="Listar maquininhas pareadas (requer Mercado Pago real)"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 px-3 text-sm text-slate-600 transition hover:border-brand-500 hover:text-brand-500 disabled:opacity-50 dark:border-ink-600 dark:text-slate-300"
+              >
+                {devBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Buscar"}
+              </button>
+            </div>
+            {devices.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {devices.map((d) => (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => setPixDevice(d.id)}
+                    className={`rounded-lg border px-2.5 py-1 text-xs transition ${
+                      pixDevice === d.id
+                        ? "border-brand-500 bg-brand-500/10 text-brand-600 dark:text-brand-300"
+                        : "border-slate-200 text-slate-600 hover:border-brand-500 dark:border-ink-600 dark:text-slate-300"
+                    }`}
+                  >
+                    {d.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            {devMsg && <p className="text-xs text-amber-600 dark:text-amber-400">{devMsg}</p>}
             <button
               onClick={savePix}
               disabled={pixSaving}

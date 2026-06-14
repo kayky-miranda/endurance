@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   buildMpPaymentBody,
   mapMpStatus,
+  mapIntentState,
   createMercadoPagoProvider,
 } from "@/lib/endurance/pix-providers/mercadopago";
 import { resolvePixProvider } from "@/lib/endurance/pix-provider";
@@ -97,6 +98,79 @@ describe("createMercadoPagoProvider", () => {
     const r = await provider.getCharge("99");
     expect(r.status).toBe("pago");
     expect(r.e2eId).toBe("E2E999");
+    expect(r.paidAt).toBeInstanceOf(Date);
+  });
+});
+
+describe("Mercado Pago Point (maquininha)", () => {
+  it("mapIntentState traduz os estados da payment-intent", () => {
+    expect(mapIntentState("FINISHED")).toBe("pago");
+    expect(mapIntentState("ON_TERMINAL")).toBe("pendente");
+    expect(mapIntentState("PROCESSING")).toBe("pendente");
+    expect(mapIntentState("CANCELED")).toBe("cancelado");
+    expect(mapIntentState("ABANDONED")).toBe("cancelado");
+    expect(mapIntentState("ERROR")).toBe("erro");
+  });
+
+  it("listDevices normaliza os aparelhos pareados", async () => {
+    const provider = createMercadoPagoProvider({
+      token: "TEST-abc",
+      baseUrl: "https://api.mercadopago.com",
+      fetchImpl: fakeFetch((url) => {
+        expect(url).toContain("/point/integration-api/devices");
+        return {
+          body: {
+            devices: [
+              { id: "PAX_A910__SMARTPOS123", operating_mode: "PDV" },
+              { id: "no-id-skip" === "" ? "" : "GERTEC__456" },
+            ],
+          },
+        };
+      }),
+    });
+    const devices = await provider.listDevices();
+    expect(devices.map((d) => d.id)).toContain("PAX_A910__SMARTPOS123");
+    expect(devices[0].mode).toBe("PDV");
+  });
+
+  it("createDeviceCharge envia centavos e devolve o id da intent (sem BR Code)", async () => {
+    let sentBody: Record<string, unknown> | undefined;
+    const provider = createMercadoPagoProvider({
+      token: "TEST-abc",
+      baseUrl: "https://api.mercadopago.com",
+      fetchImpl: ((url: string, init: { method: string; body?: string }) => {
+        expect(String(url)).toContain("/devices/DEV1/payment-intents");
+        sentBody = init.body ? JSON.parse(init.body) : undefined;
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ id: "intent_77", device_id: "DEV1" }),
+        } as Response);
+      }) as unknown as typeof fetch,
+    });
+    const r = await provider.createDeviceCharge("DEV1", {
+      ref: "TX9",
+      amount: 25.5,
+      descricao: "Venda",
+      expiraSegundos: 3600,
+    });
+    expect(sentBody?.amount).toBe(2550); // centavos
+    expect((sentBody?.payment as { type: string }).type).toBe("pix");
+    expect(r.status).toBe("pendente");
+    expect(r.providerRef).toBe("intent_77");
+    expect(r.brCode).toBe(""); // QR fica na tela da maquininha
+  });
+
+  it("getDeviceCharge marca pago quando a intent FINISHED", async () => {
+    const provider = createMercadoPagoProvider({
+      token: "TEST-abc",
+      baseUrl: "https://api.mercadopago.com",
+      fetchImpl: fakeFetch(() => ({
+        body: { id: "intent_77", state: "FINISHED", payment: { id: 9001 } },
+      })),
+    });
+    const r = await provider.getDeviceCharge("intent_77");
+    expect(r.status).toBe("pago");
+    expect(r.paymentRef).toBe("9001");
     expect(r.paidAt).toBeInstanceOf(Date);
   });
 });

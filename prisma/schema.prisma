@@ -491,10 +491,13 @@ model PixCharge {
   txid           String    @unique
   amount         Decimal   @db.Decimal(12, 2)
   status         String    @default("pendente") // pendente | pago | expirado | cancelado
-  brCode         String    @default("") // copia-e-cola (payload EMV)
+  brCode         String    @default("") // copia-e-cola (payload EMV); vazio quando vai pra maquininha
   qrImage        String    @default("") // QR como data URL / URL (opcional)
   provider       String    @default("") // "" simulado | "mercadopago"
-  providerRef    String    @default("") // id da cobrança no PSP
+  providerRef    String    @default("") // id da cobrança no PSP (ou da payment-intent, na maquininha)
+  // Maquininha (Mercado Pago Point): cobrança exibida na tela do terminal.
+  terminal       Boolean   @default(false)
+  deviceId       String    @default("") // id do aparelho quando terminal=true
   e2eId          String    @default("") // end-to-end id do PIX (na confirmação)
   expiresAt      DateTime?
   paidAt         DateTime?
@@ -518,6 +521,8 @@ model PixConfig {
   beneficiario   String   @default("") // nome do recebedor (máx. 25 no EMV)
   cidade         String   @default("") // cidade do recebedor (máx. 15 no EMV)
   expiraSegundos Int      @default(3600)
+  // Maquininha (Mercado Pago Point): id do aparelho pareado para exibir o QR.
+  deviceId       String   @default("")
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

@@ -32,3 +32,4 @@ next-env.d.ts
 # playwright (artefatos de teste)
 /test-results/
 /playwright-report/
+/pix-screens/

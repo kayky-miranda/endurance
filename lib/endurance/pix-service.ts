@@ -5,7 +5,7 @@ import type { PixCharge } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { money } from "./money";
 import { buildPixBrCode, makeTxid } from "./pix-emv";
-import { resolvePixProvider } from "./pix-provider";
+import { resolvePixProvider, type PixDevice } from "./pix-provider";
 
 /**
  * Camada de serviço PIX: orquestra config + provedor + persistência da cobrança.
@@ -26,6 +26,7 @@ export interface PixChargeView {
   qrImage: string;
   provider: string;
   simulate: boolean; // modo simulado → permite "confirmar pagamento" manual
+  terminal: boolean; // cobrança exibida na maquininha (QR na tela do aparelho)
   expiresAt: string | null;
   paidAt: string | null;
 }
@@ -41,6 +42,7 @@ function toView(c: PixCharge): PixChargeView {
     qrImage: c.qrImage,
     provider: c.provider,
     simulate: c.provider === "",
+    terminal: c.terminal,
     expiresAt: c.expiresAt ? c.expiresAt.toISOString() : null,
     paidAt: c.paidAt ? c.paidAt.toISOString() : null,
   };
@@ -68,6 +70,8 @@ export interface PixConfigView {
   beneficiario: string;
   cidade: string;
   expiraSegundos: number;
+  deviceId: string; // maquininha (Mercado Pago Point)
+  hasDevice: boolean;
 }
 
 export async function getPixConfigView(org: string): Promise<PixConfigView> {
@@ -78,6 +82,8 @@ export async function getPixConfigView(org: string): Promise<PixConfigView> {
     beneficiario: c.beneficiario,
     cidade: c.cidade,
     expiraSegundos: c.expiraSegundos,
+    deviceId: c.deviceId,
+    hasDevice: Boolean(c.deviceId),
   };
 }
 
@@ -86,6 +92,7 @@ export interface SavePixConfigInput {
   pixKey: string;
   beneficiario: string;
   cidade: string;
+  deviceId?: string;
 }
 
 export async function savePixConfig(
@@ -93,23 +100,34 @@ export async function savePixConfig(
   input: SavePixConfigInput,
 ): Promise<{ ok: boolean; error?: string }> {
   const provider = input.provider === "mercadopago" ? "mercadopago" : "";
+  const fields = {
+    provider,
+    pixKey: (input.pixKey ?? "").trim().slice(0, 120),
+    beneficiario: (input.beneficiario ?? "").trim().slice(0, 25),
+    cidade: (input.cidade ?? "").trim().toUpperCase().slice(0, 15),
+    deviceId: (input.deviceId ?? "").trim().slice(0, 80),
+  };
   await prisma.pixConfig.upsert({
     where: { organizationId: org },
-    create: {
-      organizationId: org,
-      provider,
-      pixKey: (input.pixKey ?? "").trim().slice(0, 120),
-      beneficiario: (input.beneficiario ?? "").trim().slice(0, 25),
-      cidade: (input.cidade ?? "").trim().toUpperCase().slice(0, 15),
-    },
-    update: {
-      provider,
-      pixKey: (input.pixKey ?? "").trim().slice(0, 120),
-      beneficiario: (input.beneficiario ?? "").trim().slice(0, 25),
-      cidade: (input.cidade ?? "").trim().toUpperCase().slice(0, 15),
-    },
+    create: { organizationId: org, ...fields },
+    update: fields,
   });
   return { ok: true };
+}
+
+/** Lista as maquininhas pareadas no PSP (para configurar o aparelho). */
+export async function listPixDevices(
+  org: string,
+): Promise<{ ok: true; devices: PixDevice[] } | { ok: false; error: string }> {
+  const cfg = await ensurePixConfig(org);
+  const resolution = resolvePixProvider(cfg);
+  if (resolution.kind === "error") return { ok: false, error: resolution.error };
+  if (resolution.kind !== "provider")
+    return {
+      ok: false,
+      error: "Selecione o Mercado Pago (real) para listar as maquininhas.",
+    };
+  return { ok: true, devices: await resolution.provider.listDevices() };
 }
 
 export type PixChargeResult =
@@ -120,6 +138,8 @@ export interface CreatePixChargeInput {
   token: string; // token da venda do PDV (idempotência)
   amount: number;
   customerId?: string | null;
+  /** Exibir a cobrança na maquininha (Mercado Pago Point) em vez da tela. */
+  terminal?: boolean;
 }
 
 /** Cria (ou recupera) a cobrança PIX de uma venda. */
@@ -141,8 +161,44 @@ export async function createPixCharge(
   if (resolution.kind === "error") return { ok: false, error: resolution.error };
 
   const txid = makeTxid(crypto.randomUUID().replace(/-/g, ""));
+  const wantTerminal = Boolean(input.terminal);
 
   if (resolution.kind === "provider") {
+    // MAQUININHA: cria a payment-intent no aparelho; o QR aparece na tela dele.
+    if (wantTerminal) {
+      if (!cfg.deviceId)
+        return {
+          ok: false,
+          error: "Nenhuma maquininha configurada para esta empresa.",
+        };
+      const r = await resolution.provider.createDeviceCharge(cfg.deviceId, {
+        ref: txid,
+        amount,
+        descricao: `Venda PDV ${txid.slice(0, 8)}`,
+        expiraSegundos: cfg.expiraSegundos,
+      });
+      if (r.status === "erro")
+        return { ok: false, error: r.mensagem ?? "Falha ao enviar à maquininha." };
+      const charge = await prisma.pixCharge.create({
+        data: {
+          organizationId: org,
+          token,
+          txid: r.txid,
+          amount,
+          status: "pendente",
+          brCode: "",
+          qrImage: "",
+          provider: resolution.provider.id,
+          providerRef: r.providerRef ?? "",
+          terminal: true,
+          deviceId: cfg.deviceId,
+          expiresAt: expiresFrom(cfg.expiraSegundos),
+        },
+      });
+      return { ok: true, charge: toView(charge) };
+    }
+
+    // TELA: cobrança normal com BR Code na tela do caixa.
     let payerEmail: string | undefined;
     if (input.customerId) {
       const c = await prisma.customer.findUnique({
@@ -183,7 +239,9 @@ export async function createPixCharge(
     return { ok: true, charge: toView(charge) };
   }
 
-  // SIMULADO: BR Code montado a partir da chave PIX da empresa.
+  // SIMULADO: BR Code montado a partir da chave PIX da empresa. Quando o caixa
+  // pede "maquininha", marcamos terminal=true (a UI mostra o aviso de terminal)
+  // e a confirmação continua manual (não há aparelho real).
   const brCode = buildPixBrCode({
     pixKey: cfg.pixKey || "demo@endurance.app",
     nome: cfg.beneficiario || "RECEBEDOR",
@@ -202,6 +260,8 @@ export async function createPixCharge(
       brCode,
       qrImage,
       provider: "",
+      terminal: wantTerminal,
+      deviceId: wantTerminal ? cfg.deviceId : "",
       expiresAt: expiresFrom(cfg.expiraSegundos),
     },
   });
@@ -250,8 +310,14 @@ export async function cancelPixCharge(
   if (charge.provider && charge.providerRef) {
     const cfg = await ensurePixConfig(org);
     const resolution = resolvePixProvider(cfg);
-    if (resolution.kind === "provider")
-      await resolution.provider.cancelCharge(charge.providerRef);
+    if (resolution.kind === "provider") {
+      if (charge.terminal && charge.deviceId)
+        await resolution.provider.cancelDeviceCharge(
+          charge.deviceId,
+          charge.providerRef,
+        );
+      else await resolution.provider.cancelCharge(charge.providerRef);
+    }
   }
   await prisma.pixCharge.update({
     where: { id: charge.id },
@@ -287,9 +353,15 @@ export async function refreshCharge(charge: PixCharge): Promise<PixCharge> {
   const cfg = await ensurePixConfig(charge.organizationId);
   const resolution = resolvePixProvider(cfg);
   if (resolution.kind !== "provider") return charge;
-  const r = await resolution.provider.getCharge(charge.providerRef);
+  const r = charge.terminal
+    ? await resolution.provider.getDeviceCharge(charge.providerRef)
+    : await resolution.provider.getCharge(charge.providerRef);
   if (r.status === "pago")
-    return markPaid(charge.id, r.e2eId ?? "", r.paidAt ?? new Date());
+    return markPaid(
+      charge.id,
+      r.e2eId ?? r.paymentRef ?? "",
+      r.paidAt ?? new Date(),
+    );
   if (r.status === "expirado" || r.status === "cancelado")
     return prisma.pixCharge.update({
       where: { id: charge.id },

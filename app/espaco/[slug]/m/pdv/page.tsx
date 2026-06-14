@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/endurance/money";
+import { getPixConfigView } from "@/lib/endurance/pix-service";
 import PdvClient from "../pdv-client";
 import { type Product } from "../products-client";
 import { loadModule, DeniedModule } from "../module-kit";
@@ -14,12 +15,15 @@ export default async function PdvPage({
   const { mod, session, denied } = await loadModule(slug, "pdv");
   if (denied) return <DeniedModule slug={slug} mod={mod} />;
 
-  const rows = session
-    ? await prisma.product.findMany({
-        where: { organizationId: session.org },
-        orderBy: { createdAt: "desc" },
-      })
-    : [];
+  const [rows, pixConfig] = session
+    ? await Promise.all([
+        prisma.product.findMany({
+          where: { organizationId: session.org },
+          orderBy: { createdAt: "desc" },
+        }),
+        getPixConfigView(session.org),
+      ])
+    : [[], null];
   const products: Product[] = rows.map((p) => ({
     id: p.id,
     name: p.name,
@@ -29,5 +33,11 @@ export default async function PdvPage({
     stock: p.stock,
   }));
 
-  return <PdvClient products={products} slug={slug} />;
+  return (
+    <PdvClient
+      products={products}
+      slug={slug}
+      pixHasDevice={pixConfig?.hasDevice ?? false}
+    />
+  );
 }
