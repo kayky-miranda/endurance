@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireOrgAccess } from "@/lib/auth";
-import { canAccessModule, type AccessRole } from "@/lib/endurance/catalog";
+import { requireOrgAccess, sessionHasPermission } from "@/lib/auth";
 import { getWorkspace } from "@/lib/endurance/workspace";
 import { getFinanceOverview } from "@/lib/endurance/finance";
 import { getCashflow } from "@/lib/endurance/cashflow";
@@ -16,7 +15,7 @@ export default async function RelatorioFinanceiroPage({
 }) {
   const { slug } = await params;
   const session = await requireOrgAccess(slug);
-  if (!canAccessModule(session.role as AccessRole, "financeiro")) notFound();
+  if (!sessionHasPermission(session, "finance.reports")) notFound();
 
   const ws = await getWorkspace(slug);
   const [fin, cashflow] = await Promise.all([

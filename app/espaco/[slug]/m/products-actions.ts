@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
+import { logActivity } from "@/lib/endurance/activity-log";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -40,7 +41,7 @@ export async function createProductAction(input: NewProduct): Promise<Result> {
       };
   }
 
-  await prisma.product.create({
+  const created = await prisma.product.create({
     data: {
       organizationId: s.org,
       name,
@@ -51,6 +52,7 @@ export async function createProductAction(input: NewProduct): Promise<Result> {
     },
   });
   revalidate(s.slug);
+  await logActivity(s, "product.create", `Cadastrou o produto ${name}`, created.id);
   return { ok: true };
 }
 
@@ -65,6 +67,7 @@ export async function deleteProductAction(id: string): Promise<Result> {
 
   await prisma.product.delete({ where: { id } });
   revalidate(s.slug);
+  await logActivity(s, "product.delete", `Removeu o produto ${p.name}`, id);
   return { ok: true };
 }
 
@@ -80,8 +83,15 @@ export async function adjustStockAction(
   if (!p || p.organizationId !== s.org)
     return { ok: false, error: "Produto não encontrado." };
 
-  const next = Math.max(0, p.stock + Math.trunc(delta));
+  const move = Math.trunc(delta);
+  const next = Math.max(0, p.stock + move);
   await prisma.product.update({ where: { id }, data: { stock: next } });
   revalidate(s.slug);
+  await logActivity(
+    s,
+    "stock.adjust",
+    `Ajustou estoque de ${p.name}: ${p.stock} → ${next} (${move >= 0 ? "+" : ""}${move})`,
+    id,
+  );
   return { ok: true };
 }

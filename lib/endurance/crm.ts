@@ -1,6 +1,12 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { money } from "./money";
+import {
+  PAGE_SIZE,
+  clampPage,
+  pageMeta,
+  type PageMeta,
+} from "./pagination";
 
 export type Segment = "novo" | "ativo" | "em_risco" | "inativo";
 
@@ -19,105 +25,156 @@ export interface CustomerRow {
 }
 
 export interface CrmInsights {
+  /** Página atual da tabela (compradores por gasto desc, depois os sem compra). */
   customers: CustomerRow[];
   counts: Record<Segment, number>;
   total: number;
   ticketMedio: number;
-  dueList: CustomerRow[];
+  /** Total de clientes previstos para recompra (KPI). */
+  dueCount: number;
+  /** Top da fila de recompra (ranking do CRM usa 5; notificações usam até 12). */
+  dueTop: CustomerRow[];
+  pageMeta: PageMeta;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const DAY = 86400000;
 
-export async function getCustomerInsights(orgId: string): Promise<CrmInsights> {
-  const [customers, sales] = await Promise.all([
-    prisma.customer.findMany({ where: { organizationId: orgId } }),
-    prisma.sale.findMany({
+/** Estatísticas por cliente comprador, derivadas do groupBy de vendas. */
+interface BuyerStat {
+  customerId: string;
+  orders: number;
+  totalSpent: number;
+  lastDays: number;
+  segment: Segment;
+  dueRepurchase: boolean;
+}
+
+export async function getCustomerInsights(
+  orgId: string,
+  rawPage = 1,
+): Promise<CrmInsights> {
+  // Agregação no SQL: uma linha por cliente comprador (count/sum/min/max),
+  // em vez de carregar todas as vendas na aplicação.
+  const [total, agg] = await Promise.all([
+    prisma.customer.count({ where: { organizationId: orgId } }),
+    prisma.sale.groupBy({
+      by: ["customerId"],
       where: { organizationId: orgId, customerId: { not: null } },
-      select: { customerId: true, total: true, createdAt: true },
-      orderBy: { createdAt: "asc" },
+      _count: { _all: true },
+      _sum: { total: true },
+      _min: { createdAt: true },
+      _max: { createdAt: true },
     }),
   ]);
 
-  // Agrega vendas por cliente.
-  const agg = new Map<
-    string,
-    { orders: number; total: number; dates: Date[] }
-  >();
-  for (const s of sales) {
-    const k = s.customerId as string;
-    const e = agg.get(k) ?? { orders: 0, total: 0, dates: [] };
-    e.orders += 1;
-    e.total += money(s.total);
-    e.dates.push(s.createdAt);
-    agg.set(k, e);
-  }
-
   const now = Date.now();
+  const buyers: BuyerStat[] = agg.map((g) => {
+    const orders = g._count._all;
+    const first = g._min.createdAt ?? new Date();
+    const last = g._max.createdAt ?? first;
+    const lastDays = Math.floor((now - last.getTime()) / DAY);
+    // Intervalo médio entre compras = (última − primeira) / (n − 1).
+    const avgInterval =
+      orders >= 2 ? (last.getTime() - first.getTime()) / DAY / (orders - 1) : null;
+    const segment: Segment =
+      lastDays <= 30 ? "ativo" : lastDays <= 60 ? "em_risco" : "inativo";
+    return {
+      customerId: g.customerId as string,
+      orders,
+      totalSpent: round2(money(g._sum.total)),
+      lastDays,
+      segment,
+      dueRepurchase: avgInterval !== null && lastDays >= avgInterval,
+    };
+  });
+
   const counts: Record<Segment, number> = {
-    novo: 0,
+    novo: total - buyers.length,
     ativo: 0,
     em_risco: 0,
     inativo: 0,
   };
+  for (const b of buyers) counts[b.segment] += 1;
 
-  const rows: CustomerRow[] = customers.map((c) => {
-    const e = agg.get(c.id);
-    const orders = e?.orders ?? 0;
-    const total = round2(e?.total ?? 0);
-    const avgTicket = orders ? round2(total / orders) : 0;
-    const last = e && e.dates.length ? e.dates[e.dates.length - 1] : null;
-    const lastDays = last ? Math.floor((now - last.getTime()) / DAY) : null;
+  const ticketMedio = buyers.length
+    ? round2(buyers.reduce((s, b) => s + b.totalSpent, 0) / buyers.length)
+    : 0;
 
-    // Intervalo médio entre compras (para prever recompra).
-    let avgInterval: number | null = null;
-    if (e && e.dates.length >= 2) {
-      let sum = 0;
-      for (let i = 1; i < e.dates.length; i++)
-        sum += (e.dates[i].getTime() - e.dates[i - 1].getTime()) / DAY;
-      avgInterval = sum / (e.dates.length - 1);
-    }
+  const due = buyers
+    .filter((b) => b.dueRepurchase)
+    .sort((a, b) => b.lastDays - a.lastDays);
+  const dueTopStats = due.slice(0, 12);
 
-    let segment: Segment;
-    if (orders === 0) segment = "novo";
-    else if (lastDays !== null && lastDays <= 30) segment = "ativo";
-    else if (lastDays !== null && lastDays <= 60) segment = "em_risco";
-    else segment = "inativo";
-    counts[segment] += 1;
+  // Página da tabela: compradores ordenados por gasto desc; quando a página
+  // passa do fim dessa lista, completa com os clientes sem compra ("novo").
+  const page = clampPage(rawPage, total);
+  const start = (page - 1) * PAGE_SIZE;
+  const sorted = [...buyers].sort((a, b) => b.totalSpent - a.totalSpent);
+  const pageBuyers = sorted.slice(start, start + PAGE_SIZE);
+  const novosTake = PAGE_SIZE - pageBuyers.length;
+  const novosSkip = Math.max(0, start - sorted.length);
 
-    const dueRepurchase =
-      orders >= 2 &&
-      avgInterval !== null &&
-      lastDays !== null &&
-      lastDays >= avgInterval;
+  const wantedIds = Array.from(
+    new Set([...pageBuyers, ...dueTopStats].map((b) => b.customerId)),
+  );
+  const [wanted, novos] = await Promise.all([
+    wantedIds.length
+      ? prisma.customer.findMany({ where: { id: { in: wantedIds } } })
+      : Promise.resolve([]),
+    novosTake > 0
+      ? prisma.customer.findMany({
+          where: { organizationId: orgId, sales: { none: {} } },
+          orderBy: { createdAt: "desc" },
+          skip: novosSkip,
+          take: novosTake,
+        })
+      : Promise.resolve([]),
+  ]);
+  const byId = new Map(wanted.map((c) => [c.id, c]));
 
+  const buyerRow = (b: BuyerStat): CustomerRow | null => {
+    const c = byId.get(b.customerId);
+    if (!c) return null;
     return {
       id: c.id,
       name: c.name,
       phone: c.phone,
       email: c.email,
       document: c.document,
-      orders,
-      totalSpent: total,
-      avgTicket,
-      lastDays,
-      segment,
-      dueRepurchase,
+      orders: b.orders,
+      totalSpent: b.totalSpent,
+      avgTicket: round2(b.totalSpent / b.orders),
+      lastDays: b.lastDays,
+      segment: b.segment,
+      dueRepurchase: b.dueRepurchase,
     };
+  };
+  const novoRow = (c: (typeof novos)[number]): CustomerRow => ({
+    id: c.id,
+    name: c.name,
+    phone: c.phone,
+    email: c.email,
+    document: c.document,
+    orders: 0,
+    totalSpent: 0,
+    avgTicket: 0,
+    lastDays: null,
+    segment: "novo",
+    dueRepurchase: false,
   });
 
-  rows.sort((a, b) => b.totalSpent - a.totalSpent);
+  const isRow = (r: CustomerRow | null): r is CustomerRow => r !== null;
+  const customers = [...pageBuyers.map(buyerRow).filter(isRow), ...novos.map(novoRow)];
+  const dueTop = dueTopStats.map(buyerRow).filter(isRow);
 
-  const withOrders = rows.filter((r) => r.orders > 0);
-  const ticketMedio = withOrders.length
-    ? round2(
-        withOrders.reduce((s, r) => s + r.totalSpent, 0) / withOrders.length,
-      )
-    : 0;
-
-  const dueList = rows
-    .filter((r) => r.dueRepurchase)
-    .sort((a, b) => (b.lastDays ?? 0) - (a.lastDays ?? 0));
-
-  return { customers: rows, counts, total: customers.length, ticketMedio, dueList };
+  return {
+    customers,
+    counts,
+    total,
+    ticketMedio,
+    dueCount: due.length,
+    dueTop,
+    pageMeta: pageMeta(page, total),
+  };
 }

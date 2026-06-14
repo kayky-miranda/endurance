@@ -19,6 +19,8 @@ import {
   Tag,
   Package,
   Printer,
+  QrCode,
+  Copy,
 } from "lucide-react";
 import type { Product } from "./products-client";
 import {
@@ -27,6 +29,13 @@ import {
   suggestCrossSellAction,
   type CustomerData,
 } from "./pdv-actions";
+import {
+  createPixChargeAction,
+  getPixChargeStatusAction,
+  confirmSimulatedPixAction,
+  cancelPixChargeAction,
+} from "./pix-actions";
+import type { PixChargeView } from "@/lib/endurance/pix-service";
 
 type Suggestion = { id: string; name: string; price: number; reason: string };
 
@@ -40,6 +49,7 @@ const METHODS = [
 function brl(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
+const round2 = (n: number) => Math.round(n * 100) / 100;
 function newToken() {
   return typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
@@ -86,6 +96,13 @@ export default function PdvClient({
   const [payments, setPayments] = useState<{ method: string; amount: number }[]>(
     [],
   );
+
+  // cobrança PIX (fluxo assíncrono: QR → cliente paga → finaliza)
+  const [pixModal, setPixModal] = useState(false);
+  const [pixCharge, setPixCharge] = useState<PixChargeView | null>(null);
+  const [pixBusy, setPixBusy] = useState(false);
+  const [pixError, setPixError] = useState("");
+  const [pixCopied, setPixCopied] = useState(false);
 
   // IA
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -179,16 +196,28 @@ export default function PdvClient({
     setSearch("");
     setCategory("");
     setSuggestions([]);
+    resetPix();
     tokenRef.current = newToken();
     setTimeout(() => searchRef.current?.focus(), 50);
   }
   function cancelSale() {
+    // Cancela best-effort uma cobrança PIX ainda pendente desta venda.
+    if (pixCharge && pixCharge.status === "pendente")
+      void cancelPixChargeAction(pixCharge.id);
     setActive(false);
     setCart({});
     setCustomer(null);
     setPayments([]);
     setDiscInput("");
     setError("");
+    resetPix();
+  }
+  function resetPix() {
+    setPixModal(false);
+    setPixCharge(null);
+    setPixBusy(false);
+    setPixError("");
+    setPixCopied(false);
   }
 
   function addToCart(id: string) {
@@ -276,12 +305,81 @@ export default function PdvClient({
     }
   }
 
+  const pixTotal = round2(
+    payments.filter((p) => p.method === "pix").reduce((s, p) => s + p.amount, 0),
+  );
+
   async function finalize() {
-    if (submitting.current || busy || lines.length === 0) return;
+    if (submitting.current || busy || pixBusy || lines.length === 0) return;
     if (payments.length > 0 && paid + 0.01 < total) {
       setError("Pagamento insuficiente para o total.");
       return;
     }
+    // Há parcela PIX e ainda não confirmada → abre a cobrança (QR) e aguarda.
+    if (pixTotal > 0 && !(pixCharge && pixCharge.status === "pago")) {
+      await openPixCharge(pixTotal);
+      return;
+    }
+    await doFinalize(pixCharge?.id ?? null);
+  }
+
+  /** Cria/recupera a cobrança PIX e abre o modal do QR. */
+  async function openPixCharge(amount: number) {
+    setPixError("");
+    setPixBusy(true);
+    setPixModal(true);
+    const res = await createPixChargeAction({
+      token: tokenRef.current,
+      amount,
+      customerId: customer?.id ?? null,
+    });
+    setPixBusy(false);
+    if (!res.ok) {
+      setPixError(res.error);
+      return;
+    }
+    setPixCharge(res.charge);
+    if (res.charge.status === "pago") void completePixSale(res.charge);
+  }
+
+  /** Pagamento confirmado → fecha o modal e finaliza a venda com o id da cobrança. */
+  async function completePixSale(charge: PixChargeView) {
+    setPixModal(false);
+    await doFinalize(charge.id);
+  }
+
+  async function confirmSimulated() {
+    if (!pixCharge || pixBusy) return;
+    setPixBusy(true);
+    const res = await confirmSimulatedPixAction(pixCharge.id);
+    setPixBusy(false);
+    if (!res.ok) {
+      setPixError(res.error);
+      return;
+    }
+    setPixCharge(res.charge);
+    if (res.charge.status === "pago") void completePixSale(res.charge);
+  }
+
+  async function copyBrCode() {
+    if (!pixCharge?.brCode) return;
+    try {
+      await navigator.clipboard.writeText(pixCharge.brCode);
+      setPixCopied(true);
+      setTimeout(() => setPixCopied(false), 1800);
+    } catch {
+      /* clipboard indisponível — usuário copia manualmente */
+    }
+  }
+
+  async function cancelPix() {
+    if (pixCharge && pixCharge.status === "pendente")
+      void cancelPixChargeAction(pixCharge.id);
+    resetPix();
+  }
+
+  async function doFinalize(pixChargeId: string | null) {
+    if (submitting.current || busy) return;
     submitting.current = true;
     setBusy(true);
     setError("");
@@ -293,6 +391,7 @@ export default function PdvClient({
         customerId: customer?.id ?? null,
         discount: discountValue,
         payments,
+        pixChargeId,
       });
       if (res.ok) {
         setLastSale(
@@ -306,16 +405,49 @@ export default function PdvClient({
         setCustomer(null);
         setPayments([]);
         setDiscInput("");
+        resetPix();
         tokenRef.current = newToken();
         router.refresh();
       } else {
         setError(res.error);
+        resetPix();
       }
     } finally {
       setBusy(false);
       submitting.current = false;
     }
   }
+
+  // Cobrança REAL: faz polling do status até pagar/expirar (o webhook do PSP
+  // também marca a cobrança; aqui garantimos a reação no caixa). No modo
+  // simulado não há PSP — a confirmação é manual pelo botão.
+  const pixId = pixCharge?.id;
+  const pixStatus = pixCharge?.status;
+  const pixSimulate = pixCharge?.simulate;
+  useEffect(() => {
+    if (!pixModal || !pixId || pixSimulate || pixStatus !== "pendente") return;
+    let stop = false;
+    const t = setInterval(async () => {
+      const res = await getPixChargeStatusAction(pixId);
+      if (stop || !res.ok) return;
+      setPixCharge(res.charge);
+      if (res.charge.status === "pago") {
+        clearInterval(t);
+        void completePixSale(res.charge);
+      } else if (
+        res.charge.status === "expirado" ||
+        res.charge.status === "cancelado"
+      ) {
+        clearInterval(t);
+        setPixError(`Cobrança ${res.charge.status}. Refaça o pagamento.`);
+      }
+    }, 3000);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pixModal, pixId, pixStatus, pixSimulate]);
 
   // ---------- TELA OCIOSA ----------
   if (!active) {
@@ -367,6 +499,7 @@ export default function PdvClient({
 
   // ---------- VENDA EM ANDAMENTO ----------
   return (
+    <>
     <div className="grid gap-4 lg:grid-cols-5">
       {/* ESQUERDA: busca + categorias + grade + IA */}
       <div className="space-y-4 lg:col-span-3">
@@ -750,6 +883,99 @@ export default function PdvClient({
         </div>
       </div>
     </div>
+
+      {/* Modal de cobrança PIX */}
+      {pixModal && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
+          onClick={cancelPix}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-ink-700 dark:bg-ink-900"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                <QrCode className="h-4 w-4 text-brand-500" />
+                Pagamento PIX
+              </h3>
+              <button
+                onClick={cancelPix}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {pixBusy && !pixCharge ? (
+              <div className="grid place-items-center py-12">
+                <Loader2 className="h-7 w-7 animate-spin text-brand-500" />
+              </div>
+            ) : pixError ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  {pixError}
+                </div>
+                <button
+                  onClick={cancelPix}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm text-slate-600 transition hover:border-brand-500 dark:border-ink-600 dark:text-slate-300"
+                >
+                  Fechar
+                </button>
+              </div>
+            ) : pixCharge ? (
+              <div className="space-y-3 text-center">
+                <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">
+                  {brl(pixCharge.amount)}
+                </p>
+                {pixCharge.status === "pago" ? (
+                  <div className="flex items-center justify-center gap-2 py-8 text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="h-6 w-6" />
+                    Pagamento confirmado
+                  </div>
+                ) : (
+                  <>
+                    {pixCharge.qrImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={pixCharge.qrImage}
+                        alt="QR Code PIX"
+                        className="mx-auto h-52 w-52 rounded-lg bg-white p-2"
+                      />
+                    ) : null}
+                    <button
+                      onClick={copyBrCode}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:text-slate-300"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      {pixCopied ? "Copiado!" : "Copiar código PIX"}
+                    </button>
+                    <p className="flex items-center justify-center gap-1.5 text-xs text-slate-400">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Aguardando pagamento…
+                    </p>
+                    {pixCharge.simulate && (
+                      <button
+                        onClick={confirmSimulated}
+                        disabled={pixBusy}
+                        className="w-full rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-brand-400 disabled:opacity-40"
+                      >
+                        {pixBusy ? (
+                          <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                        ) : (
+                          "Confirmar pagamento (simulado)"
+                        )}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

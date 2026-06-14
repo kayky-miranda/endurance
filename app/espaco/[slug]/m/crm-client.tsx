@@ -35,13 +35,19 @@ const labelCls =
   "mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400";
 
 /** Tabela de clientes do CRM com edição dos dados cadastrais. */
-export default function CrmCustomersTable({ rows }: { rows: CustomerRow[] }) {
+export default function CrmCustomersTable({
+  rows,
+  total,
+}: {
+  rows: CustomerRow[];
+  total: number;
+}) {
   const [editing, setEditing] = useState<CustomerRow | null>(null);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-ink-700 dark:bg-ink-900">
       <p className="px-5 py-3 text-sm font-semibold text-slate-800 dark:text-slate-100">
-        Clientes ({rows.length})
+        Clientes ({total})
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">

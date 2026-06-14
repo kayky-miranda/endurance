@@ -28,6 +28,8 @@ export interface FinalizeInput {
   customerId?: string | null;
   discount?: number;
   payments?: PaymentInput[];
+  /** Cobrança PIX já confirmada (paga) que cobre a parcela pix da venda. */
+  pixChargeId?: string | null;
 }
 
 const VALID_METHODS = ["dinheiro", "credito", "debito", "pix"];
@@ -152,6 +154,31 @@ export async function finalizeSaleAction(
       .filter((p) => p.amount > 0);
   }
 
+  // PIX: a parcela paga em PIX exige uma cobrança JÁ CONFIRMADA (paga), do mesmo
+  // token e valor. O fluxo do PDV é assíncrono: gera o QR, o cliente paga, a
+  // cobrança vira `pago`, e só então a venda é finalizada com este id.
+  const pixTotal = round2(
+    payments.filter((p) => p.method === "pix").reduce((a, p) => a + p.amount, 0),
+  );
+  let pixCharge: { id: string; txid: string } | null = null;
+  if (pixTotal > 0) {
+    const chId = (input.pixChargeId ?? "").trim();
+    if (!chId)
+      return { ok: false, error: "Confirme o pagamento PIX antes de finalizar." };
+    const ch = await prisma.pixCharge.findUnique({ where: { id: chId } });
+    if (!ch || ch.organizationId !== s.org)
+      return { ok: false, error: "Cobrança PIX não encontrada." };
+    if (ch.token !== token)
+      return { ok: false, error: "Cobrança PIX não corresponde a esta venda." };
+    if (ch.status !== "pago")
+      return { ok: false, error: "O pagamento PIX ainda não foi confirmado." };
+    if (ch.saleId)
+      return { ok: false, error: "Cobrança PIX já vinculada a outra venda." };
+    if (Math.abs(money(ch.amount) - pixTotal) > 0.01)
+      return { ok: false, error: "Valor pago em PIX difere da parcela da venda." };
+    pixCharge = { id: ch.id, txid: ch.txid };
+  }
+
   // Vincula a venda ao caixa aberto DO OPERADOR (multi-caixa por operador).
   const openSession = await getOpenSession(s.org, s.sub);
 
@@ -212,6 +239,20 @@ export async function finalizeSaleAction(
         },
         tx,
       );
+
+      // Conciliação imediata da parcela PIX: liga a cobrança à venda e marca o
+      // recebível pix como conciliado (cobrança ↔ recebível batidos no fato).
+      if (pixCharge) {
+        const now = new Date();
+        await tx.pixCharge.update({
+          where: { id: pixCharge.id },
+          data: { saleId: sale.id, reconciledAt: now },
+        });
+        await tx.financialEntry.updateMany({
+          where: { saleId: sale.id, method: "pix" },
+          data: { reconciledAt: now, externalRef: pixCharge.txid },
+        });
+      }
 
       return sale.id;
     });

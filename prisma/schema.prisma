@@ -25,20 +25,92 @@ model Organization {
   segment    String   @default("")
   createdAt  DateTime @default(now())
 
-  modules      OrgModule[]
-  users        User[]
-  products     Product[]
-  sales        Sale[]
-  customers    Customer[]
-  fiscalConfig FiscalConfig?
-  fiscalDocs   FiscalDocument[]
-  cashSessions CashSession[]
-  finEntries   FinancialEntry[]
-  suppliers    Supplier[]
-  purchases    PurchaseOrder[]
-  categories   Category[]
+  modules          OrgModule[]
+  users            User[]
+  products         Product[]
+  sales            Sale[]
+  customers        Customer[]
+  fiscalConfig     FiscalConfig?
+  fiscalDocs       FiscalDocument[]
+  cashSessions     CashSession[]
+  finEntries       FinancialEntry[]
+  suppliers        Supplier[]
+  purchases        PurchaseOrder[]
+  categories       Category[]
   importedInvoices ImportedInvoice[]
-  activityLogs ActivityLog[]
+  activityLogs     ActivityLog[]
+  aiUsage          AiUsage[]
+  subscription     Subscription?
+  invoices         Invoice[]
+  pixCharges       PixCharge[]
+  pixConfig        PixConfig?
+  whatsappConfig   WhatsAppConfig?
+  whatsappMessages WhatsAppMessage[]
+}
+
+// Assinatura SaaS do espaço (uma por organização). No protótipo a cobrança é
+// auto-gerida (sem provedor de pagamento externo): a troca de plano é imediata
+// e gera uma fatura interna. O modelo segue o vocabulário de provedores reais
+// (status trialing/active/past_due/canceled, cancelamento ao fim do ciclo) para
+// que um Stripe/Iugu possa ser plugado depois sem reescrever as telas.
+model Subscription {
+  id                 String    @id @default(cuid())
+  organizationId     String    @unique
+  plan               String    @default("starter") // starter | professional | business | enterprise
+  status             String    @default("trialing") // trialing | active | past_due | canceled
+  seats              Int       @default(2) // limite de usuários do plano
+  currentPeriodStart DateTime  @default(now())
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean   @default(false)
+  trialEndsAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoices     Invoice[]
+}
+
+// Fatura interna gerada a cada cobrança/troca de plano paga. Guarda o valor
+// congelado do plano e o período coberto — base do histórico de cobrança.
+model Invoice {
+  id             String    @id @default(cuid())
+  organizationId String
+  subscriptionId String
+  number         String // número humano sequencial (ex.: 2026-0001)
+  plan           String
+  amount         Decimal   @db.Decimal(12, 2)
+  status         String    @default("paga") // paga | pendente | falhou
+  periodStart    DateTime
+  periodEnd      DateTime
+  issuedAt       DateTime  @default(now())
+  paidAt         DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, issuedAt])
+}
+
+// Telemetria de IA por organização: cada chamada a um provedor (ou queda na
+// heurística offline) vira um registro com tokens, latência e resultado.
+// organizationId é nulo nas chamadas pré-tenant (onboarding, antes do signup).
+model AiUsage {
+  id             String   @id @default(cuid())
+  organizationId String?
+  feature        String // assistant | onboarding | sales_insights | stock_advice | crm_campaigns | pricing_advice
+  provider       String // gemini | anthropic | offline
+  model          String   @default("")
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  latencyMs      Int      @default(0)
+  ok             Boolean  @default(true)
+  fallback       Boolean  @default(false) // resolveu pela heurística offline
+  error          String   @default("")
+  createdAt      DateTime @default(now())
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
 }
 
 // Nota fiscal importada por XML (NF-e modelo 55 / NFC-e modelo 65). Registro
@@ -57,6 +129,11 @@ model ImportedInvoice {
   itemsCount     Int      @default(0)
   dhEmi          DateTime @default(now())
   xml            String
+  // Lançamentos gerados a partir da nota (entrada de estoque / conta a pagar).
+  // Ficam no header porque a importação é idempotente por chave: só a primeira
+  // importação de uma chave lança estoque/financeiro.
+  appliedStock   Boolean  @default(false)
+  appliedPayable Boolean  @default(false)
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -182,6 +259,9 @@ model FinancialEntry {
   saleId         String?
   dueDate        DateTime
   paidAt         DateTime?
+  // Conciliação: quando o recebível foi batido contra a cobrança/extrato externo.
+  reconciledAt   DateTime?
+  externalRef    String    @default("") // referência externa (txid PIX, id de extrato)
   createdAt      DateTime  @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -209,6 +289,11 @@ model FiscalConfig {
   ambiente       String   @default("2")
   cscId          String   @default("000001")
   csc            String   @default("")
+  // Emissão real: "" = simulada (protótipo) | "focusnfe" = provedor homologado.
+  provider       String   @default("")
+  // NCM padrão dos itens (8 díg.) quando o produto não tem NCM próprio. A SEFAZ
+  // valida o NCM, então a emissão real exige ao menos este default por empresa.
+  defaultNcm     String   @default("")
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -230,8 +315,12 @@ model FiscalDocument {
   protocolo       String    @default("")
   qrCode          String    @default("")
   xml             String    @default("")
-  valorTotal      Decimal  @db.Decimal(12, 2)
+  valorTotal      Decimal   @db.Decimal(12, 2)
   motivoCancel    String    @default("")
+  // Rastreabilidade do provedor de emissão real (vazio quando simulado).
+  provider        String    @default("") // "" | "focusnfe"
+  providerRef     String    @default("") // referência idempotente enviada ao provedor
+  danfeUrl        String    @default("") // URL do DANFE/cupom no provedor
   dataEmissao     DateTime  @default(now())
   dataAutorizacao DateTime?
   dataCancel      DateTime?
@@ -252,8 +341,9 @@ model Customer {
   document       String   @default("")
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sales        Sale[]
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sales            Sale[]
+  whatsAppMessages WhatsAppMessage[]
 
   @@index([organizationId])
 }
@@ -293,13 +383,14 @@ model Sale {
   itemsCount     Int
   createdAt      DateTime @default(now())
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer     Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  seller       User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
-  cashSession  CashSession?  @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  seller       User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  cashSession  CashSession?    @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
   items        SaleItem[]
   payments     SalePayment[]
   fiscalDoc    FiscalDocument?
+  pixCharge    PixCharge?
 
   @@index([organizationId])
   @@index([customerId])
@@ -321,7 +412,7 @@ model SaleItem {
 
 // Pagamento de uma venda (permite split: várias formas na mesma venda).
 model SalePayment {
-  id     String @id @default(cuid())
+  id     String  @id @default(cuid())
   saleId String
   method String // dinheiro | credito | debito | pix
   amount Decimal @db.Decimal(12, 2)
@@ -351,8 +442,9 @@ model User {
   organizationId String
   createdAt      DateTime  @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sales        Sale[]
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sales            Sale[]
+  whatsappMessages WhatsAppMessage[]
 
   @@index([organizationId])
 }
@@ -384,4 +476,88 @@ model OrgModule {
 
   @@unique([organizationId, moduleId])
   @@index([organizationId])
+}
+
+// Cobrança PIX gerada no PDV. No fluxo assíncrono, a venda (Sale) só é criada
+// quando a cobrança é confirmada como `pago`. Idempotente por `token` (o mesmo
+// token de venda do PDV) e por `txid`. provider="" = simulado (BR Code gerado
+// localmente); "mercadopago" = cobrança real via PSP. e2eId é o end-to-end id
+// do PIX (preenchido na confirmação). reconciledAt marca a conciliação.
+model PixCharge {
+  id             String    @id @default(cuid())
+  organizationId String
+  saleId         String?   @unique // ligado quando a venda é finalizada
+  token          String    @unique // = token da venda no PDV (idempotência)
+  txid           String    @unique
+  amount         Decimal   @db.Decimal(12, 2)
+  status         String    @default("pendente") // pendente | pago | expirado | cancelado
+  brCode         String    @default("") // copia-e-cola (payload EMV)
+  qrImage        String    @default("") // QR como data URL / URL (opcional)
+  provider       String    @default("") // "" simulado | "mercadopago"
+  providerRef    String    @default("") // id da cobrança no PSP
+  e2eId          String    @default("") // end-to-end id do PIX (na confirmação)
+  expiresAt      DateTime?
+  paidAt         DateTime?
+  reconciledAt   DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sale         Sale?        @relation(fields: [saleId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status])
+}
+
+// Configuração PIX da empresa (uma por org). O token do PSP fica em variável de
+// ambiente no servidor (espelha o Focus NFe); aqui só os dados não-secretos.
+model PixConfig {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  // "" = simulado (BR Code da chave) | "mercadopago" = cobrança real.
+  provider       String   @default("")
+  pixKey         String   @default("") // chave PIX do recebedor (BR Code simulado)
+  beneficiario   String   @default("") // nome do recebedor (máx. 25 no EMV)
+  cidade         String   @default("") // cidade do recebedor (máx. 15 no EMV)
+  expiraSegundos Int      @default(3600)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// Configuração WhatsApp Business da empresa (uma por org). O token Meta fica em
+// variável de ambiente no servidor; aqui só os identificadores não-secretos.
+model WhatsAppConfig {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  provider       String   @default("") // "" simulado | "meta"
+  phoneNumberId  String   @default("") // Phone Number ID da Cloud API
+  remetente      String   @default("") // número/nome exibido
+  enabled        Boolean  @default(false)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// Log de mensagens WhatsApp enviadas (cobrança PIX, recibo, recompra CRM, manual).
+model WhatsAppMessage {
+  id             String    @id @default(cuid())
+  organizationId String
+  customerId     String?
+  toPhone        String
+  kind           String    @default("manual") // pix | recibo | crm | manual
+  body           String    @default("")
+  templateName   String    @default("")
+  status         String    @default("enfileirado") // enfileirado | enviado | entregue | lido | falha
+  provider       String    @default("") // "" simulado | "meta"
+  providerRef    String    @default("") // id da mensagem no provedor (wamid)
+  error          String    @default("")
+  createdAt      DateTime  @default(now())
+  sentAt         DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  user         User?        @relation(fields: [userId], references: [id])
+  userId       String?
+
+  @@index([organizationId, status])
+  @@index([providerRef])
 }

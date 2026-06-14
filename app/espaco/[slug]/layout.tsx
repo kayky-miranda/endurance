@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireOrgAccess, canManageTeamSession } from "@/lib/auth";
 import { getWorkspace } from "@/lib/endurance/workspace";
-import { canAccessModule, type AccessRole } from "@/lib/endurance/catalog";
 import {
   effectivePermissions,
   modulePermission,
@@ -20,14 +19,13 @@ export default async function EspacoLayout({
   const ws = await getWorkspace(slug);
   if (!ws) notFound();
 
-  // Permissões efetivas (OWNER/ADMIN têm tudo). Usadas para o RBAC granular
-  // de navegação, por cima do gating por papel já existente.
+  // Permissões efetivas (OWNER/ADMIN têm tudo). Fonte única do RBAC de
+  // navegação: o menu só mostra módulos cuja permissão o usuário tem.
   const perms = new Set(effectivePermissions(session.role, session.permissions));
   const canViewDashboard = perms.has("dashboard.view");
 
   const modules = ws.modules
     .filter((m) => {
-      if (!canAccessModule(session.role as AccessRole, m.id)) return false;
       const required = modulePermission(m.id);
       return required ? perms.has(required) : true;
     })
@@ -41,6 +39,7 @@ export default async function EspacoLayout({
       modules={modules}
       userName={session.name}
       canManage={canManageTeamSession(session)}
+      canManageBilling={perms.has("subscription.manage")}
       canViewDashboard={canViewDashboard}
     >
       {children}

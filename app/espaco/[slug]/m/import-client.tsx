@@ -300,6 +300,48 @@ export default function ImportClient({ slug }: { slug: string }) {
   );
 }
 
+function ImportToggle({
+  checked,
+  onChange,
+  label,
+  hint,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  hint: string;
+  disabled?: boolean;
+}) {
+  return (
+    <label
+      className={`flex cursor-pointer gap-2 rounded-xl border p-3 transition ${
+        disabled
+          ? "cursor-not-allowed border-slate-200 opacity-50 dark:border-ink-800"
+          : checked
+            ? "border-brand-500/50 bg-brand-500/5"
+            : "border-slate-200 hover:border-brand-500/40 dark:border-ink-700"
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={checked && !disabled}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-4 w-4 shrink-0 accent-brand-500"
+      />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+          {label}
+        </span>
+        <span className="block text-xs text-slate-500 dark:text-slate-400">
+          {hint}
+        </span>
+      </span>
+    </label>
+  );
+}
+
 function Count({
   label,
   value,
@@ -340,13 +382,24 @@ type InvRow = {
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+type InvDone = {
+  imported: number;
+  skipped: number;
+  stockUpdated: number;
+  productsCreated: number;
+  payables: number;
+};
+
 function InvoiceImport({ spec }: { spec: ImportEntitySpec }) {
   const router = useRouter();
   const [files, setFiles] = useState<InvFile[]>([]);
   const [rows, setRows] = useState<InvRow[] | null>(null);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<{ imported: number; skipped: number } | null>(null);
+  const [done, setDone] = useState<InvDone | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [applyStock, setApplyStock] = useState(true);
+  const [applyPayable, setApplyPayable] = useState(true);
+  const [createProducts, setCreateProducts] = useState(true);
   const ref = useRef<HTMLInputElement>(null);
 
   function reset() {
@@ -379,10 +432,20 @@ function InvoiceImport({ spec }: { spec: ImportEntitySpec }) {
   async function commit() {
     setBusy(true);
     setErr(null);
-    const res = await commitInvoicesAction(files);
+    const res = await commitInvoicesAction(files, {
+      applyStock,
+      applyPayable,
+      createProducts,
+    });
     setBusy(false);
     if (res.ok) {
-      setDone({ imported: res.imported ?? 0, skipped: res.skipped ?? 0 });
+      setDone({
+        imported: res.imported,
+        skipped: res.skipped,
+        stockUpdated: res.stockUpdated,
+        productsCreated: res.productsCreated,
+        payables: res.payables,
+      });
       setRows(null);
       router.refresh();
     } else setErr(res.error ?? "Falha ao importar.");
@@ -418,6 +481,33 @@ function InvoiceImport({ spec }: { spec: ImportEntitySpec }) {
             className="hidden"
           />
         </label>
+
+        <div className="mt-4 border-t border-slate-100 pt-4 dark:border-ink-800">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Ao importar (notas de entrada)
+          </p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            <ImportToggle
+              checked={applyStock}
+              onChange={setApplyStock}
+              label="Dar entrada no estoque"
+              hint="Soma as quantidades dos itens aos produtos."
+            />
+            <ImportToggle
+              checked={applyPayable}
+              onChange={setApplyPayable}
+              label="Gerar conta a pagar"
+              hint="Cria um lançamento com o total da nota (venc. +28d)."
+            />
+            <ImportToggle
+              checked={createProducts}
+              onChange={setCreateProducts}
+              disabled={!applyStock}
+              label="Criar produtos novos"
+              hint="Cadastra itens que ainda não existem no catálogo."
+            />
+          </div>
+        </div>
       </div>
 
       {err && (
@@ -442,6 +532,15 @@ function InvoiceImport({ spec }: { spec: ImportEntitySpec }) {
             {done.imported} nota(s) importada(s)
             {done.skipped > 0 && ` · ${done.skipped} ignorada(s) (inválidas/duplicadas)`}.
           </p>
+          {(done.stockUpdated > 0 || done.payables > 0) && (
+            <p className="mt-1 text-emerald-700/80 dark:text-emerald-300/80">
+              {done.stockUpdated} entrada(s) de estoque
+              {done.productsCreated > 0 &&
+                ` (${done.productsCreated} produto(s) novo(s))`}
+              {" · "}
+              {done.payables} conta(s) a pagar gerada(s).
+            </p>
+          )}
           <button
             onClick={reset}
             className="mt-3 rounded-lg border border-emerald-500/40 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300"

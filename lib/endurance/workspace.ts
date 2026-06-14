@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import {
   NICHES,
@@ -128,8 +129,14 @@ export interface WorkspaceView {
   modules: { id: string; label: string; description: string; core: boolean }[];
 }
 
-/** Carrega um espaço pelo slug, já mapeando os ids para rótulos do catálogo. */
-export async function getWorkspace(slug: string): Promise<WorkspaceView | null> {
+/**
+ * Carrega um espaço pelo slug, já mapeando os ids para rótulos do catálogo.
+ * Deduplicado por request com React cache() — layout e página do módulo
+ * compartilham a mesma consulta no mesmo render.
+ */
+export const getWorkspace = cache(async function getWorkspace(
+  slug: string,
+): Promise<WorkspaceView | null> {
   const org = await prisma.organization.findUnique({
     where: { slug },
     include: { modules: true },
@@ -161,4 +168,4 @@ export async function getWorkspace(slug: string): Promise<WorkspaceView | null> 
     createdAt: org.createdAt.toISOString(),
     modules,
   };
-}
+});

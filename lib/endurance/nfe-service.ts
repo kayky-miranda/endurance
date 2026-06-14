@@ -2,6 +2,12 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { money } from "./money";
 import {
+  PAGE_SIZE,
+  clampPage,
+  pageMeta,
+  type PageMeta,
+} from "./pagination";
+import {
   buildAccessKey,
   buildQrCode,
   buildNfceXml,
@@ -167,6 +173,7 @@ export interface NfeRow {
 export interface NfeOverview {
   config: FiscalConfigView;
   rows: NfeRow[];
+  pageMeta: PageMeta;
   kpis: {
     autorizadasMes: number;
     valorMes: number;
@@ -176,12 +183,52 @@ export interface NfeOverview {
 }
 
 /** Lista as vendas elegíveis a NF-e (cliente identificado) e suas notas. */
-export async function getNfeOverview(org: string): Promise<NfeOverview> {
+export async function getNfeOverview(
+  org: string,
+  rawPage = 1,
+): Promise<NfeOverview> {
   const config = await getFiscalConfigView(org);
+  const eligible = {
+    organizationId: org,
+    customer: { document: { not: "" } },
+  } as const;
+
+  const startMonth = new Date();
+  startMonth.setDate(1);
+  startMonth.setHours(0, 0, 0, 0);
+  const startDay = new Date();
+  startDay.setHours(0, 0, 0, 0);
+
+  // KPIs agregados no banco (globais, não apenas da página atual).
+  const [eligibleTotal, mes, emitidasHoje, pendentes] = await Promise.all([
+    prisma.sale.count({ where: eligible }),
+    prisma.fiscalDocument.aggregate({
+      where: {
+        organizationId: org,
+        modelo: "55",
+        status: "autorizada",
+        dataEmissao: { gte: startMonth },
+      },
+      _count: true,
+      _sum: { valorTotal: true },
+    }),
+    prisma.fiscalDocument.count({
+      where: {
+        organizationId: org,
+        modelo: "55",
+        status: "autorizada",
+        dataEmissao: { gte: startDay },
+      },
+    }),
+    prisma.sale.count({ where: { ...eligible, fiscalDoc: { is: null } } }),
+  ]);
+
+  const page = clampPage(rawPage, eligibleTotal);
   const sales = await prisma.sale.findMany({
-    where: { organizationId: org, customer: { document: { not: "" } } },
+    where: eligible,
     orderBy: { createdAt: "desc" },
-    take: 50,
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
     include: { fiscalDoc: true, customer: true },
   });
 
@@ -217,26 +264,15 @@ export async function getNfeOverview(org: string): Promise<NfeOverview> {
       };
     });
 
-  const startMonth = new Date();
-  startMonth.setDate(1);
-  startMonth.setHours(0, 0, 0, 0);
-  const startDay = new Date();
-  startDay.setHours(0, 0, 0, 0);
-
-  const docs = await prisma.fiscalDocument.findMany({
-    where: { organizationId: org, modelo: "55", status: "autorizada" },
-    select: { valorTotal: true, dataEmissao: true },
-  });
-  const mes = docs.filter((d) => d.dataEmissao >= startMonth);
-
   return {
     config,
     rows,
+    pageMeta: pageMeta(page, eligibleTotal),
     kpis: {
-      autorizadasMes: mes.length,
-      valorMes: mes.reduce((a, d) => a + money(d.valorTotal), 0),
-      emitidasHoje: docs.filter((d) => d.dataEmissao >= startDay).length,
-      pendentes: rows.filter((r) => r.status === "pendente").length,
+      autorizadasMes: mes._count,
+      valorMes: money(mes._sum.valorTotal),
+      emitidasHoje,
+      pendentes,
     },
   };
 }

@@ -340,35 +340,8 @@ export function moduleById(id: string): ModuleDef | undefined {
   return MODULE_BY_ID.get(id);
 }
 
-// ---- RBAC: acesso aos módulos por papel ----
-// Papéis: MEMBER (operação) < ADMIN (gestão) < OWNER (dono).
-export type AccessRole = "OWNER" | "ADMIN" | "MEMBER";
-const ROLE_RANK: Record<AccessRole, number> = { MEMBER: 0, ADMIN: 1, OWNER: 2 };
-
-// Módulos sensíveis (financeiro/gestão/fiscal) ficam restritos a ADMIN/OWNER.
-// Os demais (PDV, caixa, produtos, estoque, CRM…) ficam liberados ao MEMBER.
-const ADMIN_MODULES = new Set<string>([
-  "financeiro",
-  "relatorios",
-  "fornecedores",
-  "precificacao",
-  "nfce",
-  "nfe",
-  "acesso",
-  "notificacoes",
-  "comissoes",
-  "mensalidades",
-  "planos",
-  "importacao",
-]);
-
-export function moduleMinRole(moduleId: string): AccessRole {
-  return ADMIN_MODULES.has(moduleId) ? "ADMIN" : "MEMBER";
-}
-
-export function canAccessModule(role: AccessRole, moduleId: string): boolean {
-  return ROLE_RANK[role] >= ROLE_RANK[moduleMinRole(moduleId)];
-}
+// RBAC: o gating de módulos vive em `permissions.ts` (MODULE_PERMISSION +
+// canAccessModule) — permissões granulares, sem lista de módulos por papel.
 
 export function coreModules(): ModuleDef[] {
   return MODULES.filter((m) => m.scope === "core");

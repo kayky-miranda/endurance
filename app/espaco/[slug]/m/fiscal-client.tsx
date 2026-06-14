@@ -263,6 +263,8 @@ function ConfigForm({
     ambiente: config.ambiente,
     cscId: config.cscId,
     csc: config.csc,
+    provider: config.provider,
+    defaultNcm: config.defaultNcm,
   });
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -385,7 +387,35 @@ function ConfigForm({
             className={inputCls}
           />
         </Field>
+        <Field label="Emissão">
+          <select
+            value={form.provider}
+            onChange={(e) => set("provider", e.target.value)}
+            className={inputCls}
+          >
+            <option value="">Simulada (protótipo)</option>
+            <option value="focusnfe">Real · Focus NFe</option>
+          </select>
+        </Field>
+        <Field label="NCM padrão dos produtos">
+          <input
+            value={form.defaultNcm}
+            onChange={(e) => set("defaultNcm", e.target.value)}
+            maxLength={8}
+            placeholder="8 dígitos (ex.: 22021000)"
+            className={inputCls}
+          />
+        </Field>
       </div>
+
+      {form.provider === "focusnfe" && (
+        <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          Emissão real via Focus NFe. Em <strong>Homologação</strong> as notas
+          não têm valor fiscal. A produção exige certificado A1 cadastrado no
+          provedor e liberação no servidor — só ligue após validar em
+          homologação.
+        </p>
+      )}
 
       {err && <p className="mt-3 text-sm text-red-500">{err}</p>}
 

@@ -103,6 +103,30 @@ const ACTION_LABEL: Record<string, string> = {
   "user.unblock": "Desbloqueou usuário",
   "user.delete": "Removeu usuário",
   "user.reset_password": "Redefiniu senha",
+  // Fiscal
+  "nfce.emit": "Emitiu NFC-e",
+  "nfce.cancel": "Cancelou NFC-e",
+  "nfe.emit": "Emitiu NF-e",
+  "nfe.cancel": "Cancelou NF-e",
+  "fiscal.config_save": "Configuração fiscal",
+  "invoice.import": "Importou notas",
+  // Financeiro
+  "finance.entry_create": "Criou lançamento",
+  "finance.entry_paid": "Baixa financeira",
+  "cash.open": "Abriu o caixa",
+  "cash.movement": "Movimentou o caixa",
+  "cash.close": "Fechou o caixa",
+  // Estoque
+  "product.create": "Cadastrou produto",
+  "product.delete": "Removeu produto",
+  "stock.adjust": "Ajustou estoque",
+  "supplier.create": "Cadastrou fornecedor",
+  "purchase.create": "Criou pedido de compra",
+  "purchase.sent": "Enviou pedido de compra",
+  "purchase.receive": "Recebeu pedido de compra",
+  "barcode.generate": "Gerou código de barras",
+  "barcode.set": "Definiu código de barras",
+  "data.import": "Importação em massa",
 };
 
 // Ícone por perfil pré-configurado (para o dropdown de perfil).

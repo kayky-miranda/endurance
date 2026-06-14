@@ -128,7 +128,7 @@ export const IMPORT_ENTITIES: ImportEntitySpec[] = [
     description: "Importação de NF-e (modelo 55) e NFC-e (modelo 65) por XML.",
     available: true,
     format: "xml",
-    note: "Envie um ou mais arquivos .xml (layout 4.00). A nota é registrada por chave de acesso.",
+    note: "Envie um ou mais arquivos .xml (layout 4.00). Cada nota é registrada por chave de acesso e pode dar entrada no estoque e gerar conta a pagar.",
     columns: [],
   },
 ];

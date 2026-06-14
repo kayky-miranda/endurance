@@ -12,6 +12,7 @@ import {
   nicheLabel,
 } from "./catalog";
 import type { OnboardingResult } from "./types";
+import { recordAiUsage } from "./ai-telemetry";
 
 const MODEL = "claude-opus-4-8";
 // Modelos Gemini Flash a tentar em ordem (a cota gratuita varia por modelo).
@@ -209,18 +210,54 @@ export async function classifyBusiness(
     throw new Error("Descrição vazia.");
   }
 
+  // Telemetria pré-tenant (sem organização ainda → organizationId nulo).
+  const startedAt = Date.now();
   const provider = selectProvider();
-  if (!provider) return fallbackClassify(text);
+  if (!provider) {
+    recordAiUsage({
+      feature: "onboarding",
+      provider: "offline",
+      fallback: true,
+      latencyMs: Date.now() - startedAt,
+    });
+    return fallbackClassify(text);
+  }
 
   try {
-    const parsed =
+    const out =
       provider === "gemini"
         ? await callGemini(text)
         : await callAnthropic(text);
-    if (!parsed || !parsed.niche) return fallbackClassify(text);
-    return normalize(parsed, "ai");
+    if (!out || !out.json?.niche) {
+      recordAiUsage({
+        feature: "onboarding",
+        provider,
+        model: out?.model,
+        fallback: true,
+        latencyMs: Date.now() - startedAt,
+        error: "resposta vazia",
+      });
+      return fallbackClassify(text);
+    }
+    recordAiUsage({
+      feature: "onboarding",
+      provider,
+      model: out.model,
+      inputTokens: out.inputTokens,
+      outputTokens: out.outputTokens,
+      latencyMs: Date.now() - startedAt,
+    });
+    return normalize(out.json, "ai");
   } catch (err) {
     console.error(`[onboarding:ai:${provider}] falhou, usando fallback:`, err);
+    recordAiUsage({
+      feature: "onboarding",
+      provider,
+      ok: false,
+      fallback: true,
+      latencyMs: Date.now() - startedAt,
+      error: String((err as Error)?.message ?? err),
+    });
     return fallbackClassify(text);
   }
 }
@@ -228,8 +265,16 @@ export async function classifyBusiness(
 const userPrompt = (text: string) =>
   `Descrição do negócio do cliente:\n"""\n${text}\n"""`;
 
+/** Resposta de um provedor + metadados para a telemetria. */
+interface AiCallOut {
+  json: OnboardingJson | null;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
 /** Claude (Anthropic) — structured outputs + prompt caching no system. */
-async function callAnthropic(text: string): Promise<OnboardingJson | null> {
+async function callAnthropic(text: string): Promise<AiCallOut | null> {
   const client = new Anthropic();
   const response = await client.messages.create({
     model: MODEL,
@@ -257,11 +302,19 @@ async function callAnthropic(text: string): Promise<OnboardingJson | null> {
     `output=${u.output_tokens}`,
   );
   const block = response.content.find((b) => b.type === "text");
-  return block && block.type === "text" ? JSON.parse(block.text) : null;
+  return {
+    json: block && block.type === "text" ? JSON.parse(block.text) : null,
+    model: MODEL,
+    inputTokens:
+      u.input_tokens +
+      (u.cache_creation_input_tokens ?? 0) +
+      (u.cache_read_input_tokens ?? 0),
+    outputTokens: u.output_tokens,
+  };
 }
 
 /** Gemini (Google) — tier gratuito, saída estruturada via responseSchema. */
-async function callGemini(text: string): Promise<OnboardingJson | null> {
+async function callGemini(text: string): Promise<AiCallOut | null> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   const ai = new GoogleGenAI({ apiKey });
 
@@ -279,7 +332,13 @@ async function callGemini(text: string): Promise<OnboardingJson | null> {
         },
       });
       const out = response.text;
-      return out ? (JSON.parse(out) as OnboardingJson) : null;
+      const usage = response.usageMetadata;
+      return {
+        json: out ? (JSON.parse(out) as OnboardingJson) : null,
+        model,
+        inputTokens: usage?.promptTokenCount ?? 0,
+        outputTokens: usage?.candidatesTokenCount ?? 0,
+      };
     } catch (e) {
       lastErr = e;
       // 404 = inexistente; 429 = sem cota; 500/503 = instável → tenta o próximo.

@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireOrgAccess } from "@/lib/auth";
-import { canAccessModule, type AccessRole } from "@/lib/endurance/catalog";
+import { requireOrgAccess, sessionHasPermission } from "@/lib/auth";
 import { getWorkspace } from "@/lib/endurance/workspace";
 import { getSalesSummary } from "@/lib/endurance/sales-analytics";
 import { getCashflow } from "@/lib/endurance/cashflow";
@@ -16,8 +15,8 @@ export default async function RelatorioPage({
 }) {
   const { slug } = await params;
   const session = await requireOrgAccess(slug);
-  // Relatório executivo é restrito a gestores (mesma regra do módulo).
-  if (!canAccessModule(session.role as AccessRole, "relatorios")) notFound();
+  // Relatório executivo exige a mesma permissão do módulo de relatórios.
+  if (!sessionHasPermission(session, "finance.reports")) notFound();
 
   const ws = await getWorkspace(slug);
   const [summary, cashflow] = await Promise.all([
