@@ -33,3 +33,6 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /pix-screens/
+
+# marketing (carrosseis renderizados — armazenamento efêmero, ir pra blob storage)
+/public/campaigns/

@@ -36,6 +36,12 @@ model Organization {
   finEntries       FinancialEntry[]
   suppliers        Supplier[]
   purchases        PurchaseOrder[]
+  requisitions     PurchaseRequisition[]
+  quotations       Quotation[]
+  receipts         Receipt[]
+  stockMovements   StockMovement[]
+  productSuppliers ProductSupplier[]
+  costCenters      CostCenter[]
   categories       Category[]
   importedInvoices ImportedInvoice[]
   activityLogs     ActivityLog[]
@@ -46,6 +52,10 @@ model Organization {
   pixConfig        PixConfig?
   whatsappConfig   WhatsAppConfig?
   whatsappMessages WhatsAppMessage[]
+  brandKit         BrandKit?
+  campaigns        Campaign[]
+  creditLedger     CreditLedger[]
+  marketingSub     MarketingSubscription?
 }
 
 // Assinatura SaaS do espaço (uma por organização). No protótipo a cobrança é
@@ -156,20 +166,98 @@ model Category {
   @@index([organizationId])
 }
 
-// Fornecedor do negócio (compras / reposição de estoque).
+// Fornecedor do negócio (compras / reposição de estoque). Cadastro completo:
+// identidade fiscal, endereço, condições comerciais e avaliação (usada no
+// ranking de cotações). Contatos adicionais em SupplierContact.
 model Supplier {
   id             String   @id @default(cuid())
   organizationId String
+  // Identidade — `name` é o nome de exibição (fantasia ou razão social).
   name           String
+  razaoSocial    String   @default("")
+  nomeFantasia   String   @default("")
   cnpj           String   @default("")
+  ie             String   @default("") // inscrição estadual
+  // Endereço
+  address        String   @default("")
+  city           String   @default("")
+  state          String   @default("")
+  zip            String   @default("")
+  country        String   @default("Brasil")
+  // Contato principal (contatos adicionais ficam em SupplierContact)
   phone          String   @default("")
   email          String   @default("")
-  note           String   @default("")
+  // Condições comerciais
+  paymentTermDays Int     @default(0) // prazo de pagamento (dias)
+  leadTimeDays    Int     @default(0) // prazo médio de entrega (dias)
+  creditLimit     Decimal @default(0) @db.Decimal(12, 2)
+  rating          Float   @default(0) // avaliação 0..5 (ranking de cotação)
+  status          String  @default("ativo") // ativo | inativo
+  note            String  @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
+
+  organization  Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  orders        PurchaseOrder[]
+  contacts      SupplierContact[]
+  productLinks  ProductSupplier[]
+  quotationBids QuotationSupplier[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+}
+
+// Contato adicional de um fornecedor (um fornecedor tem vários contatos).
+model SupplierContact {
+  id         String   @id @default(cuid())
+  supplierId String
+  name       String
+  role       String   @default("") // cargo/função do contato
+  phone      String   @default("")
+  mobile     String   @default("")
+  email      String   @default("")
+  createdAt  DateTime @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+}
+
+// Vínculo Produto ⇄ Fornecedor (N:N). Um produto pode ter vários fornecedores e
+// um fornecedor fornece vários produtos. Guarda o código/custo do fornecedor.
+model ProductSupplier {
+  id             String   @id @default(cuid())
+  organizationId String
+  productId      String
+  supplierId     String
+  supplierSku    String   @default("") // código do produto no fornecedor
+  unitCost       Decimal  @default(0) @db.Decimal(12, 2)
+  leadTimeDays   Int      @default(0)
+  lastPurchaseAt DateTime?
   createdAt      DateTime @default(now())
 
-  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  orders       PurchaseOrder[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplier     Supplier     @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
+  @@unique([productId, supplierId])
+  @@index([organizationId])
+  @@index([supplierId])
+}
+
+// Centro de custo (para classificar solicitações de compra e despesas).
+model CostCenter {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  code           String   @default("")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requisitions PurchaseRequisition[]
+
+  @@unique([organizationId, name])
   @@index([organizationId])
 }
 
@@ -179,30 +267,41 @@ model PurchaseOrder {
   id             String    @id @default(cuid())
   organizationId String
   supplierId     String
-  status         String    @default("enviado") // enviado | recebido | cancelado
+  requisitionId  String? // origem (quando gerado de uma solicitação)
+  quotationId    String? // origem (quando gerado da cotação vencedora)
+  status         String    @default("aberto") // aberto | enviado | confirmado | parcial | recebido | cancelado
   total          Decimal   @default(0) @db.Decimal(12, 2)
+  paymentTerm    String    @default("") // condição de pagamento (texto livre)
   note           String    @default("")
   createdAt      DateTime  @default(now())
+  expectedDate   DateTime? // previsão de entrega
+  confirmedAt    DateTime? // confirmação do fornecedor
   receivedAt     DateTime?
   sentAt         DateTime? // quando o pedido foi enviado ao fornecedor
   sentVia        String    @default("") // whatsapp | email | manual
 
-  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  supplier     Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplier     Supplier             @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  requisition  PurchaseRequisition? @relation(fields: [requisitionId], references: [id], onDelete: SetNull)
+  quotation    Quotation?           @relation(fields: [quotationId], references: [id], onDelete: SetNull)
   items        PurchaseOrderItem[]
+  receipts     Receipt[]
 
   @@index([organizationId])
+  @@index([organizationId, status])
 }
 
 model PurchaseOrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  productId String?
-  name      String
-  quantity  Int
-  unitCost  Decimal @db.Decimal(12, 2)
+  id          String  @id @default(cuid())
+  orderId     String
+  productId   String?
+  name        String
+  quantity    Int
+  receivedQty Int     @default(0) // quantidade já recebida (recebimento parcial)
+  unitCost    Decimal @db.Decimal(12, 2)
 
-  order PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order       PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  receiptItems ReceiptItem[]
 
   @@index([orderId])
 }
@@ -360,9 +459,13 @@ model Product {
   price          Decimal  @default(0) @db.Decimal(12, 2)
   cost           Decimal  @default(0) @db.Decimal(12, 2)
   stock          Int      @default(0)
+  unit           String   @default("un") // unidade (un, cx, kg, l...)
+  minStock       Int      @default(0) // estoque mínimo (ponto de alerta/reposição)
   createdAt      DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplierLinks  ProductSupplier[]
+  stockMovements StockMovement[]
 
   @@index([organizationId])
   @@index([organizationId, barcode])
@@ -565,4 +668,298 @@ model WhatsAppMessage {
 
   @@index([organizationId, status])
   @@index([providerRef])
+}
+
+// ===========================================================================
+// SUPRIMENTOS / COMPRAS — fluxo: Solicitação → Aprovação → Cotação → Pedido →
+// Recebimento → (Estoque + Financeiro). Todas as tabelas são escopadas por
+// organizationId (multi-tenant) e indexadas para as consultas do dashboard.
+// ===========================================================================
+
+// Solicitação de compra: um usuário pede materiais. Passa por aprovação e pode
+// virar cotação. `number` é sequencial humano por organização (ex.: SC-000123).
+model PurchaseRequisition {
+  id             String   @id @default(cuid())
+  organizationId String
+  number         String
+  requesterId    String? // usuário solicitante
+  requesterName  String   @default("")
+  costCenterId   String?
+  status         String   @default("aberta") // aberta | em_aprovacao | aprovada | rejeitada | convertida
+  priority       String   @default("media") // baixa | media | alta | urgente
+  estimatedTotal Decimal  @default(0) @db.Decimal(12, 2)
+  note           String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  costCenter   CostCenter?               @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+  items        PurchaseRequisitionItem[]
+  approvals    PurchaseApproval[]
+  quotations   Quotation[]
+  orders       PurchaseOrder[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status])
+}
+
+model PurchaseRequisitionItem {
+  id                String  @id @default(cuid())
+  requisitionId     String
+  productId         String?
+  name              String
+  quantity          Int
+  priority          String  @default("media") // baixa | media | alta | urgente
+  justification     String  @default("")
+  estimatedUnitCost Decimal @default(0) @db.Decimal(12, 2)
+
+  requisition PurchaseRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+
+  @@index([requisitionId])
+}
+
+// Etapa de aprovação (workflow multinível). O nível exigido é decidido pelo
+// valor estimado: <=5k Supervisor, <=20k Gerente, >20k Diretor. Cada decisão
+// (aprovar/rejeitar/solicitar ajuste) vira um registro — histórico completo.
+model PurchaseApproval {
+  id            String   @id @default(cuid())
+  requisitionId String
+  level         String // supervisor | gerente | diretor
+  status        String   @default("pendente") // pendente | aprovado | rejeitado | ajuste
+  approverId    String?
+  approverName  String   @default("")
+  note          String   @default("")
+  decidedAt     DateTime?
+  createdAt     DateTime @default(now())
+
+  requisition PurchaseRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+
+  @@index([requisitionId])
+}
+
+// Cotação: envia a demanda a vários fornecedores e compara as propostas.
+model Quotation {
+  id              String   @id @default(cuid())
+  organizationId  String
+  requisitionId   String?
+  number          String
+  status          String   @default("aberta") // aberta | respondida | fechada | cancelada
+  deadline        DateTime?
+  winnerSupplierId String? // fornecedor vencedor (ao fechar)
+  note            String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  requisition  PurchaseRequisition? @relation(fields: [requisitionId], references: [id], onDelete: SetNull)
+  items        QuotationItem[]
+  suppliers    QuotationSupplier[]
+  orders       PurchaseOrder[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status])
+}
+
+// Item demandado na cotação (o mesmo para todos os fornecedores convidados).
+model QuotationItem {
+  id          String  @id @default(cuid())
+  quotationId String
+  productId   String?
+  name        String
+  quantity    Int
+
+  quotation Quotation              @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  prices    QuotationSupplierItem[]
+
+  @@index([quotationId])
+}
+
+// Proposta de um fornecedor para a cotação (cabeçalho: prazo, pagamento, total).
+model QuotationSupplier {
+  id           String   @id @default(cuid())
+  quotationId  String
+  supplierId   String
+  paymentTerm  String   @default("")
+  leadTimeDays Int      @default(0)
+  total        Decimal  @default(0) @db.Decimal(12, 2)
+  note         String   @default("")
+  respondedAt  DateTime?
+  createdAt    DateTime @default(now())
+
+  quotation Quotation              @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  supplier  Supplier               @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  prices    QuotationSupplierItem[]
+
+  @@unique([quotationId, supplierId])
+  @@index([quotationId])
+}
+
+// Preço unitário de um fornecedor para um item da cotação (matriz comparativa).
+model QuotationSupplierItem {
+  id                  String  @id @default(cuid())
+  quotationSupplierId String
+  quotationItemId     String
+  unitPrice           Decimal @default(0) @db.Decimal(12, 2)
+
+  quotationSupplier QuotationSupplier @relation(fields: [quotationSupplierId], references: [id], onDelete: Cascade)
+  item              QuotationItem     @relation(fields: [quotationItemId], references: [id], onDelete: Cascade)
+
+  @@unique([quotationSupplierId, quotationItemId])
+  @@index([quotationItemId])
+}
+
+// Recebimento de materiais de um pedido. Permite recebimento parcial e registra
+// divergências de quantidade e qualidade por item.
+model Receipt {
+  id             String   @id @default(cuid())
+  organizationId String
+  orderId        String
+  number         String
+  status         String   @default("aprovado") // aprovado | parcial | rejeitado
+  receivedById   String?
+  receivedByName String   @default("")
+  note           String   @default("")
+  createdAt      DateTime @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  order        PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  items        ReceiptItem[]
+
+  @@index([organizationId])
+  @@index([orderId])
+}
+
+model ReceiptItem {
+  id          String  @id @default(cuid())
+  receiptId   String
+  orderItemId String?
+  productId   String?
+  name        String
+  qtyOrdered  Int     @default(0)
+  qtyReceived Int     @default(0)
+  qualityOk   Boolean @default(true)
+  note        String  @default("")
+
+  receipt   Receipt            @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  orderItem PurchaseOrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  @@index([receiptId])
+}
+
+// Razão (ledger) de movimentação de estoque. TODA alteração de saldo passa por
+// aqui — venda, recebimento, ajuste, importação — dando histórico auditável.
+// quantity é com sinal (entrada positiva, saída negativa). balanceAfter é o
+// saldo do produto após o movimento.
+model StockMovement {
+  id             String   @id @default(cuid())
+  organizationId String
+  productId      String
+  type           String // entrada | saida | ajuste
+  reason         String   @default("") // venda | recebimento | ajuste | devolucao_cliente | perda | ...
+  quantity       Int // com sinal: +entrada / -saída
+  balanceBefore  Int      @default(0) // saldo do produto ANTES do movimento (auditoria)
+  balanceAfter   Int      @default(0) // saldo do produto DEPOIS do movimento
+  refType        String   @default("") // sale | receipt | adjust | manual | import | initial
+  refId          String   @default("")
+  userId         String? // usuário responsável
+  userName       String   @default("") // nome do responsável (snapshot p/ auditoria)
+  note           String   @default("")
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([productId])
+}
+
+// ===========================================================================
+// MARKETING COM IA — carrosséis profissionais para Instagram.
+// ===========================================================================
+
+// Identidade visual da organização (cores, fontes, logo). Uma por org.
+model BrandKit {
+  id              String   @id @default(cuid())
+  organizationId  String   @unique
+  primaryColor    String   @default("#6366F1")
+  darkColor       String   @default("#312E81")
+  lightColor      String   @default("#A5B4FC")
+  lightBg         String   @default("#F8F7FF")
+  darkBg          String   @default("#0F0E17")
+  fontHeading     String   @default("Plus Jakarta Sans")
+  fontBody        String   @default("Plus Jakarta Sans")
+  logoText        String   @default("")
+  tagline         String   @default("")
+  instagramHandle String   @default("")
+  updatedAt       DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// Campanha = um carrossel gerado pela IA. Cada campanha tem 7 slides.
+model Campaign {
+  id             String   @id @default(cuid())
+  organizationId String
+  prompt         String
+  status         String   @default("draft") // draft | rendering | ready | error
+  slideCount     Int      @default(7)
+  errorMsg       String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  slides       CampaignSlide[]
+
+  @@index([organizationId, createdAt])
+}
+
+// Slide individual de uma campanha (conteúdo + caminho da imagem renderizada).
+model CampaignSlide {
+  id         String   @id @default(cuid())
+  campaignId String
+  index      Int
+  layout     String   @default("")
+  headline   String   @default("")
+  body       String   @default("")
+  bullets    String[] @default([])
+  imageUrl   String   @default("")
+  createdAt  DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, index])
+}
+
+// Assinatura do módulo de Marketing (separada da assinatura SaaS principal).
+model MarketingSubscription {
+  id                 String    @id @default(cuid())
+  organizationId     String    @unique
+  plan               String    @default("trial") // trial | basico | pro | enterprise
+  status             String    @default("active") // active | trial_ended | canceled
+  credits            Int       @default(8)
+  currentPeriodStart DateTime  @default(now())
+  currentPeriodEnd   DateTime
+  trialEndsAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ledger       CreditLedger[]
+}
+
+// Razão de créditos (event sourcing): positivo = crédito, negativo = débito.
+model CreditLedger {
+  id             String    @id @default(cuid())
+  organizationId String
+  marketingSubId String?
+  campaignId     String?
+  amount         Int
+  reason         String
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  marketingSub MarketingSubscription? @relation(fields: [marketingSubId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
 }

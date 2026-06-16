@@ -15,7 +15,8 @@ export type AiFeature =
   | "sales_insights"
   | "stock_advice"
   | "crm_campaigns"
-  | "pricing_advice";
+  | "pricing_advice"
+  | "marketing_carousel";
 
 export interface AiUsageEvent {
   /** Nulo nas chamadas pré-tenant (onboarding antes do signup). */
@@ -126,4 +127,5 @@ export const AI_FEATURE_LABEL: Record<string, string> = {
   stock_advice: "Conselho de estoque",
   crm_campaigns: "Campanhas de CRM",
   pricing_advice: "Conselho de precificação",
+  marketing_carousel: "Carrossel de Marketing",
 };

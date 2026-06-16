@@ -42,9 +42,17 @@ import {
   Box,
   Banknote,
   UploadCloud,
+  GitCompare,
+  ShoppingCart,
+  PackageCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { logoutAction } from "@/app/actions";
+import {
+  moduleCategory,
+  MODULE_CATEGORIES,
+  allModuleIds,
+} from "@/lib/endurance/catalog";
 import AssistantWidget from "./assistant-widget";
 
 export type ShellModule = { id: string; label: string; core: boolean };
@@ -84,6 +92,13 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   anamnese: FileText,
   confirmacao_auto: BadgeCheck,
   recibo: Receipt,
+  // Suprimentos / Compras
+  compras: BarChart3,
+  solicitacoes: ClipboardList,
+  aprovacoes: BadgeCheck,
+  cotacoes: GitCompare,
+  pedidos_compra: ShoppingCart,
+  recebimento: PackageCheck,
 };
 
 export default function Shell({
@@ -208,14 +223,61 @@ export default function Shell({
             </div>
           </header>
           <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
-          <AssistantWidget />
+          <AssistantWidget userName={userName} />
         </div>
       </div>
     );
   }
 
-  const core = modules.filter((m) => m.core);
-  const niche = modules.filter((m) => !m.core);
+  // Itens da navegação agrupados nas categorias do catálogo. Os itens fixos
+  // (Visão geral, Usuários, Plano) entram nas suas categorias junto dos módulos.
+  type NavEntry = {
+    category: (typeof MODULE_CATEGORIES)[number];
+    href: string;
+    icon: LucideIcon;
+    label: string;
+  };
+  const entries: NavEntry[] = [];
+  if (canViewDashboard)
+    entries.push({
+      category: "Dashboards",
+      href: base,
+      icon: LayoutDashboard,
+      label: "Visão geral",
+    });
+  // Ordena os módulos pela sequência canônica do catálogo (fluxo lógico),
+  // independente da ordem em que foram ativados no espaço (OrgModule).
+  const order = allModuleIds();
+  const orderedModules = [...modules].sort(
+    (a, b) => order.indexOf(a.id) - order.indexOf(b.id),
+  );
+  for (const m of orderedModules)
+    entries.push({
+      category: moduleCategory(m.id),
+      href: `${base}/m/${m.id}`,
+      icon: MODULE_ICONS[m.id] ?? Box,
+      label: m.label,
+    });
+  if (canManage)
+    entries.push({
+      category: "Administração",
+      href: `${base}/equipe`,
+      icon: Users,
+      label: "Usuários",
+    });
+  if (canManageBilling)
+    entries.push({
+      category: "Administração",
+      href: `${base}/assinatura`,
+      icon: CreditCard,
+      label: "Plano e cobrança",
+    });
+
+  // Visão geral é exata; os demais destacam também as sub-rotas (ex.: cotação/[id]).
+  const isActive = (href: string) =>
+    href === base
+      ? pathname === base
+      : pathname === href || pathname.startsWith(`${href}/`);
 
   const initial = (userName || "?").trim().charAt(0).toUpperCase();
 
@@ -259,63 +321,23 @@ export default function Shell({
           </div>
 
           <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
-            {canViewDashboard && (
-              <NavGroup>
-                <NavItem
-                  href={base}
-                  icon={LayoutDashboard}
-                  label="Visão geral"
-                  active={pathname === base}
-                />
-              </NavGroup>
-            )}
-
-            <NavGroup title="O essencial">
-              {core.map((m) => (
-                <NavItem
-                  key={m.id}
-                  href={`${base}/m/${m.id}`}
-                  icon={MODULE_ICONS[m.id] ?? Box}
-                  label={m.label}
-                  active={pathname === `${base}/m/${m.id}`}
-                />
-              ))}
-            </NavGroup>
-
-            {niche.length > 0 && (
-              <NavGroup title={nicheLabel}>
-                {niche.map((m) => (
-                  <NavItem
-                    key={m.id}
-                    href={`${base}/m/${m.id}`}
-                    icon={MODULE_ICONS[m.id] ?? Box}
-                    label={m.label}
-                    active={pathname === `${base}/m/${m.id}`}
-                  />
-                ))}
-              </NavGroup>
-            )}
-
-            {(canManage || canManageBilling) && (
-              <NavGroup title="Gestão">
-                {canManage && (
-                  <NavItem
-                    href={`${base}/equipe`}
-                    icon={Users}
-                    label="Usuários"
-                    active={pathname === `${base}/equipe`}
-                  />
-                )}
-                {canManageBilling && (
-                  <NavItem
-                    href={`${base}/assinatura`}
-                    icon={CreditCard}
-                    label="Plano e cobrança"
-                    active={pathname === `${base}/assinatura`}
-                  />
-                )}
-              </NavGroup>
-            )}
+            {MODULE_CATEGORIES.map((cat) => {
+              const items = entries.filter((e) => e.category === cat);
+              if (items.length === 0) return null;
+              return (
+                <NavGroup key={cat} title={cat}>
+                  {items.map((e) => (
+                    <NavItem
+                      key={e.href}
+                      href={e.href}
+                      icon={e.icon}
+                      label={e.label}
+                      active={isActive(e.href)}
+                    />
+                  ))}
+                </NavGroup>
+              );
+            })}
           </nav>
 
           <div className="border-t border-ink-800 p-3">
@@ -380,7 +402,7 @@ export default function Shell({
 
           <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         </div>
-        <AssistantWidget />
+        <AssistantWidget userName={userName} />
       </div>
     </div>
   );

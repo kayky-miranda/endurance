@@ -30,6 +30,8 @@ const nextConfig = {
     "@anthropic-ai/sdk",
     "@google/genai",
     "@prisma/client",
+    "playwright",
+    "playwright-core",
   ],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

@@ -14,6 +14,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import type { AssistantEvent, Widget } from "@/lib/endurance/assistant";
+import MrChippy from "./mr-chippy";
 
 type Msg = { role: "user" | "assistant"; content: string; widgets?: Widget[] };
 
@@ -41,7 +42,15 @@ const SUGGESTIONS = [
   "Qual meu lucro deste mês?",
 ];
 
-export default function AssistantWidget() {
+/** Saudação curta conforme o horário — dá o tom de "companheiro de bordo". */
+function greeting(name?: string): string {
+  const h = new Date().getHours();
+  const part = h < 6 ? "Boa madrugada" : h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
+  const first = (name ?? "").trim().split(/\s+/)[0];
+  return first ? `${part}, ${first}!` : `${part}!`;
+}
+
+export default function AssistantWidget({ userName }: { userName?: string }) {
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -151,10 +160,16 @@ export default function AssistantWidget() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-5 right-5 z-50 inline-flex items-center gap-2 rounded-full bg-brand-500 px-4 py-3 text-sm font-semibold text-ink-950 shadow-lg shadow-black/20 transition hover:bg-brand-400"
+          aria-label="Abrir o Mr. Chippy"
+          className="group fixed bottom-5 right-5 z-50 inline-flex items-center gap-2 rounded-full bg-brand-500 py-2 pl-2 pr-4 text-sm font-semibold text-ink-950 shadow-lg shadow-black/20 transition hover:bg-brand-400"
         >
-          <Sparkles className="h-5 w-5" />
-          Gerente IA
+          <span className="relative grid h-9 w-9 place-items-center">
+            <span className="pulse-ring absolute inset-0 rounded-full bg-brand-300/50" />
+            <span className="chippy-bob grid h-9 w-9 place-items-center rounded-full bg-ink-950/10">
+              <MrChippy className="h-7 w-7" mood="happy" />
+            </span>
+          </span>
+          Mr. Chippy
         </button>
       )}
 
@@ -162,15 +177,15 @@ export default function AssistantWidget() {
         <div className="fixed bottom-5 right-5 z-50 flex h-[min(88vh,680px)] w-[min(94vw,440px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-black/30 dark:border-ink-700 dark:bg-ink-900">
           {/* Header */}
           <header className="flex items-center gap-3 border-b border-slate-200 bg-gradient-to-r from-brand-500/15 to-transparent px-4 py-3 dark:border-ink-800">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/20 text-brand-500 ring-1 ring-brand-500/30">
-              <Sparkles className="h-4 w-4" />
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-500/20 ring-1 ring-brand-500/30">
+              <MrChippy className="h-7 w-7" mood={busy ? "thinking" : "idle"} />
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                ENDURANCE IA
+                Mr. Chippy
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                Seu gerente virtual · consulta dados em tempo real
+                Seu companheiro de bordo · consulta dados em tempo real
               </p>
             </div>
             {msgs.length > 0 && (
@@ -194,7 +209,7 @@ export default function AssistantWidget() {
           {/* Conversa */}
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
             {msgs.length === 0 && (
-              <Welcome onPick={send} />
+              <Welcome onPick={send} userName={userName} />
             )}
 
             {msgs.map((m, i) => (
@@ -253,16 +268,32 @@ export default function AssistantWidget() {
 }
 
 // --------------------------------------------------------------------------
-function Welcome({ onPick }: { onPick: (q: string) => void }) {
+function Welcome({
+  onPick,
+  userName,
+}: {
+  onPick: (q: string) => void;
+  userName?: string;
+}) {
   return (
     <div className="pt-2">
-      <div className="mb-3 flex items-center gap-2 text-slate-700 dark:text-slate-200">
-        <Sparkles className="h-5 w-5 text-brand-500" />
-        <p className="text-sm font-medium">Olá! Sou seu gerente virtual.</p>
+      <div className="mb-3 flex items-center gap-3">
+        <div className="chippy-bob grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-500/15 ring-1 ring-brand-500/25">
+          <MrChippy className="h-9 w-9" mood="happy" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            {greeting(userName)} Sou o Mr. Chippy. 🐾
+          </p>
+          <p className="text-[12px] text-slate-500 dark:text-slate-400">
+            Seu companheiro de bordo nesta jornada.
+          </p>
+        </div>
       </div>
       <p className="text-sm text-slate-500 dark:text-slate-400">
-        Pergunte em linguagem natural — eu consulto os dados reais do seu negócio
-        e respondo com números, tabelas e análises.
+        Pergunte em linguagem natural — eu navego pelos dados reais do seu
+        negócio e respondo com números, tabelas e análises. Também aponto
+        oportunidades pelo caminho. Pode começar por uma destas rotas:
       </p>
       <div className="mt-4 grid gap-2">
         {SUGGESTIONS.map((q) => (
@@ -275,6 +306,10 @@ function Welcome({ onPick }: { onPick: (q: string) => void }) {
           </button>
         ))}
       </div>
+      <p className="mt-4 text-[11px] leading-relaxed text-slate-400 dark:text-slate-500">
+        Novo por aqui? É só perguntar &ldquo;como faço uma venda?&rdquo; ou
+        &ldquo;como cadastro um produto?&rdquo; — eu te oriento passo a passo. ⚓
+      </p>
     </div>
   );
 }
@@ -291,8 +326,8 @@ function MessageRow({ msg }: { msg: Msg }) {
   }
   return (
     <div className="flex gap-2.5">
-      <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-500/15 text-brand-500 ring-1 ring-brand-500/20">
-        <Sparkles className="h-3.5 w-3.5" />
+      <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-500/15 ring-1 ring-brand-500/20">
+        <MrChippy className="h-5 w-5" mood="happy" />
       </div>
       <div className="min-w-0 flex-1 space-y-2.5">
         <div className="rounded-2xl rounded-tl-md bg-slate-100 px-3.5 py-2 text-sm text-slate-700 dark:bg-ink-800 dark:text-slate-200">
@@ -309,8 +344,8 @@ function MessageRow({ msg }: { msg: Msg }) {
 function TypingIndicator({ status }: { status?: string }) {
   return (
     <div className="flex gap-2.5">
-      <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-500/15 text-brand-500 ring-1 ring-brand-500/20">
-        <Sparkles className="h-3.5 w-3.5" />
+      <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-500/15 ring-1 ring-brand-500/20">
+        <MrChippy className="chippy-bob h-5 w-5" mood="thinking" />
       </div>
       <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-md bg-slate-100 px-4 py-3 dark:bg-ink-800">
         {status ? (

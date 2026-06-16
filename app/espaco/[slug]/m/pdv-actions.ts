@@ -7,6 +7,10 @@ import { suggestCrossSell, type Suggestion } from "@/lib/endurance/crosssell";
 import { getOpenSession } from "@/lib/endurance/cash";
 import { createReceivablesForSale } from "@/lib/endurance/finance";
 import { money } from "@/lib/endurance/money";
+import {
+  applyStockMovement,
+  InsufficientStockError,
+} from "@/lib/endurance/stock-ledger";
 
 type Result =
   | { ok: true; total: number; saleId: string; change: number }
@@ -34,13 +38,6 @@ export interface FinalizeInput {
 
 const VALID_METHODS = ["dinheiro", "credito", "debito", "pix"];
 const round2 = (n: number) => Math.round(n * 100) / 100;
-
-/** Aborta a transação quando o decremento condicional não encontra saldo. */
-class InsufficientStockError extends Error {
-  constructor(public productName: string) {
-    super(`Estoque insuficiente de "${productName}".`);
-  }
-}
 
 /**
  * Fecha a venda do PDV: valida estoque, aplica desconto, registra formas de
@@ -185,21 +182,6 @@ export async function finalizeSaleAction(
   let saleId = "";
   try {
     saleId = await prisma.$transaction(async (tx) => {
-      // Baixa condicional: só decrementa se ainda houver saldo (stock >= qty).
-      // É o guard definitivo contra corrida — a checagem acima é só fast-fail.
-      for (const it of clean) {
-        const updated = await tx.product.updateMany({
-          where: {
-            id: it.productId,
-            organizationId: s.org,
-            stock: { gte: it.qty },
-          },
-          data: { stock: { decrement: it.qty } },
-        });
-        if (updated.count === 0)
-          throw new InsufficientStockError(byId.get(it.productId)!.name);
-      }
-
       const sale = await tx.sale.create({
         data: {
           organizationId: s.org,
@@ -226,6 +208,21 @@ export async function finalizeSaleAction(
           payments: { create: payments },
         },
       });
+
+      // Baixa de estoque pelo RAZÃO (saída/venda): condicional/race-safe e com
+      // registro auditável (saldo anterior→posterior, documento, responsável).
+      // Se faltar saldo, InsufficientStockError reverte a venda inteira.
+      for (const it of clean) {
+        await applyStockMovement(tx, {
+          organizationId: s.org,
+          productId: it.productId,
+          delta: -it.qty,
+          reason: "venda",
+          refType: "sale",
+          refId: sale.id,
+          actor: { id: s.sub, name: s.name },
+        });
+      }
 
       // Recebíveis na MESMA transação: venda sem lançamento financeiro (ou
       // vice-versa) nunca persiste.

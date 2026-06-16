@@ -238,6 +238,21 @@ body {
   animation: sheen 1.1s ease;
 }
 
+/* Mr. Chippy — balanço suave do avatar (respira/acena de leve) */
+@keyframes chippy-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-1.5px) rotate(-3deg);
+  }
+}
+.chippy-bob {
+  animation: chippy-bob 3.4s ease-in-out infinite;
+  transform-origin: 50% 80%;
+}
+
 /* Pulso de orbe (seção de IA) */
 @keyframes pulse-ring {
   0% {
@@ -262,6 +277,7 @@ body {
   .float,
   .marquee-track,
   .pulse-ring,
+  .chippy-bob,
   .btn-sheen::after {
     animation: none;
   }
