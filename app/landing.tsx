@@ -1235,10 +1235,13 @@ function Footer() {
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-5 py-6 text-xs text-slate-600 sm:flex-row">
           <p>© {new Date().getFullYear()} ENDURANCE · Feito para resistir.</p>
           <div className="flex gap-5">
-            <a href="#" className="transition hover:text-slate-300">
+            <a href="/precos" className="transition hover:text-slate-300">
+              Preços
+            </a>
+            <a href="/privacidade" className="transition hover:text-slate-300">
               Privacidade
             </a>
-            <a href="#" className="transition hover:text-slate-300">
+            <a href="/termos" className="transition hover:text-slate-300">
               Termos
             </a>
           </div>
