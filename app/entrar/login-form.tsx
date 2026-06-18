@@ -71,6 +71,15 @@ export default function LoginForm({ next }: { next?: string }) {
         {loading && <Loader2 className="h-4 w-4 animate-spin" />}
         {loading ? "Entrando…" : "Entrar"}
       </button>
+
+      <div className="pt-1 text-center">
+        <a
+          href="/recuperar"
+          className="text-xs text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline"
+        >
+          Esqueci minha senha
+        </a>
+      </div>
     </div>
   );
 }

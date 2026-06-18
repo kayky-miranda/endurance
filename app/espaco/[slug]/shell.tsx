@@ -54,6 +54,7 @@ import {
   allModuleIds,
 } from "@/lib/endurance/catalog";
 import AssistantWidget from "./assistant-widget";
+import VerifyEmailBanner from "./verify-email-banner";
 
 export type ShellModule = { id: string; label: string; core: boolean };
 
@@ -107,6 +108,8 @@ export default function Shell({
   slug,
   modules,
   userName,
+  userEmail,
+  emailVerified,
   canManage,
   canManageBilling = false,
   canViewDashboard = true,
@@ -117,6 +120,8 @@ export default function Shell({
   slug: string;
   modules: ShellModule[];
   userName: string;
+  userEmail: string;
+  emailVerified: boolean;
   canManage: boolean;
   canManageBilling?: boolean;
   canViewDashboard?: boolean;
@@ -399,6 +404,8 @@ export default function Shell({
               </div>
             </div>
           </header>
+
+          {!emailVerified && <VerifyEmailBanner email={userEmail} />}
 
           <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         </div>

@@ -38,6 +38,8 @@ export default async function EspacoLayout({
       slug={slug}
       modules={modules}
       userName={session.name}
+      userEmail={session.email}
+      emailVerified={session.emailVerified ?? false}
       canManage={canManageTeamSession(session)}
       canManageBilling={perms.has("subscription.manage")}
       canViewDashboard={canViewDashboard}

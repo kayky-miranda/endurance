@@ -531,25 +531,62 @@ model SalePayment {
 // `profile` guarda o perfil pré-configurado escolhido (ou "" se personalizado).
 // `status` controla bloqueio (active | blocked). `lastLoginAt` registra o último acesso.
 model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
-  passwordHash   String
-  name           String
-  role           String    @default("MEMBER")
-  phone          String    @default("")
-  jobTitle       String    @default("") // cargo
-  profile        String    @default("") // id do perfil pré-configurado
-  permissions    String[]  @default([]) // ids de permissão (RBAC granular)
-  status         String    @default("active") // active | blocked
-  lastLoginAt    DateTime?
-  organizationId String
-  createdAt      DateTime  @default(now())
+  id              String    @id @default(cuid())
+  email           String    @unique
+  emailVerifiedAt DateTime? // null = e-mail ainda não confirmado
+  passwordHash    String
+  name            String
+  role            String    @default("MEMBER")
+  phone           String    @default("")
+  jobTitle        String    @default("") // cargo
+  profile         String    @default("") // id do perfil pré-configurado
+  permissions     String[]  @default([]) // ids de permissão (RBAC granular)
+  status          String    @default("active") // active | blocked
+  lastLoginAt     DateTime?
+  organizationId  String
+  createdAt       DateTime  @default(now())
 
-  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  sales            Sale[]
-  whatsappMessages WhatsAppMessage[]
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sales               Sale[]
+  whatsappMessages    WhatsAppMessage[]
+  passwordResetTokens PasswordResetToken[]
+  emailVerifyTokens   EmailVerifyToken[]
 
   @@index([organizationId])
+}
+
+// Tokens de recuperação de senha. Single-use, com expiração curta (1h).
+// Guardamos só o HASH do token — o valor original nunca é persistido. Quando
+// o usuário clica no link, recomputamos o hash e comparamos.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique // SHA-256 hex do token plain
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Tokens de confirmação de e-mail. Mesma estrutura do reset, mas com TTL
+// maior (7 dias) porque o usuário pode demorar a abrir o e-mail.
+model EmailVerifyToken {
+  id        String    @id @default(cuid())
+  userId    String
+  email     String // e-mail sendo verificado (pode ser troca de e-mail)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // Trilha de auditoria: registra ações relevantes (criação/edição/bloqueio de

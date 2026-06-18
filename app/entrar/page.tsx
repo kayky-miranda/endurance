@@ -4,14 +4,23 @@ import { Compass } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import LoginForm from "./login-form";
 
+const VERIFY_BANNERS: Record<string, { kind: "ok" | "err"; msg: string }> = {
+  ok: { kind: "ok", msg: "E-mail confirmado! Faça login para continuar." },
+  expired: { kind: "err", msg: "O link expirou. Solicite um novo dentro do app." },
+  invalid: { kind: "err", msg: "Link inválido. Solicite um novo dentro do app." },
+  used: { kind: "err", msg: "Este link já foi usado." },
+  missing: { kind: "err", msg: "Token ausente." },
+};
+
 export default async function EntrarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; verify?: string }>;
 }) {
   const session = await getSession();
   if (session) redirect(`/espaco/${session.slug}`);
-  const { next } = await searchParams;
+  const { next, verify } = await searchParams;
+  const banner = verify ? VERIFY_BANNERS[verify] : undefined;
 
   return (
     <>
@@ -27,6 +36,18 @@ export default async function EntrarPage({
             ENDURANCE
           </span>
         </Link>
+
+        {banner && (
+          <div
+            className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+              banner.kind === "ok"
+                ? "border-emerald-700 bg-emerald-950/40 text-emerald-200"
+                : "border-amber-700 bg-amber-950/40 text-amber-200"
+            }`}
+          >
+            {banner.msg}
+          </div>
+        )}
 
         <div className="rounded-2xl border border-ink-700 bg-ink-900/80 p-6 shadow-2xl shadow-black/40 backdrop-blur">
           <h1 className="text-xl font-semibold">Entrar</h1>

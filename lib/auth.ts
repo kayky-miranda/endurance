@@ -20,6 +20,7 @@ export interface SessionPayload {
   slug: string; // slug da organização (para redirecionar sem consultar o banco)
   profile?: string; // id do perfil pré-configurado
   permissions?: string[]; // ids de permissão (RBAC granular)
+  emailVerified?: boolean; // hidratado do banco em getSession()
 }
 
 /** OWNER e ADMIN podem gerenciar a equipe; MEMBER não. */
@@ -120,6 +121,7 @@ const loadUserForSession = cache(async (id: string) => {
       permissions: true,
       status: true,
       organizationId: true,
+      emailVerifiedAt: true,
     },
   });
 });
@@ -149,6 +151,7 @@ export async function getSession(): Promise<SessionPayload | null> {
     role: user.role as Role,
     profile: user.profile,
     permissions: user.permissions,
+    emailVerified: !!user.emailVerifiedAt,
   };
 }
 

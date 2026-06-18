@@ -14,6 +14,8 @@ import {
 import { createWorkspace, EmailTakenError } from "@/lib/endurance/workspace";
 import { allPermissionIds } from "@/lib/endurance/permissions";
 import { hit, peek, record, clientIp } from "@/lib/rate-limit";
+import { sendVerificationFor } from "@/lib/endurance/email-verification";
+import { logger } from "@/lib/logger";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -88,13 +90,36 @@ export async function signupAction(input: SignupInput): Promise<AuthResult> {
       profile: "administrador",
       permissions: allPermissionIds(),
     });
+    // Dispara verificação de e-mail em background — se falhar, o usuário pode
+    // re-solicitar via banner. Não bloqueia o signup.
+    sendVerificationFor(userId).catch((e) =>
+      logger.exception("Falha ao disparar verificação no signup", e),
+    );
     return { ok: true, slug };
   } catch (e) {
     if (e instanceof EmailTakenError)
       return { ok: false, error: "Esse e-mail já tem conta — faça login." };
-    console.error("[signup] erro:", e);
+    logger.exception("Signup falhou", e);
     return { ok: false, error: "Não consegui criar a conta." };
   }
+}
+
+/**
+ * Reenvia o e-mail de verificação para o usuário logado. Acionada pelo banner
+ * do dashboard quando emailVerifiedAt está null.
+ */
+export async function resendVerificationAction(): Promise<SimpleResult> {
+  const { getSession } = await import("@/lib/auth");
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Sessão expirada." };
+
+  // Rate limit: 3 reenvios por usuário a cada 10 min.
+  if (!hit(`verify:resend:${session.sub}`, 3, 10 * 60_000).ok)
+    return { ok: false, error: "Aguarde alguns minutos antes de reenviar." };
+
+  const res = await sendVerificationFor(session.sub);
+  if (!res.ok) return { ok: false, error: "Não consegui enviar o e-mail. Tente em alguns minutos." };
+  return { ok: true };
 }
 
 export async function loginAction(

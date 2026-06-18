@@ -69,4 +69,18 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+// Sentry — só envolve o config quando SENTRY_DSN está presente. Sem isso,
+// evita poluir o build local com o plugin do Sentry (que faz source-map upload).
+let exported = nextConfig;
+if (process.env.SENTRY_DSN) {
+  const { withSentryConfig } = await import("@sentry/nextjs");
+  exported = withSentryConfig(nextConfig, {
+    // Org/projeto vêm das envs SENTRY_ORG / SENTRY_PROJECT.
+    silent: true,
+    widenClientFileUpload: true,
+    hideSourceMaps: true,
+    disableLogger: true,
+  });
+}
+
+export default exported;
