@@ -17,6 +17,20 @@ import { hit, peek, record, clientIp } from "@/lib/rate-limit";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * Política de senha: ≥8 caracteres, com pelo menos uma letra e um número.
+ * Para ser amigável no cadastro de balcão (mercados/salões), não exigimos
+ * símbolos especiais — exigência mínima para passar em check de invasão de
+ * dicionário.
+ */
+function validatePassword(pw: string): { ok: true } | { ok: false; error: string } {
+  if (pw.length < 8) return { ok: false, error: "A senha precisa ter ao menos 8 caracteres." };
+  if (pw.length > 128) return { ok: false, error: "Senha muito longa (limite 128 caracteres)." };
+  if (!/[a-zA-Z]/.test(pw)) return { ok: false, error: "A senha precisa ter ao menos uma letra." };
+  if (!/[0-9]/.test(pw)) return { ok: false, error: "A senha precisa ter ao menos um número." };
+  return { ok: true };
+}
+
 type AuthResult = { ok: true; slug: string } | { ok: false; error: string };
 type SimpleResult = { ok: true } | { ok: false; error: string };
 
@@ -49,8 +63,8 @@ export async function signupAction(input: SignupInput): Promise<AuthResult> {
 
   if (!ownerName) return { ok: false, error: "Informe o seu nome." };
   if (!EMAIL_RE.test(email)) return { ok: false, error: "E-mail inválido." };
-  if (password.length < 6)
-    return { ok: false, error: "A senha precisa ter ao menos 6 caracteres." };
+  const pw = validatePassword(password);
+  if (!pw.ok) return { ok: false, error: pw.error };
 
   try {
     const passwordHash = await hashPassword(password);

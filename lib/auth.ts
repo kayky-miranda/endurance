@@ -183,8 +183,12 @@ export async function requireOrgAccess(slug: string): Promise<SessionPayload> {
   return session;
 }
 
+// Salt rounds 12 (~250ms/hash em CPU comum). Hashes antigos com rounds=10
+// continuam validando — o custo fica embutido no próprio hash.
+const BCRYPT_ROUNDS = 12;
+
 export async function hashPassword(plain: string): Promise<string> {
-  return bcrypt.hash(plain, 10);
+  return bcrypt.hash(plain, BCRYPT_ROUNDS);
 }
 
 export async function verifyPassword(
@@ -192,4 +196,11 @@ export async function verifyPassword(
   hash: string,
 ): Promise<boolean> {
   return bcrypt.compare(plain, hash);
+}
+
+/** Verifica se um hash usa custo inferior ao atual (para rehash silencioso). */
+export function needsRehash(hash: string): boolean {
+  const m = hash.match(/^\$2[aby]\$(\d+)\$/);
+  if (!m) return true;
+  return Number(m[1]) < BCRYPT_ROUNDS;
 }

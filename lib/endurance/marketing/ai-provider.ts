@@ -41,6 +41,9 @@ export async function generateStructured<T>(
 
 async function callAnthropic<T>(opts: GenerateOptions<T>): Promise<T> {
   const client = new Anthropic();
+  // `output_config` é beta — o tipo do SDK ainda não conhece. Mantemos via cast
+  // porque ele força a saída a respeitar o JSON Schema (mais robusto que pedir
+  // "retorne só JSON" no prompt).
   const response = await client.messages.create({
     model: ANTHROPIC_MODEL,
     max_tokens: 4096,
@@ -52,7 +55,7 @@ async function callAnthropic<T>(opts: GenerateOptions<T>): Promise<T> {
     output_config: {
       format: { type: "json_schema", schema: opts.jsonSchema },
     },
-  });
+  } as unknown as Anthropic.MessageCreateParamsNonStreaming);
   const block = response.content.find((b) => b.type === "text");
   if (!block || block.type !== "text") throw new Error("Resposta vazia da IA.");
   return JSON.parse(block.text) as T;

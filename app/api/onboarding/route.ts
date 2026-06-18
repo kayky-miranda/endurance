@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
 import { classifyBusiness } from "@/lib/endurance/onboarding";
+import { hit, clientIp } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 // Usa o SDK da Anthropic (Node) e lê env em runtime — força Node + dinâmico.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
+  // Endpoint público que dispara chamada paga à IA — limita por IP.
+  const ip = await clientIp();
+  if (!hit(`ai:onboarding:${ip}`, 20, 60_000).ok) {
+    return NextResponse.json(
+      { error: "Muitas tentativas. Aguarde um instante." },
+      { status: 429 },
+    );
+  }
+
   let description = "";
   try {
     const body = await request.json();
@@ -28,7 +39,7 @@ export async function POST(request: Request) {
     const result = await classifyBusiness(description);
     return NextResponse.json(result);
   } catch (err) {
-    console.error("[api/onboarding] erro:", err);
+    logger.exception("Falha ao classificar o negócio", err);
     return NextResponse.json(
       { error: "Falha ao classificar o negócio." },
       { status: 500 },

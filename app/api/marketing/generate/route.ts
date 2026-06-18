@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { getSession, sessionHasPermission } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateCarousel } from "@/lib/endurance/marketing/carousel-generator";
 import { renderCarouselToPNGs } from "@/lib/endurance/marketing/carousel-renderer";
 import { debitCredits, refundCredits } from "@/lib/endurance/marketing/credits";
+import { hit } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -11,6 +13,18 @@ export const maxDuration = 120;
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+
+  // Autorização granular (a UI já esconde o botão, mas a API é o gate real).
+  if (!sessionHasPermission(session, "marketing.manage"))
+    return NextResponse.json({ error: "Sem permissão para gerar campanhas." }, { status: 403 });
+
+  // Rate limit por organização — geração custa crédito + chamada de IA.
+  if (!hit(`ai:carousel:${session.org}`, 10, 60_000).ok) {
+    return NextResponse.json(
+      { error: "Muitas gerações seguidas. Aguarde um instante." },
+      { status: 429 },
+    );
+  }
 
   const body = await req.json().catch(() => ({}));
   const prompt: string = (body.prompt ?? "").trim();
