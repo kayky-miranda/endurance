@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Compass, Check, Sparkles, MessageCircle } from "lucide-react";
 import { PLAN_CATALOG } from "@/lib/endurance/billing";
+import { SoftwareJsonLd } from "../json-ld";
 
 export const metadata: Metadata = {
   title: "Planos e preços — ENDURANCE",
@@ -16,6 +17,7 @@ function formatBRL(n: number): string {
 export default function PrecosPage() {
   return (
     <div className="min-h-screen bg-ink-950 text-slate-200">
+      <SoftwareJsonLd />
       <header className="border-b border-ink-800 bg-ink-900/40">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
           <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight">

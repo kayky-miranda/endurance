@@ -116,6 +116,31 @@ export async function sendVerificationEmail(opts: {
   return sendEmail({ to: opts.to, subject: `Confirme seu e-mail no ${BRAND}`, html, text });
 }
 
+export async function sendTeamInviteEmail(opts: {
+  to: string;
+  orgName: string;
+  inviterName: string;
+  token: string;
+}): Promise<SendResult> {
+  const url = `${APP_URL}/convite/${opts.token}`;
+  const html = wrap(
+    "Você foi convidado(a)",
+    `<p>Olá!</p>
+     <p><strong>${opts.inviterName}</strong> convidou você para fazer parte do espaço <strong>${opts.orgName}</strong> no ${BRAND}.</p>
+     <p style="margin:24px 0;">${button(url, "Aceitar convite")}</p>
+     <p style="font-size:13px;color:#64748b;">Ou copie e cole este link no navegador:<br>
+     <span style="word-break:break-all;color:#0ea5e9;">${url}</span></p>
+     <p style="font-size:13px;color:#94a3b8;margin-top:24px;">O link expira em 7 dias. Se você não esperava esse convite, ignore esta mensagem.</p>`,
+  );
+  const text = `Olá! ${opts.inviterName} convidou você para o espaço ${opts.orgName} no ${BRAND}. Aceite em ${url} (expira em 7 dias).`;
+  return sendEmail({
+    to: opts.to,
+    subject: `${opts.inviterName} convidou você para o ${opts.orgName}`,
+    html,
+    text,
+  });
+}
+
 export async function sendPasswordResetEmail(opts: {
   to: string;
   name: string;

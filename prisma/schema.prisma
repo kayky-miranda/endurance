@@ -56,6 +56,7 @@ model Organization {
   campaigns        Campaign[]
   creditLedger     CreditLedger[]
   marketingSub     MarketingSubscription?
+  invites          Invite[]
 }
 
 // Assinatura SaaS do espaço (uma por organização). No protótipo a cobrança é
@@ -569,6 +570,28 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
+}
+
+// Convite de equipe via link mágico. O OWNER/ADMIN cria com email + papel; o
+// destinatário recebe um link e define o nome/senha em /convite/[token]. O
+// usuário só é criado no aceite — antes disso, e-mail vazado não cria conta.
+model Invite {
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String // destino do convite
+  role           String    @default("MEMBER") // MEMBER | ADMIN
+  profile        String    @default("") // perfil pré-configurado RBAC
+  permissions    String[]  @default([])
+  tokenHash      String    @unique // SHA-256 hex do token plain
+  invitedById    String? // OWNER/ADMIN que criou
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, acceptedAt])
   @@index([expiresAt])
 }
 

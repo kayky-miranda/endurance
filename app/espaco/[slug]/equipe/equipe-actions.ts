@@ -54,13 +54,27 @@ export async function createUserAction(input: CreateUserInput): Promise<R> {
   if (!gate.ok) return gate;
   const session = gate.session;
 
+  // Gate de assinatura: past_due / canceled / trial expirado bloqueiam mutação.
+  const { assertSubscriptionActive, checkSeatAvailability } = await import(
+    "@/lib/endurance/plan-limits"
+  );
+  const sub = await assertSubscriptionActive(session.org);
+  if (!sub.ok) return { ok: false, error: sub.error! };
+
+  // Gate de seats: cada plano tem o seu limite (0 = ilimitado).
+  const seat = await checkSeatAvailability(session.org);
+  if (!seat.ok) return { ok: false, error: seat.error! };
+
   const name = (input.name ?? "").trim();
   const email = (input.email ?? "").trim().toLowerCase();
   const password = input.password ?? "";
   if (!name) return { ok: false, error: "Informe o nome." };
   if (!EMAIL_RE.test(email)) return { ok: false, error: "E-mail inválido." };
-  if (password.length < 6)
-    return { ok: false, error: "A senha precisa ter ao menos 6 caracteres." };
+  // Mesma política do signup (≥8 + letra + número).
+  if (password.length < 8)
+    return { ok: false, error: "A senha precisa ter ao menos 8 caracteres." };
+  if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password))
+    return { ok: false, error: "A senha precisa ter letra e número." };
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return { ok: false, error: "E-mail já cadastrado." };
