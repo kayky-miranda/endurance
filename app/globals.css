@@ -2,8 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/* -----------------------------------------------------------------------------
+   Design tokens (CSS variables) — fonte única para o white-label.
+   O shell autenticado injeta um <style> sobrescrevendo estas vars com a
+   paleta da org (ThemeSettings). Landing/login usam estes defaults.
+----------------------------------------------------------------------------- */
 :root {
   color-scheme: dark;
+
+  /* Brand — ciano glacial padrão (paleta cyan do Tailwind). */
+  --color-brand-50: #ecfeff;
+  --color-brand-200: #a5f3fc;
+  --color-brand-300: #67e8f9;
+  --color-brand-400: #22d3ee;
+  --color-brand-500: #06b6d4;
+  --color-brand-600: #0891b2;
+
+  /* Chrome (sidebar/header) — paleta "polar". */
+  --color-ink-950: #060912;
+  --color-ink-900: #0a0f1d;
+  --color-ink-800: #0f1628;
+  --color-ink-700: #18223a;
+  --color-ink-600: #273456;
+
+  /* Tokens derivados pra componentes mais polidos. */
+  --color-button-text: #060912; /* texto sobre a cor primary */
+  --color-card-bg: #ffffff; /* fundo dos cards no modo claro */
+  --color-card-bg-dark: #0a0f1d; /* fundo dos cards no modo escuro */
+  --color-text-strong: #0f172a; /* texto principal claro */
 }
 
 html,

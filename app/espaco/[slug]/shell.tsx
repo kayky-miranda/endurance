@@ -45,6 +45,7 @@ import {
   GitCompare,
   ShoppingCart,
   PackageCheck,
+  Palette,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { logoutAction } from "@/app/actions";
@@ -269,6 +270,13 @@ export default function Shell({
       href: `${base}/equipe`,
       icon: Users,
       label: "Usuários",
+    });
+  if (canManage)
+    entries.push({
+      category: "Administração",
+      href: `${base}/aparencia`,
+      icon: Palette,
+      label: "Aparência",
     });
   if (canManageBilling)
     entries.push({

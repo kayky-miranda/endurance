@@ -57,6 +57,29 @@ model Organization {
   creditLedger     CreditLedger[]
   marketingSub     MarketingSubscription?
   invites          Invite[]
+  themeSettings    ThemeSettings?
+}
+
+// White-label: cada empresa pode customizar a paleta do app. Todos os campos
+// guardam HEX no formato #RRGGBB ou null (= usa o default do preset). O front
+// resolve null → fallback. presetId é só "memória" do botão clicado.
+model ThemeSettings {
+  id              String   @id @default(cuid())
+  organizationId  String   @unique
+  presetId        String   @default("default") // azul_corporativo | verde_empresarial | etc
+  primaryColor    String? // botões, links, destaque
+  secondaryColor  String? // acento secundário
+  accentColor     String? // hover, ênfase pontual
+  buttonTextColor String? // texto sobre primary (auto contraste; manual aqui)
+  sidebarBg       String? // fundo da sidebar (modo claro)
+  sidebarBgDark   String? // fundo da sidebar (modo escuro)
+  textColor       String? // texto principal (modo claro)
+  cardBg          String? // fundo de cards (modo claro)
+  defaultDarkMode Boolean  @default(false) // tema escuro como padrão da org
+  updatedAt       DateTime @updatedAt
+  updatedById     String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 // Assinatura SaaS do espaço (uma por organização). No protótipo a cobrança é
