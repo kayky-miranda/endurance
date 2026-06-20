@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/auth";
+import { requirePermission, requirePermissionVerified } from "@/lib/auth";
 import {
   changePlan,
   setCancelAtPeriodEnd,
@@ -13,7 +13,8 @@ type R = { ok: boolean; error?: string };
 
 /** Troca o plano contratado do espaço. Imediato e gera fatura se for pago. */
 export async function changePlanAction(planId: string): Promise<R> {
-  const gate = await requirePermission("subscription.manage");
+  // Troca de plano tem efeito financeiro — exige e-mail verificado.
+  const gate = await requirePermissionVerified("subscription.manage");
   if (!gate.ok) return gate;
   const s = gate.session;
 

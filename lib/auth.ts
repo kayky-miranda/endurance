@@ -67,6 +67,24 @@ export async function requirePermission(
   return { ok: true, session };
 }
 
+/**
+ * Combina requirePermission com a exigência de e-mail verificado. Usar em
+ * mutações sensíveis: emissão fiscal (NFC-e/NF-e), troca de plano, qualquer
+ * coisa que tenha consequência financeira ou comprometimento jurídico.
+ */
+export async function requirePermissionVerified(
+  permId: import("@/lib/endurance/permissions").PermissionId,
+): Promise<PermissionCheck> {
+  const gate = await requirePermission(permId);
+  if (!gate.ok) return gate;
+  if (!gate.session.emailVerified)
+    return {
+      ok: false,
+      error: "Confirme seu e-mail antes de executar esta ação.",
+    };
+  return gate;
+}
+
 function getSecret(): Uint8Array {
   const secret = process.env.AUTH_SECRET;
   if (!secret) throw new Error("AUTH_SECRET não definido no ambiente (.env).");

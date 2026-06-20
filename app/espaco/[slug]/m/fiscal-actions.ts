@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/auth";
+import { requirePermission, requirePermissionVerified } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
   emitNfce,
@@ -11,7 +11,8 @@ import {
 import { logActivity } from "@/lib/endurance/activity-log";
 
 export async function emitNfceAction(saleId: string): Promise<EmitResult> {
-  const gate = await requirePermission("fiscal.manage");
+  // Gate reforçado: emissão fiscal exige e-mail verificado (LGPD + compliance).
+  const gate = await requirePermissionVerified("fiscal.manage");
   if (!gate.ok) return gate;
   const s = gate.session;
   const res = await emitNfce(s.org, saleId);

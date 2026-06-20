@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/auth";
+import { requirePermission, requirePermissionVerified } from "@/lib/auth";
 import { emitNfe } from "@/lib/endurance/nfe-service";
 import { cancelNfce } from "@/lib/endurance/fiscal-service";
 import { logActivity } from "@/lib/endurance/activity-log";
@@ -9,7 +9,8 @@ import { logActivity } from "@/lib/endurance/activity-log";
 export async function emitNfeAction(
   saleId: string,
 ): Promise<{ ok: boolean; error?: string; docId?: string }> {
-  const gate = await requirePermission("fiscal.manage");
+  // Gate reforçado: emissão fiscal exige e-mail verificado.
+  const gate = await requirePermissionVerified("fiscal.manage");
   if (!gate.ok) return gate;
   const s = gate.session;
   const res = await emitNfe(s.org, saleId);
