@@ -65,16 +65,11 @@ export async function createUserAction(input: CreateUserInput): Promise<R> {
   const seat = await checkSeatAvailability(session.org);
   if (!seat.ok) return { ok: false, error: seat.error! };
 
-  const name = (input.name ?? "").trim();
-  const email = (input.email ?? "").trim().toLowerCase();
-  const password = input.password ?? "";
-  if (!name) return { ok: false, error: "Informe o nome." };
-  if (!EMAIL_RE.test(email)) return { ok: false, error: "E-mail inválido." };
-  // Mesma política do signup (≥8 + letra + número).
-  if (password.length < 8)
-    return { ok: false, error: "A senha precisa ter ao menos 8 caracteres." };
-  if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password))
-    return { ok: false, error: "A senha precisa ter letra e número." };
+  // Validação centralizada via Zod (formato, comprimento, política de senha).
+  const { CreateUserSchema, firstError } = await import("@/lib/validation");
+  const parsed = CreateUserSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const { name, email, password } = parsed.data;
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return { ok: false, error: "E-mail já cadastrado." };

@@ -34,6 +34,11 @@ import { assertSubscriptionActive, checkSeatAvailability } from "@/lib/endurance
 import { logActivity } from "@/lib/endurance/activity-log";
 import { hit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import {
+  CreateInviteSchema,
+  AcceptInviteSchema,
+  firstError,
+} from "@/lib/validation";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -64,8 +69,9 @@ export async function createInviteAction(input: CreateInviteInput): Promise<Resu
   const seat = await checkSeatAvailability(session.org);
   if (!seat.ok) return { ok: false, error: seat.error! };
 
-  const email = (input.email ?? "").trim().toLowerCase();
-  if (!EMAIL_RE.test(email)) return { ok: false, error: "E-mail inválido." };
+  const parsed = CreateInviteSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const { email } = parsed.data;
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return { ok: false, error: "Esse e-mail já tem conta." };
@@ -122,18 +128,14 @@ export interface AcceptInviteInput {
  * Roda sem sessão (o usuário ainda não existe).
  */
 export async function acceptInviteAction(input: AcceptInviteInput): Promise<Result> {
-  const tokenHash = hashToken(input.token);
+  const parsed = AcceptInviteSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const { token, name, password } = parsed.data;
+
+  const tokenHash = hashToken(token);
   const invite = await prisma.invite.findUnique({ where: { tokenHash } });
   if (!invite || invite.acceptedAt || invite.expiresAt < new Date())
     return { ok: false, error: "Convite inválido ou expirado." };
-
-  const name = (input.name ?? "").trim();
-  const password = input.password ?? "";
-  if (!name) return { ok: false, error: "Informe seu nome." };
-  if (password.length < 8)
-    return { ok: false, error: "A senha precisa ter ao menos 8 caracteres." };
-  if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password))
-    return { ok: false, error: "A senha precisa ter letra e número." };
 
   // Pode ter race com cron de expire-trials — re-checa seats no momento do aceite.
   const seat = await checkSeatAvailability(invite.organizationId);

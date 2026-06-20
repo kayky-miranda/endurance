@@ -58,6 +58,7 @@ import {
   removeUserAction,
   resetPasswordAction,
 } from "./equipe-actions";
+import InviteModal from "./invite-modal";
 
 export type MemberView = {
   id: string;
@@ -214,6 +215,7 @@ export default function EquipeClient({
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "blocked">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [showCreate, setShowCreate] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
   const [editing, setEditing] = useState<MemberView | null>(null);
   const [resetting, setResetting] = useState<MemberView | null>(null);
   const [busyId, setBusyId] = useState("");
@@ -282,17 +284,30 @@ export default function EquipeClient({
             Crie usuários da sua empresa e defina permissões por perfil (RBAC).
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setError("");
-            setShowCreate(true);
-          }}
-          className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-brand-400"
-        >
-          <UserPlus className="h-4 w-4" />
-          Novo usuário
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setError("");
+              setShowInvite(true);
+            }}
+            className="inline-flex items-center gap-2 rounded-xl border border-brand-500 px-4 py-2.5 text-sm font-semibold text-brand-500 transition hover:bg-brand-500/10"
+          >
+            <Mail className="h-4 w-4" />
+            Convidar por e-mail
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setError("");
+              setShowCreate(true);
+            }}
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-brand-400"
+          >
+            <UserPlus className="h-4 w-4" />
+            Novo usuário
+          </button>
+        </div>
       </div>
 
       {/* Cards de estatística */}
@@ -403,6 +418,19 @@ export default function EquipeClient({
           onClose={() => setShowCreate(false)}
           onSaved={() => {
             setShowCreate(false);
+            router.refresh();
+          }}
+        />
+      )}
+      {showInvite && (
+        <InviteModal
+          profiles={profiles.map((p) => ({
+            id: p.id,
+            label: p.label,
+            description: p.description,
+          }))}
+          onClose={() => {
+            setShowInvite(false);
             router.refresh();
           }}
         />

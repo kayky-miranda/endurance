@@ -16,6 +16,7 @@ import { allPermissionIds } from "@/lib/endurance/permissions";
 import { hit, peek, record, clientIp } from "@/lib/rate-limit";
 import { sendVerificationFor } from "@/lib/endurance/email-verification";
 import { logger } from "@/lib/logger";
+import { SignupSchema, firstError } from "@/lib/validation";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -59,25 +60,22 @@ export async function signupAction(input: SignupInput): Promise<AuthResult> {
       error: "Muitas tentativas de cadastro. Tente novamente em alguns minutos.",
     };
 
-  const ownerName = (input.ownerName ?? "").trim();
-  const email = (input.email ?? "").trim().toLowerCase();
-  const password = input.password ?? "";
-
-  if (!ownerName) return { ok: false, error: "Informe o seu nome." };
-  if (!EMAIL_RE.test(email)) return { ok: false, error: "E-mail inválido." };
-  const pw = validatePassword(password);
-  if (!pw.ok) return { ok: false, error: pw.error };
+  // Validação centralizada — Zod cobre formato, comprimento e política de senha.
+  const parsed = SignupSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const data = parsed.data;
+  const { ownerName, email, password } = data;
 
   try {
     const passwordHash = await hashPassword(password);
     const { slug, userId, orgId } = await createWorkspace({
-      name: input.name,
-      niche: input.niche,
-      city: input.city,
-      state: input.state,
-      country: input.country,
-      segment: input.segment,
-      moduleIds: input.moduleIds,
+      name: data.name,
+      niche: data.niche,
+      city: data.city,
+      state: data.state,
+      country: data.country,
+      segment: data.segment,
+      moduleIds: data.moduleIds,
       owner: { name: ownerName, email, passwordHash },
     });
     await createSession({
