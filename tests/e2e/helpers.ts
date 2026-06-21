@@ -12,12 +12,26 @@ export function uniqueEmail(): string {
 
 /**
  * Cria um espaço novo pelo onboarding real (classificador offline) e devolve o
- * slug. Deixa a sessão do dono logada no contexto da página.
+ * slug + credenciais usadas (úteis pra fluxos que precisam relogar).
+ * Deixa a sessão do dono logada no contexto da página.
  */
 export async function signupWorkspace(
   page: Page,
   bizName: string,
-): Promise<string> {
+): Promise<string>;
+export async function signupWorkspace(
+  page: Page,
+  bizName: string,
+  opts: { withCredentials: true },
+): Promise<{ slug: string; email: string; password: string }>;
+export async function signupWorkspace(
+  page: Page,
+  bizName: string,
+  opts?: { withCredentials?: boolean },
+): Promise<string | { slug: string; email: string; password: string }> {
+  const email = uniqueEmail();
+  const password = "segredo123";
+
   await page.goto("/onboarding");
   await page
     .locator("#desc")
@@ -28,12 +42,13 @@ export async function signupWorkspace(
 
   await page.getByPlaceholder("Nome do negócio").fill(bizName);
   await page.getByPlaceholder("Seu nome").fill("Dono E2E");
-  await page.getByPlaceholder("Seu e-mail").fill(uniqueEmail());
-  await page.getByPlaceholder("Senha (mín. 6 caracteres)").fill("segredo123");
+  await page.getByPlaceholder("Seu e-mail").fill(email);
+  await page.locator('input[type="password"]').fill(password);
   await page.getByRole("button", { name: "Criar meu espaço" }).click();
 
   await page.waitForURL(/\/espaco\/[^/?#]+$/, { timeout: 60_000 });
-  return new URL(page.url()).pathname.split("/")[2];
+  const slug = new URL(page.url()).pathname.split("/")[2];
+  return opts?.withCredentials ? { slug, email, password } : slug;
 }
 
 /** Cadastra um produto pela tela de produtos. */

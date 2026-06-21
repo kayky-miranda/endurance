@@ -391,7 +391,7 @@ export default function OnboardingClient({
                 <Field
                   icon={Lock}
                   type="password"
-                  placeholder="Senha (mín. 6 caracteres)"
+                  placeholder="Senha (mín. 8 caracteres, com letra e número)"
                   value={password}
                   onChange={setPassword}
                   onEnter={handleSignup}
