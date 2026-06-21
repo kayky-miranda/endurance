@@ -17,7 +17,7 @@ export default async function EquipePage({
   const session = await requireOrgAccess(slug);
   if (!canManageTeamSession(session)) redirect(`/espaco/${slug}`);
 
-  const [users, logs] = await Promise.all([
+  const [users, logs, invites] = await Promise.all([
     prisma.user.findMany({
       where: { organizationId: session.org },
       orderBy: { createdAt: "asc" },
@@ -44,6 +44,22 @@ export default async function EquipePage({
         actorName: true,
         action: true,
         detail: true,
+        createdAt: true,
+      },
+    }),
+    prisma.invite.findMany({
+      where: {
+        organizationId: session.org,
+        acceptedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        profile: true,
+        expiresAt: true,
         createdAt: true,
       },
     }),
@@ -77,6 +93,14 @@ export default async function EquipePage({
       currentUserId={session.sub}
       members={members}
       activity={activity}
+      invites={invites.map((i) => ({
+        id: i.id,
+        email: i.email,
+        role: i.role,
+        profile: i.profile,
+        expiresAt: i.expiresAt.toISOString(),
+        createdAt: i.createdAt.toISOString(),
+      }))}
       permissions={PERMISSIONS}
       permissionGroups={PERMISSION_GROUPS}
       profiles={PROFILES}

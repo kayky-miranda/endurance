@@ -9,6 +9,7 @@ export default function LoginForm({ next }: { next?: string }) {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"password" | "totp">("password");
+  const [useBackup, setUseBackup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -41,11 +42,13 @@ export default function LoginForm({ next }: { next?: string }) {
   }
 
   async function submitTotp() {
-    if (loading || code.length !== 6) return;
+    if (loading) return;
+    if (useBackup && code.replace(/[\s-]/g, "").length !== 8) return;
+    if (!useBackup && code.length !== 6) return;
     setLoading(true);
     setError("");
     try {
-      const res = await verifyTotpLoginAction(code);
+      const res = await verifyTotpLoginAction(code, useBackup);
       if (!res.ok) {
         setError(res.error);
         setLoading(false);
@@ -59,26 +62,46 @@ export default function LoginForm({ next }: { next?: string }) {
   }
 
   if (step === "totp") {
+    const valid = useBackup
+      ? code.replace(/[\s-]/g, "").length === 8
+      : code.length === 6;
     return (
       <div className="mt-5 space-y-3">
         <div className="flex items-center gap-2 rounded-lg bg-brand-500/10 px-3 py-2 text-sm text-brand-300">
           <ShieldCheck className="h-4 w-4 shrink-0" />
-          Senha confirmada. Agora informe o código do seu app de autenticação.
+          {useBackup
+            ? "Informe um dos seus códigos de recuperação."
+            : "Senha confirmada. Agora informe o código do seu app de autenticação."}
         </div>
-        <input
-          type="text"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={6}
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") submitTotp();
-          }}
-          autoFocus
-          placeholder="000000"
-          className="w-full rounded-xl border border-ink-600 bg-ink-950 px-4 py-3 text-center font-mono text-lg tracking-[0.5em] text-slate-100 placeholder:text-slate-600 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
-        />
+        {useBackup ? (
+          <input
+            type="text"
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitTotp();
+            }}
+            autoFocus
+            placeholder="XXXX-XXXX"
+            maxLength={9}
+            className="w-full rounded-xl border border-ink-600 bg-ink-950 px-4 py-3 text-center font-mono text-lg tracking-[0.2em] text-slate-100 placeholder:text-slate-600 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
+          />
+        ) : (
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitTotp();
+            }}
+            autoFocus
+            placeholder="000000"
+            className="w-full rounded-xl border border-ink-600 bg-ink-950 px-4 py-3 text-center font-mono text-lg tracking-[0.5em] text-slate-100 placeholder:text-slate-600 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
+          />
+        )}
         {error && (
           <div className="flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">
             <AlertCircle className="h-4 w-4 shrink-0" />
@@ -88,23 +111,35 @@ export default function LoginForm({ next }: { next?: string }) {
         <button
           type="button"
           onClick={submitTotp}
-          disabled={loading || code.length !== 6}
+          disabled={loading || !valid}
           className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-brand-400 disabled:opacity-40"
         >
           {loading && <Loader2 className="h-4 w-4 animate-spin" />}
           {loading ? "Verificando…" : "Verificar e entrar"}
         </button>
-        <div className="text-center">
+        <div className="flex items-center justify-between text-center">
           <button
             type="button"
             onClick={() => {
               setStep("password");
               setCode("");
+              setUseBackup(false);
               setError("");
             }}
             className="text-xs text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline"
           >
-            Voltar
+            ← Voltar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setUseBackup((v) => !v);
+              setCode("");
+              setError("");
+            }}
+            className="text-xs text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline"
+          >
+            {useBackup ? "Usar código do app" : "Usar código de recuperação"}
           </button>
         </div>
       </div>

@@ -117,6 +117,79 @@ export async function createInviteAction(input: CreateInviteInput): Promise<Resu
   return { ok: true };
 }
 
+/**
+ * Cancela um convite ainda não aceito (vira "consumido"). O OWNER/ADMIN pode
+ * fazer isso quando errou o e-mail ou desistiu da contratação.
+ */
+export async function cancelInviteAction(inviteId: string): Promise<Result> {
+  const gate = await requirePermission("team.manage");
+  if (!gate.ok) return gate;
+  const session = gate.session;
+
+  const invite = await prisma.invite.findUnique({ where: { id: inviteId } });
+  if (!invite || invite.organizationId !== session.org)
+    return { ok: false, error: "Convite não encontrado." };
+  if (invite.acceptedAt)
+    return { ok: false, error: "Convite já foi usado." };
+
+  await prisma.invite.update({
+    where: { id: inviteId },
+    data: { acceptedAt: new Date() }, // marca como consumido = invalidado
+  });
+  await logActivity(session, "invite.cancel", `Cancelou convite de ${invite.email}`, inviteId);
+  revalidatePath(`/espaco/${session.slug}/equipe`);
+  return { ok: true };
+}
+
+/**
+ * Reenvia o e-mail de um convite ainda válido. Não gera token novo — só
+ * dispara o mail outra vez. Para o user, é "não recebi".
+ * NB: como guardamos só o HASH do token, não podemos remandar o link
+ * antigo. Geramos um token NOVO e atualizamos o hash.
+ */
+export async function resendInviteAction(inviteId: string): Promise<Result> {
+  const gate = await requirePermission("team.manage");
+  if (!gate.ok) return gate;
+  const session = gate.session;
+
+  if (!hit(`invite:resend:${session.sub}`, 20, 60 * 60_000).ok)
+    return { ok: false, error: "Muitos reenvios. Aguarde uma hora." };
+
+  const invite = await prisma.invite.findUnique({
+    where: { id: inviteId },
+    include: { organization: { select: { name: true } } },
+  });
+  if (!invite || invite.organizationId !== session.org)
+    return { ok: false, error: "Convite não encontrado." };
+  if (invite.acceptedAt)
+    return { ok: false, error: "Convite já foi aceito ou cancelado." };
+
+  // Gera token novo (não temos como recuperar o antigo — só o hash fica salvo).
+  const { plain, hash } = generateToken();
+  await prisma.invite.update({
+    where: { id: inviteId },
+    data: {
+      tokenHash: hash,
+      expiresAt: new Date(Date.now() + TOKEN_TTL_MS), // estende validade
+    },
+  });
+
+  const res = await sendTeamInviteEmail({
+    to: invite.email,
+    orgName: invite.organization.name,
+    inviterName: session.name,
+    token: plain,
+  });
+  if (!res.ok) {
+    logger.error("Reenvio de convite — falha no e-mail", { inviteId });
+    return { ok: false, error: "Não consegui enviar o e-mail." };
+  }
+
+  await logActivity(session, "invite.resend", `Reenviou convite para ${invite.email}`, inviteId);
+  revalidatePath(`/espaco/${session.slug}/equipe`);
+  return { ok: true };
+}
+
 export interface AcceptInviteInput {
   token: string;
   name: string;

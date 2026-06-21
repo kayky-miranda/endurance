@@ -13,7 +13,7 @@ export default async function MinhaContaPage({
 
   const user = await prisma.user.findUnique({
     where: { id: session.sub },
-    select: { totpEnabledAt: true },
+    select: { totpEnabledAt: true, totpBackupCodes: true },
   });
 
   return (
@@ -32,7 +32,10 @@ export default async function MinhaContaPage({
         emailVerified={session.emailVerified ?? false}
       />
 
-      <SecuritySection totpEnabled={!!user?.totpEnabledAt} />
+      <SecuritySection
+        totpEnabled={!!user?.totpEnabledAt}
+        backupCodesRemaining={user?.totpBackupCodes.length ?? 0}
+      />
     </div>
   );
 }

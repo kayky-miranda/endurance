@@ -1,5 +1,5 @@
 import "server-only";
-import { createHmac, randomBytes } from "node:crypto";
+import { createHmac, randomBytes, createHash } from "node:crypto";
 
 /**
  * Implementação de TOTP (RFC 6238) + HOTP (RFC 4226) pura em Node — sem
@@ -111,6 +111,33 @@ export function verifyTotpCode(
     if (hotp(secret, current + offset, DIGITS) === code) return true;
   }
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// Backup codes — single-use, exibidos uma única vez no setup.
+// ---------------------------------------------------------------------------
+
+/** 8 códigos no formato XXXX-XXXX (4 dígitos + hífen + 4 dígitos). */
+export function generateBackupCodes(count = 8): string[] {
+  const codes: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const buf = randomBytes(4);
+    // 32 bits → 8 chars hex, formatado XXXX-XXXX (legível à mão).
+    const hex = buf.toString("hex").toUpperCase();
+    codes.push(`${hex.slice(0, 4)}-${hex.slice(4)}`);
+  }
+  return codes;
+}
+
+/** Normaliza um código vindo do user antes de comparar (uppercase, sem hifens/espaços). */
+export function normalizeBackupCode(input: string): string {
+  return input.replace(/[\s-]/g, "").toUpperCase();
+}
+
+/** Hash determinístico pra guardar no banco. Backup codes têm entropia alta (32 bits),
+ * então SHA-256 é suficiente (bcrypt seria overkill aqui). */
+export function hashBackupCode(code: string): string {
+  return createHash("sha256").update(normalizeBackupCode(code)).digest("hex");
 }
 
 /**

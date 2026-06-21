@@ -578,6 +578,9 @@ model User {
   // que o segredo vaze, o atacante ainda precisa da senha).
   totpSecret      String?
   totpEnabledAt   DateTime?
+  // Backup codes do 2FA: 8 códigos single-use guardados como SHA-256 do
+  // valor plain. Quando usuário usa um, removemos do array.
+  totpBackupCodes String[]  @default([])
   organizationId  String
   createdAt       DateTime  @default(now())
 

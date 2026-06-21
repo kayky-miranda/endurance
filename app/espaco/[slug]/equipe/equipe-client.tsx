@@ -59,6 +59,7 @@ import {
   resetPasswordAction,
 } from "./equipe-actions";
 import InviteModal from "./invite-modal";
+import InviteList from "./invite-list";
 
 export type MemberView = {
   id: string;
@@ -79,6 +80,15 @@ export type ActivityView = {
   actorName: string;
   action: string;
   detail: string;
+  createdAt: string;
+};
+
+export type InviteView = {
+  id: string;
+  email: string;
+  role: string;
+  profile: string;
+  expiresAt: string;
   createdAt: string;
 };
 
@@ -197,6 +207,7 @@ export default function EquipeClient({
   currentUserId,
   members,
   activity,
+  invites,
   permissions,
   permissionGroups,
   profiles,
@@ -205,12 +216,13 @@ export default function EquipeClient({
   currentUserId: string;
   members: MemberView[];
   activity: ActivityView[];
+  invites: InviteView[];
   permissions: PermissionDef[];
   permissionGroups: string[];
   profiles: ProfileDef[];
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"users" | "audit">("users");
+  const [tab, setTab] = useState<"users" | "invites" | "audit">("users");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "blocked">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -322,6 +334,14 @@ export default function EquipeClient({
         <TabBtn active={tab === "users"} onClick={() => setTab("users")} icon={Users}>
           Usuários
         </TabBtn>
+        <TabBtn active={tab === "invites"} onClick={() => setTab("invites")} icon={Mail}>
+          Convites
+          {invites.length > 0 && (
+            <span className="ml-1.5 rounded-full bg-brand-500 px-1.5 py-0.5 text-[10px] font-bold text-ink-950">
+              {invites.length}
+            </span>
+          )}
+        </TabBtn>
         <TabBtn active={tab === "audit"} onClick={() => setTab("audit")} icon={History}>
           Auditoria
         </TabBtn>
@@ -404,6 +424,8 @@ export default function EquipeClient({
             ))}
           </div>
         </div>
+      ) : tab === "invites" ? (
+        <InviteList invites={invites} profiles={profiles} />
       ) : (
         <AuditList activity={activity} />
       )}

@@ -8,6 +8,8 @@ import {
   generateTotpSecret,
   buildOtpauthUrl,
   verifyTotpCode,
+  generateBackupCodes,
+  hashBackupCode,
 } from "@/lib/totp";
 import { logActivity } from "@/lib/endurance/activity-log";
 import { hit } from "@/lib/rate-limit";
@@ -69,7 +71,9 @@ export async function startTotpSetupAction(): Promise<
  * Passo 2: confirma com o primeiro código de 6 dígitos. Só nesse momento
  * gravamos o secret no banco e marcamos totpEnabledAt.
  */
-export async function enable2faAction(code: string): Promise<R> {
+export async function enable2faAction(
+  code: string,
+): Promise<{ ok: true; backupCodes: string[] } | { ok: false; error: string }> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Sessão expirada." };
 
@@ -80,15 +84,52 @@ export async function enable2faAction(code: string): Promise<R> {
   if (!verifyTotpCode(secret, code))
     return { ok: false, error: "Código incorreto. Confira o app de autenticação." };
 
+  // Gera 8 backup codes; mostra plain ao usuário UMA vez e grava só o hash.
+  const plainCodes = generateBackupCodes(8);
+  const hashed = plainCodes.map(hashBackupCode);
+
   await prisma.user.update({
     where: { id: session.sub },
-    data: { totpSecret: secret, totpEnabledAt: new Date() },
+    data: {
+      totpSecret: secret,
+      totpEnabledAt: new Date(),
+      totpBackupCodes: hashed,
+    },
   });
   store.delete(SETUP_COOKIE);
 
   await logActivity(session, "2fa.enable", "2FA TOTP ativado");
   logger.info("2FA ativado", { userId: session.sub });
-  return { ok: true };
+  return { ok: true, backupCodes: plainCodes };
+}
+
+/**
+ * Regenera os 8 backup codes (descartando os anteriores). Útil quando o
+ * usuário expõe a lista por engano. Mostra os novos uma vez.
+ */
+export async function regenerateBackupCodesAction(): Promise<
+  { ok: true; backupCodes: string[] } | { ok: false; error: string }
+> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Sessão expirada." };
+
+  if (!hit(`2fa:regen:${session.sub}`, 5, 60 * 60_000).ok)
+    return { ok: false, error: "Muitas tentativas. Aguarde uma hora." };
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.sub },
+    select: { totpEnabledAt: true },
+  });
+  if (!user?.totpEnabledAt) return { ok: false, error: "2FA não está ativo." };
+
+  const plainCodes = generateBackupCodes(8);
+  const hashed = plainCodes.map(hashBackupCode);
+  await prisma.user.update({
+    where: { id: session.sub },
+    data: { totpBackupCodes: hashed },
+  });
+  await logActivity(session, "2fa.backup.regenerate", "Backup codes regenerados");
+  return { ok: true, backupCodes: plainCodes };
 }
 
 /**

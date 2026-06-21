@@ -204,14 +204,18 @@ export async function loginAction(
  * (gravado em loginAction quando o usuário tem 2FA ativo), confere o código
  * e só então cria a sessão real.
  */
-export async function verifyTotpLoginAction(code: string): Promise<AuthResult> {
+export async function verifyTotpLoginAction(
+  code: string,
+  isBackupCode = false,
+): Promise<AuthResult> {
   const { cookies } = await import("next/headers");
-  const { verifyTotpCode } = await import("@/lib/totp");
+  const { verifyTotpCode, normalizeBackupCode, hashBackupCode } = await import(
+    "@/lib/totp"
+  );
   const store = await cookies();
   const userId = store.get(PENDING_2FA_COOKIE)?.value;
   if (!userId) return { ok: false, error: "Sessão de login expirou — refaça o login." };
 
-  // Rate limit por usuário (brute-force de TOTP).
   if (!hit(`2fa:login:${userId}`, 5, 5 * 60_000).ok)
     return { ok: false, error: "Muitas tentativas. Aguarde alguns minutos." };
 
@@ -224,13 +228,31 @@ export async function verifyTotpLoginAction(code: string): Promise<AuthResult> {
   if (user.status === "blocked")
     return { ok: false, error: "Usuário bloqueado." };
 
-  if (!verifyTotpCode(user.totpSecret, code))
-    return { ok: false, error: "Código incorreto." };
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { lastLoginAt: new Date() },
-  });
+  if (isBackupCode) {
+    const hashed = hashBackupCode(code);
+    const idx = user.totpBackupCodes.indexOf(hashed);
+    if (idx < 0) return { ok: false, error: "Código de recuperação inválido." };
+    // Remove o código usado (single-use) + segue login.
+    const remaining = user.totpBackupCodes.filter((_, i) => i !== idx);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        totpBackupCodes: remaining,
+        lastLoginAt: new Date(),
+      },
+    });
+    logger.info("Login via backup code", {
+      userId: user.id,
+      remaining: remaining.length,
+    });
+  } else {
+    if (!verifyTotpCode(user.totpSecret, code))
+      return { ok: false, error: "Código incorreto." };
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+  }
 
   await createSession({
     sub: user.id,

@@ -15,15 +15,34 @@ import {
   startTotpSetupAction,
   enable2faAction,
   disable2faAction,
+  regenerateBackupCodesAction,
 } from "./security-actions";
 
 export default function SecuritySection({
   totpEnabled,
+  backupCodesRemaining,
 }: {
   totpEnabled: boolean;
+  backupCodesRemaining: number;
 }) {
   const [setupOpen, setSetupOpen] = useState(false);
   const [disableOpen, setDisableOpen] = useState(false);
+  const [regenCodes, setRegenCodes] = useState<string[] | null>(null);
+  const [regenLoading, setRegenLoading] = useState(false);
+
+  async function regenerate() {
+    if (
+      !confirm(
+        "Os backup codes atuais serão invalidados. Continuar?",
+      )
+    )
+      return;
+    setRegenLoading(true);
+    const res = await regenerateBackupCodesAction();
+    setRegenLoading(false);
+    if (res.ok) setRegenCodes(res.backupCodes);
+    else alert(res.error);
+  }
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-ink-700 dark:bg-ink-900">
@@ -76,6 +95,52 @@ export default function SecuritySection({
         )}
       </div>
 
+      {/* Status dos backup codes, só quando 2FA está ativo */}
+      {totpEnabled && (
+        <div className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-slate-200 p-3 dark:border-ink-700">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              Códigos de recuperação
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Restam {backupCodesRemaining}/8 códigos não usados.{" "}
+              {backupCodesRemaining < 3 && (
+                <span className="font-semibold text-amber-700 dark:text-amber-300">
+                  Recomendado regenerar.
+                </span>
+              )}
+            </p>
+          </div>
+          <button
+            onClick={regenerate}
+            disabled={regenLoading}
+            className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-ink-700 dark:text-slate-200 dark:hover:bg-ink-800"
+          >
+            {regenLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Regenerar"}
+          </button>
+        </div>
+      )}
+
+      {regenCodes && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-ink-900">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              Novos códigos de recuperação
+            </h3>
+            <div className="mt-4">
+              <BackupCodesPanel codes={regenCodes} />
+            </div>
+            <button
+              onClick={() => setRegenCodes(null)}
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold hover:bg-brand-600"
+              style={{ color: "var(--color-button-text)" }}
+            >
+              Concluir
+            </button>
+          </div>
+        </div>
+      )}
+
       {setupOpen && <SetupModal onClose={() => setSetupOpen(false)} />}
       {disableOpen && <DisableModal onClose={() => setDisableOpen(false)} />}
     </section>
@@ -91,6 +156,7 @@ function SetupModal({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
 
   async function start() {
     setLoading(true);
@@ -115,6 +181,7 @@ function SetupModal({ onClose }: { onClose: () => void }) {
       setError(res.error);
       return;
     }
+    setBackupCodes(res.backupCodes);
     setPhase("done");
     router.refresh();
   }
@@ -223,23 +290,88 @@ function SetupModal({ onClose }: { onClose: () => void }) {
         )}
 
         {phase === "done" && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/40">
-            <div className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-300">
-              <Check className="h-4 w-4" />
-              2FA ativado
+          <div className="space-y-3">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/40">
+              <div className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-300">
+                <Check className="h-4 w-4" />
+                2FA ativado
+              </div>
+              <p className="mt-1 text-xs text-emerald-800 dark:text-emerald-200">
+                No próximo login você precisará informar o código do app.
+              </p>
             </div>
-            <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">
-              No próximo login você precisará informar o código de 6 dígitos.
-              Guarde o segredo em local seguro caso perca acesso ao app.
-            </p>
+            <BackupCodesPanel codes={backupCodes} />
             <button
               onClick={onClose}
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold hover:bg-brand-600"
+              style={{ color: "var(--color-button-text)" }}
             >
               Concluir
             </button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function BackupCodesPanel({ codes }: { codes: string[] }) {
+  const [copied, setCopied] = useState(false);
+
+  function copyAll() {
+    navigator.clipboard.writeText(codes.join("\n"));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function download() {
+    const blob = new Blob(
+      [
+        "ENDURANCE — Backup codes\n",
+        "Cada código vale UMA vez. Guarde em local seguro.\n",
+        "Sem o app de autenticação E sem estes códigos, você perde acesso.\n\n",
+        ...codes.map((c) => c + "\n"),
+      ],
+      { type: "text/plain;charset=utf-8" },
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `endurance-backup-codes-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  if (!codes.length) return null;
+
+  return (
+    <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
+      <p className="text-xs font-bold text-amber-800 dark:text-amber-200">
+        ⚠️ Guarde estes 8 códigos de recuperação
+      </p>
+      <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
+        Use um deles se perder o app de autenticação. Cada código vale UMA vez. <strong>Não mostraremos de novo.</strong>
+      </p>
+      <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg bg-white p-2 font-mono text-xs dark:bg-ink-900">
+        {codes.map((c) => (
+          <span key={c} className="text-center text-slate-800 dark:text-slate-200">
+            {c}
+          </span>
+        ))}
+      </div>
+      <div className="mt-2 flex gap-2">
+        <button
+          onClick={copyAll}
+          className="flex-1 rounded-lg bg-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-300 dark:bg-amber-800 dark:text-amber-50 dark:hover:bg-amber-700"
+        >
+          {copied ? "Copiado!" : "Copiar"}
+        </button>
+        <button
+          onClick={download}
+          className="flex-1 rounded-lg bg-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-300 dark:bg-amber-800 dark:text-amber-50 dark:hover:bg-amber-700"
+        >
+          Baixar .txt
+        </button>
       </div>
     </div>
   );
