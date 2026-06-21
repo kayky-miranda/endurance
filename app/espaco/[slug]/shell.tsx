@@ -114,6 +114,7 @@ export default function Shell({
   canManage,
   canManageBilling = false,
   canViewDashboard = true,
+  logoDataUrl = null,
   children,
 }: {
   orgName: string;
@@ -126,6 +127,7 @@ export default function Shell({
   canManage: boolean;
   canManageBilling?: boolean;
   canViewDashboard?: boolean;
+  logoDataUrl?: string | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -313,9 +315,18 @@ export default function Shell({
           }`}
         >
           <div className="flex h-16 items-center gap-2.5 border-b border-ink-800 px-5">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
-              <Compass className="h-5 w-5" strokeWidth={2} />
-            </div>
+            {logoDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoDataUrl}
+                alt={orgName}
+                className="h-9 w-9 shrink-0 rounded-lg object-contain bg-white/5 p-1"
+              />
+            ) : (
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
+                <Compass className="h-5 w-5" strokeWidth={2} />
+              </div>
+            )}
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-slate-100">
                 {orgName}

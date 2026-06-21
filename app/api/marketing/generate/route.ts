@@ -18,6 +18,14 @@ export async function POST(req: Request) {
   if (!sessionHasPermission(session, "marketing.manage"))
     return NextResponse.json({ error: "Sem permissão para gerar campanhas." }, { status: 403 });
 
+  // Marketing gera conteúdo que será exibido publicamente (Instagram) — exige
+  // e-mail verificado para reduzir uso por contas descartáveis.
+  if (!session.emailVerified)
+    return NextResponse.json(
+      { error: "Confirme seu e-mail antes de gerar campanhas." },
+      { status: 403 },
+    );
+
   // Rate limit por organização — geração custa crédito + chamada de IA.
   if (!hit(`ai:carousel:${session.org}`, 10, 60_000).ok) {
     return NextResponse.json(

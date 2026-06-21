@@ -73,3 +73,64 @@ export async function resetThemeAction(): Promise<Result> {
   revalidatePath(`/espaco/${session.slug}`, "layout");
   return { ok: true };
 }
+
+const ALLOWED_LOGO_MIMES = ["image/png", "image/svg+xml", "image/jpeg", "image/webp"];
+const MAX_LOGO_BYTES = 200 * 1024; // 200 KB
+
+/**
+ * Upload de logo da empresa. Pra evitar dependência de storage externo no
+ * MVP, guardamos como data URL base64 direto no banco. Limite estrito:
+ * 200KB. Em produção, trocar por Vercel Blob/R2 (campo vira só a URL).
+ */
+export async function uploadLogoAction(input: {
+  dataUrl: string;
+  mime: string;
+}): Promise<Result> {
+  const gate = await requirePermission("team.manage");
+  if (!gate.ok) return gate;
+  const session = gate.session;
+
+  if (!ALLOWED_LOGO_MIMES.includes(input.mime))
+    return { ok: false, error: "Formato não suportado. Use PNG, SVG, JPEG ou WebP." };
+  if (!input.dataUrl.startsWith(`data:${input.mime};base64,`))
+    return { ok: false, error: "Formato inválido (data URL esperado)." };
+
+  // base64 → bytes: cada 4 chars representa 3 bytes (aproximação alta).
+  const base64Body = input.dataUrl.split(",")[1] ?? "";
+  const approxBytes = (base64Body.length * 3) / 4;
+  if (approxBytes > MAX_LOGO_BYTES)
+    return { ok: false, error: "Logo muito grande (máximo 200KB). Otimize a imagem." };
+
+  await prisma.themeSettings.upsert({
+    where: { organizationId: session.org },
+    create: {
+      organizationId: session.org,
+      presetId: "default",
+      logoDataUrl: input.dataUrl,
+      logoMime: input.mime,
+      updatedById: session.sub,
+    },
+    update: {
+      logoDataUrl: input.dataUrl,
+      logoMime: input.mime,
+      updatedById: session.sub,
+    },
+  });
+  await logActivity(session, "theme.logo.upload", "Logo da empresa atualizada");
+  revalidatePath(`/espaco/${session.slug}`, "layout");
+  return { ok: true };
+}
+
+export async function removeLogoAction(): Promise<Result> {
+  const gate = await requirePermission("team.manage");
+  if (!gate.ok) return gate;
+  const session = gate.session;
+
+  await prisma.themeSettings.updateMany({
+    where: { organizationId: session.org },
+    data: { logoDataUrl: null, logoMime: null },
+  });
+  await logActivity(session, "theme.logo.remove", "Logo da empresa removida");
+  revalidatePath(`/espaco/${session.slug}`, "layout");
+  return { ok: true };
+}

@@ -27,6 +27,8 @@ export interface ResolvedTheme {
   chrome600: string;
   defaultDarkMode: boolean;
   presetId: string;
+  logoDataUrl: string | null;
+  logoMime: string | null;
 }
 
 const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
@@ -58,6 +60,8 @@ export const resolveTheme = cache(async function resolveTheme(
     chrome700: pick(null, preset.chrome700),
     chrome600: pick(null, preset.chrome600),
     defaultDarkMode: row?.defaultDarkMode ?? false,
+    logoDataUrl: row?.logoDataUrl ?? null,
+    logoMime: row?.logoMime ?? null,
   };
 });
 

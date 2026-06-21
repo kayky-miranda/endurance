@@ -51,6 +51,7 @@ export default async function EspacoLayout({
         canManage={canManageTeamSession(session)}
         canManageBilling={perms.has("subscription.manage")}
         canViewDashboard={canViewDashboard}
+        logoDataUrl={theme.logoDataUrl}
       >
         {children}
       </Shell>

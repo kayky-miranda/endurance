@@ -31,6 +31,7 @@ export default async function AparenciaPage({
           buttonTextColor: theme.buttonText,
           sidebarBgDark: theme.chrome950,
           defaultDarkMode: theme.defaultDarkMode,
+          logoDataUrl: theme.logoDataUrl,
         }}
       />
     </div>

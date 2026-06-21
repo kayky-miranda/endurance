@@ -76,6 +76,11 @@ model ThemeSettings {
   textColor       String? // texto principal (modo claro)
   cardBg          String? // fundo de cards (modo claro)
   defaultDarkMode Boolean  @default(false) // tema escuro como padrão da org
+  // Logo da empresa como data URL (base64) — sem precisar de Blob externo no
+  // MVP. Limite de ~200KB no upload pra evitar inchar o banco. Em produção
+  // (>100 orgs) trocar por Vercel Blob/R2 e guardar só a URL.
+  logoDataUrl     String? @db.Text
+  logoMime        String? // image/png | image/svg+xml | image/jpeg
   updatedAt       DateTime @updatedAt
   updatedById     String?
 

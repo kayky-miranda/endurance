@@ -9,10 +9,19 @@ import {
   Check,
   AlertTriangle,
   ShieldCheck,
+  Upload,
+  Trash2,
+  ImageIcon,
 } from "lucide-react";
 import { THEME_PRESETS, DEFAULT_PRESET } from "@/lib/theme-presets";
 import { contrastRatio, wcagLevel } from "@/lib/theme-contrast";
-import { saveThemeAction, resetThemeAction, type ThemeInput } from "./aparencia-actions";
+import {
+  saveThemeAction,
+  resetThemeAction,
+  uploadLogoAction,
+  removeLogoAction,
+  type ThemeInput,
+} from "./aparencia-actions";
 
 const COLOR_FIELDS: {
   key: keyof Omit<ThemeInput, "presetId" | "defaultDarkMode">;
@@ -32,6 +41,7 @@ interface State {
   buttonTextColor: string;
   sidebarBgDark: string;
   defaultDarkMode: boolean;
+  logoDataUrl: string | null;
 }
 
 export default function AparenciaClient({ initial }: { initial: State }) {
@@ -105,6 +115,13 @@ export default function AparenciaClient({ initial }: { initial: State }) {
 
   return (
     <>
+      {/* LOGO */}
+      <LogoSection
+        logoDataUrl={state.logoDataUrl}
+        onUploaded={(url) => setState((s) => ({ ...s, logoDataUrl: url }))}
+        onRemoved={() => setState((s) => ({ ...s, logoDataUrl: null }))}
+      />
+
       {/* PRESETS */}
       <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-ink-700 dark:bg-ink-900">
         <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">Temas prontos</h2>
@@ -318,4 +335,109 @@ export default function AparenciaClient({ initial }: { initial: State }) {
       </div>
     </>
   );
+}
+
+function LogoSection({
+  logoDataUrl,
+  onUploaded,
+  onRemoved,
+}: {
+  logoDataUrl: string | null;
+  onUploaded: (url: string) => void;
+  onRemoved: () => void;
+}) {
+  const router = useRouter();
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFile(file: File) {
+    setError(null);
+    if (file.size > 200 * 1024) {
+      setError("Arquivo muito grande (máximo 200KB). Otimize a imagem.");
+      return;
+    }
+    setUploading(true);
+    const dataUrl = await fileToDataUrl(file);
+    const res = await uploadLogoAction({ dataUrl, mime: file.type });
+    setUploading(false);
+    if (res.ok) {
+      onUploaded(dataUrl);
+      router.refresh();
+    } else {
+      setError(res.error);
+    }
+  }
+
+  async function remove() {
+    if (!confirm("Remover a logo? Voltamos pro ícone padrão.")) return;
+    await removeLogoAction();
+    onRemoved();
+    router.refresh();
+  }
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-ink-700 dark:bg-ink-900">
+      <h2 className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100">
+        <ImageIcon className="h-4 w-4 text-brand-500" />
+        Logo da empresa
+      </h2>
+      <p className="mt-1 text-xs text-slate-500">
+        Aparece na sidebar e nos e-mails enviados pelo sistema. PNG, SVG, JPEG ou WebP até 200KB.
+      </p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        <div className="grid h-20 w-20 place-items-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 dark:border-ink-700 dark:bg-ink-800">
+          {logoDataUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoDataUrl}
+              alt="Logo"
+              className="max-h-16 max-w-16 object-contain"
+            />
+          ) : (
+            <ImageIcon className="h-6 w-6 text-slate-400" />
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold hover:bg-brand-600" style={{ color: "var(--color-button-text)" }}>
+            {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+            {uploading ? "Enviando…" : logoDataUrl ? "Trocar logo" : "Enviar logo"}
+            <input
+              type="file"
+              accept="image/png,image/svg+xml,image/jpeg,image/webp"
+              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              className="hidden"
+              disabled={uploading}
+            />
+          </label>
+          {logoDataUrl && (
+            <button
+              type="button"
+              onClick={remove}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-300 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
+            >
+              <Trash2 className="h-3 w-3" />
+              Remover
+            </button>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Falha ao ler o arquivo."));
+    reader.readAsDataURL(file);
+  });
 }
