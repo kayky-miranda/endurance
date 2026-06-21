@@ -95,13 +95,14 @@ export default function OnboardingClient({
         email,
         password,
       });
-      if (res.ok) {
+      if (res.ok && "slug" in res) {
         // Navegação completa: o cookie de sessão já foi gravado pela action.
         window.location.href = `/espaco/${res.slug}`;
-      } else {
+      } else if (!res.ok) {
         setError(res.error);
         setCreating(false);
       }
+      // ok && needs2fa não cabe no signup (usuário acabou de criar conta sem 2FA).
     } catch {
       setError("Algo deu errado ao criar a conta.");
       setCreating(false);

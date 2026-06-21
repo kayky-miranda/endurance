@@ -572,6 +572,12 @@ model User {
   permissions     String[]  @default([]) // ids de permissão (RBAC granular)
   status          String    @default("active") // active | blocked
   lastLoginAt     DateTime?
+  // 2FA TOTP (RFC 6238). totpSecret é o segredo base32 usado pra gerar
+  // os códigos. Em produção, idealmente criptografado por uma chave do app.
+  // No MVP fica em texto — o controle de risco é o bcrypt da senha (mesmo
+  // que o segredo vaze, o atacante ainda precisa da senha).
+  totpSecret      String?
+  totpEnabledAt   DateTime?
   organizationId  String
   createdAt       DateTime  @default(now())
 

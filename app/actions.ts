@@ -34,8 +34,14 @@ function validatePassword(pw: string): { ok: true } | { ok: false; error: string
   return { ok: true };
 }
 
-type AuthResult = { ok: true; slug: string } | { ok: false; error: string };
+type AuthResult =
+  | { ok: true; slug: string }
+  | { ok: true; needs2fa: true } // senha OK mas falta TOTP
+  | { ok: false; error: string };
 type SimpleResult = { ok: true } | { ok: false; error: string };
+
+const PENDING_2FA_COOKIE = "endurance_pending_2fa";
+const PENDING_2FA_TTL_SEC = 5 * 60;
 
 export interface SignupInput {
   name: string; // nome do negócio
@@ -158,6 +164,22 @@ export async function loginAction(
       error: "Usuário bloqueado. Fale com o administrador do espaço.",
     };
 
+  // Se o usuário tem 2FA ativo, NÃO criamos a sessão ainda. Marcamos um
+  // cookie "pending" com o id do usuário e devolvemos needs2fa pro client
+  // prompt do código. verifyTotpLoginAction abaixo finaliza o login.
+  if (user.totpEnabledAt && user.totpSecret) {
+    const { cookies } = await import("next/headers");
+    const store = await cookies();
+    store.set(PENDING_2FA_COOKIE, user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: PENDING_2FA_TTL_SEC,
+    });
+    return { ok: true, needs2fa: true };
+  }
+
   // Registra o último acesso (auditoria / coluna "Último acesso").
   await prisma.user.update({
     where: { id: user.id },
@@ -174,6 +196,54 @@ export async function loginAction(
     profile: user.profile,
     permissions: user.permissions,
   });
+  return { ok: true, slug: user.organization.slug };
+}
+
+/**
+ * Verifica o código TOTP do login em 2 etapas. Lê o cookie pending_2fa
+ * (gravado em loginAction quando o usuário tem 2FA ativo), confere o código
+ * e só então cria a sessão real.
+ */
+export async function verifyTotpLoginAction(code: string): Promise<AuthResult> {
+  const { cookies } = await import("next/headers");
+  const { verifyTotpCode } = await import("@/lib/totp");
+  const store = await cookies();
+  const userId = store.get(PENDING_2FA_COOKIE)?.value;
+  if (!userId) return { ok: false, error: "Sessão de login expirou — refaça o login." };
+
+  // Rate limit por usuário (brute-force de TOTP).
+  if (!hit(`2fa:login:${userId}`, 5, 5 * 60_000).ok)
+    return { ok: false, error: "Muitas tentativas. Aguarde alguns minutos." };
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { organization: true },
+  });
+  if (!user || !user.totpSecret || !user.totpEnabledAt)
+    return { ok: false, error: "Configuração de 2FA inválida." };
+  if (user.status === "blocked")
+    return { ok: false, error: "Usuário bloqueado." };
+
+  if (!verifyTotpCode(user.totpSecret, code))
+    return { ok: false, error: "Código incorreto." };
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date() },
+  });
+
+  await createSession({
+    sub: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role as Role,
+    org: user.organizationId,
+    slug: user.organization.slug,
+    profile: user.profile,
+    permissions: user.permissions,
+  });
+
+  store.delete(PENDING_2FA_COOKIE);
   return { ok: true, slug: user.organization.slug };
 }
 
