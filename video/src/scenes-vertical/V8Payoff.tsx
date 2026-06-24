@@ -3,12 +3,11 @@ import { Scene } from "../components/Scene";
 import { COLORS, SPRING_SNAPPY, SCENE_FRAMES } from "../theme";
 import { FONT } from "../fonts";
 
-export const Scene8Payoff: React.FC = () => {
+export const V8Payoff: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const subReveal = spring({ frame: frame - 2, fps, config: SPRING_SNAPPY });
-
   const mainSlam = spring({ frame: frame - 8, fps, config: { damping: 12, stiffness: 280, mass: 0.4 } });
   const mainScale = interpolate(mainSlam, [0, 1], [1.8, 1]);
 
@@ -45,30 +44,32 @@ export const Scene8Payoff: React.FC = () => {
         />
       )}
 
-      <div style={{ textAlign: "center", transform: `translateX(${shake}px)` }}>
+      <div style={{ textAlign: "center", transform: `translateX(${shake}px)`, padding: "0 60px" }}>
         <p
           style={{
             fontFamily: FONT.body,
             fontWeight: 500,
-            fontSize: 24,
+            fontSize: 36,
             color: COLORS.muted,
             margin: 0,
             opacity: subReveal,
             transform: `translateY(${interpolate(subReveal, [0, 1], [15, 0])}px)`,
+            lineHeight: 1.3,
           }}
         >
-          do zero a um ERP completo, configurado pro seu negócio
+          do zero a um ERP completo,{"\n"}configurado pro seu negócio
         </p>
         <h1
           style={{
             fontFamily: FONT.serif,
-            fontSize: 100,
+            fontSize: 140,
             color: COLORS.foreground,
             fontWeight: 400,
-            margin: "20px 0 0",
+            margin: "32px 0 0",
             transform: `scale(${mainScale})`,
             opacity: mainSlam,
-            filter: `drop-shadow(0 0 ${30 * glowPulse}px ${COLORS.emerald})`,
+            filter: `drop-shadow(0 0 ${40 * glowPulse}px ${COLORS.emerald})`,
+            lineHeight: 1.05,
           }}
         >
           Em menos de{" "}

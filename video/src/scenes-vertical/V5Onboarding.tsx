@@ -9,22 +9,21 @@ const MODULES = [
   { icon: "🧾", name: "PDV" },
   { icon: "📦", name: "Estoque" },
   { icon: "📊", name: "Financeiro" },
-  { icon: "📄", name: "Fiscal / NFC-e" },
-  { icon: "👥", name: "Clientes CRM" },
+  { icon: "📄", name: "Fiscal" },
+  { icon: "👥", name: "CRM" },
   { icon: "🔐", name: "Equipe" },
 ];
 
-export const Scene5Onboarding: React.FC = () => {
+export const V5Onboarding: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const browserSlide = spring({ frame: frame - 2, fps, config: SPRING_SNAPPY });
-  const browserY = interpolate(browserSlide, [0, 1], [60, 0]);
+  const browserY = interpolate(browserSlide, [0, 1], [80, 0]);
 
   const headerReveal = spring({ frame: frame - 6, fps, config: SPRING });
-
   const floatBadge = spring({ frame: frame - 55, fps, config: SPRING_BOUNCY });
-  const badgeFloat = Math.sin(frame * 0.08) * 5;
+  const badgeFloat = Math.sin(frame * 0.08) * 6;
 
   const moduleCount = frame >= 55
     ? Math.min(6, Math.round(interpolate(frame, [55, 72], [0, 6], {
@@ -35,44 +34,25 @@ export const Scene5Onboarding: React.FC = () => {
 
   return (
     <Scene durationInFrames={SCENE_FRAMES.onboarding}>
-      <div
-        style={{
-          position: "relative",
-          transform: `translateY(${browserY}px)`,
-          opacity: browserSlide,
-        }}
-      >
-        <BrowserWindow url="endurance.app/dashboard" width={800}>
+      <div style={{ position: "relative", transform: `translateY(${browserY}px)`, opacity: browserSlide }}>
+        <BrowserWindow url="endurance.app/dashboard" width={920}>
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 14,
+              gap: 18,
               opacity: headerReveal,
               transform: `translateX(${interpolate(headerReveal, [0, 1], [-20, 0])}px)`,
+              flexWrap: "wrap",
             }}
           >
-            <span
-              style={{
-                fontFamily: FONT.body,
-                fontWeight: 700,
-                fontSize: 26,
-                color: COLORS.foreground,
-              }}
-            >
+            <span style={{ fontFamily: FONT.body, fontWeight: 700, fontSize: 36, color: COLORS.foreground }}>
               Mercadinho do Zé
             </span>
-            <Badge>✓ Configurado por IA</Badge>
+            <Badge style={{ fontSize: 18, padding: "8px 14px" }}>✓ Configurado por IA</Badge>
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 14,
-              marginTop: 26,
-            }}
-          >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 18, marginTop: 32 }}>
             {MODULES.map((m, i) => {
               const pop = spring({ frame: frame - (10 + i * 5), fps, config: SPRING_BOUNCY });
               const scale = interpolate(pop, [0, 1], [0.3, 1]);
@@ -84,41 +64,27 @@ export const Scene5Onboarding: React.FC = () => {
                   style={{
                     background: COLORS.bg,
                     border: `1px solid ${COLORS.cardBorder}`,
-                    borderRadius: 12,
-                    padding: 18,
+                    borderRadius: 16,
+                    padding: 28,
                     transform: `scale(${scale * hover})`,
                     opacity: pop,
                   }}
                 >
-                  <div style={{ fontSize: 28 }}>{m.icon}</div>
-                  <div
-                    style={{
-                      fontFamily: FONT.body,
-                      fontWeight: 600,
-                      fontSize: 16,
-                      color: COLORS.foreground,
-                      marginTop: 8,
-                    }}
-                  >
+                  <div style={{ fontSize: 48 }}>{m.icon}</div>
+                  <div style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: 26, color: COLORS.foreground, marginTop: 12 }}>
                     {m.name}
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
                     <div
                       style={{
-                        width: 8,
-                        height: 8,
+                        width: 12,
+                        height: 12,
                         borderRadius: "50%",
                         background: COLORS.emerald,
-                        boxShadow: `0 0 6px ${COLORS.emerald}`,
+                        boxShadow: `0 0 8px ${COLORS.emerald}`,
                       }}
                     />
-                    <span
-                      style={{
-                        fontFamily: FONT.body,
-                        fontSize: 13,
-                        color: COLORS.emeraldBright,
-                      }}
-                    >
+                    <span style={{ fontFamily: FONT.body, fontSize: 18, color: COLORS.emeraldBright }}>
                       Ativo
                     </span>
                   </div>
@@ -131,20 +97,20 @@ export const Scene5Onboarding: React.FC = () => {
         <div
           style={{
             position: "absolute",
-            top: -18,
-            right: -40,
+            top: -30,
+            right: -20,
             transform: `scale(${interpolate(floatBadge, [0, 1], [0.3, 1])}) translateY(${badgeFloat}px)`,
             opacity: floatBadge,
           }}
         >
           <Badge
             style={{
-              fontSize: 15,
-              padding: "10px 18px",
+              fontSize: 22,
+              padding: "14px 22px",
               boxShadow: `0 8px 30px ${COLORS.emeraldGlow}`,
             }}
           >
-            {moduleCount} módulos · 0 configurações manuais
+            {moduleCount} módulos · 0 configs
           </Badge>
         </div>
       </div>

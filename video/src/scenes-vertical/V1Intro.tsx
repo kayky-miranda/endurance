@@ -4,7 +4,7 @@ import { Logo } from "../components/Logo";
 import { COLORS, SPRING_SNAPPY, SPRING_BOUNCY, SCENE_FRAMES } from "../theme";
 import { FONT } from "../fonts";
 
-export const Scene1Intro: React.FC = () => {
+export const V1Intro: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -24,11 +24,7 @@ export const Scene1Intro: React.FC = () => {
   });
 
   const titleReveal = spring({ frame: frame - 6, fps, config: SPRING_SNAPPY });
-  const titleX = interpolate(titleReveal, [0, 1], [-60, 0]);
-
   const subReveal = spring({ frame: frame - 12, fps, config: SPRING_SNAPPY });
-  const subY = interpolate(subReveal, [0, 1], [20, 0]);
-
   const glowPulse = 0.15 + 0.1 * Math.sin(frame * 0.12);
 
   return (
@@ -43,17 +39,17 @@ export const Scene1Intro: React.FC = () => {
         />
       )}
 
-      <div style={{ textAlign: "center", position: "relative" }}>
+      <div style={{ textAlign: "center", position: "relative", padding: "0 60px" }}>
         <div
           style={{
             position: "absolute",
             left: "50%",
-            top: "50%",
-            transform: `translate(-50%, -50%) scale(${ringScale * 3})`,
-            width: 120,
-            height: 120,
+            top: 110,
+            transform: `translate(-50%, 0) scale(${ringScale * 3})`,
+            width: 180,
+            height: 180,
             borderRadius: "50%",
-            border: `2px solid ${COLORS.emerald}`,
+            border: `3px solid ${COLORS.emerald}`,
             opacity: ringOpacity,
           }}
         />
@@ -63,22 +59,23 @@ export const Scene1Intro: React.FC = () => {
             display: "flex",
             justifyContent: "center",
             transform: `scale(${logoScale}) rotate(${logoRotate}deg)`,
-            filter: `drop-shadow(0 0 ${40 * glowPulse}px ${COLORS.emerald})`,
+            filter: `drop-shadow(0 0 ${50 * glowPulse}px ${COLORS.emerald})`,
           }}
         >
-          <Logo size={110} radius={24} />
+          <Logo size={200} radius={42} />
         </div>
 
         <h1
           style={{
             fontFamily: FONT.serif,
-            fontSize: 80,
+            fontSize: 96,
             color: COLORS.foreground,
             fontWeight: 400,
-            margin: "36px 0 0",
-            transform: `translateX(${titleX}px)`,
+            margin: "60px 0 0",
             opacity: titleReveal,
+            transform: `translateY(${interpolate(titleReveal, [0, 1], [40, 0])}px)`,
             letterSpacing: -1,
+            lineHeight: 1.05,
           }}
         >
           Apresentando o{" "}
@@ -88,11 +85,12 @@ export const Scene1Intro: React.FC = () => {
         <p
           style={{
             fontFamily: FONT.body,
-            fontSize: 28,
+            fontSize: 40,
             color: COLORS.muted,
-            margin: "14px 0 0",
-            transform: `translateY(${subY}px)`,
+            margin: "32px 0 0",
             opacity: subReveal,
+            transform: `translateY(${interpolate(subReveal, [0, 1], [20, 0])}px)`,
+            lineHeight: 1.3,
           }}
         >
           ERP com IA para pequenos negócios brasileiros

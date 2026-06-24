@@ -36,3 +36,6 @@ next-env.d.ts
 
 # marketing (carrosseis renderizados — armazenamento efêmero, ir pra blob storage)
 /public/campaigns/
+
+# scaffold remotion criado por engano (duplicado de video/)
+/endurance-video/

@@ -15,7 +15,7 @@
 
 | Propriedade | Valor |
 |-------------|-------|
-| Resolução | 1920×1080 (16:9 landscape) |
+| Resolução | 1080x1920 (9:16 landscape) |
 | FPS | 30 |
 | Duração total | 1380 frames (~46 segundos) |
 
@@ -25,8 +25,8 @@
 
 | Setting | Value |
 |---------|-------|
-| Voice ID | `gJx1vCzNCD1EQHT212Ls` |
-| Fallback voice (free) | Laura — `FGY2WhTYpPnrIDTdsKH5` |
+| Voice ID | `ohZOfA9iwlZ5nOsoY7LB` |
+| Fallback voice (free) | Roberta — `mBvW81C9wY6qV9V9R01I` |
 | Model | `eleven_multilingual_v2` |
 | Stability | 0.3 |
 | Similarity boost | 0.8 |

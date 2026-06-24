@@ -1,18 +1,15 @@
 import { AbsoluteFill, Sequence, Series, Audio, staticFile, useCurrentFrame, interpolate } from "remotion";
-import { Background } from "./components/Background";
-import { Scene1Intro } from "./scenes/Scene1Intro";
-import { Scene2Dor } from "./scenes/Scene2Dor";
-import { Scene3Agitacao } from "./scenes/Scene3Agitacao";
-import { Scene4Solucao } from "./scenes/Scene4Solucao";
-import { Scene5Onboarding } from "./scenes/Scene5Onboarding";
-import { Scene6Modulos } from "./scenes/Scene6Modulos";
-import { Scene7IA } from "./scenes/Scene7IA";
-import { Scene8Payoff } from "./scenes/Scene8Payoff";
-import { Scene9CTA } from "./scenes/Scene9CTA";
+import { BackgroundVertical } from "./components/BackgroundVertical";
+import { V1Intro } from "./scenes-vertical/V1Intro";
+import { V2Dor } from "./scenes-vertical/V2Dor";
+import { V3Agitacao } from "./scenes-vertical/V3Agitacao";
+import { V4Solucao } from "./scenes-vertical/V4Solucao";
+import { V5Onboarding } from "./scenes-vertical/V5Onboarding";
+import { V6Modulos } from "./scenes-vertical/V6Modulos";
+import { V7IA } from "./scenes-vertical/V7IA";
+import { V8Payoff } from "./scenes-vertical/V8Payoff";
+import { V9CTA } from "./scenes-vertical/V9CTA";
 import { SCENE_FRAMES, COLORS } from "./theme";
-
-const HAS_NARRATION = true;
-const HAS_MUSIC = true;
 
 const NARRATION = [
   "audio/v1-s01.mp3",
@@ -27,15 +24,15 @@ const NARRATION = [
 ];
 
 const SCENES = [
-  { C: Scene1Intro, d: SCENE_FRAMES.intro },
-  { C: Scene2Dor, d: SCENE_FRAMES.dor },
-  { C: Scene3Agitacao, d: SCENE_FRAMES.agitacao },
-  { C: Scene4Solucao, d: SCENE_FRAMES.solucao },
-  { C: Scene5Onboarding, d: SCENE_FRAMES.onboarding },
-  { C: Scene6Modulos, d: SCENE_FRAMES.modulos },
-  { C: Scene7IA, d: SCENE_FRAMES.ia },
-  { C: Scene8Payoff, d: SCENE_FRAMES.payoff },
-  { C: Scene9CTA, d: SCENE_FRAMES.cta },
+  { C: V1Intro, d: SCENE_FRAMES.intro },
+  { C: V2Dor, d: SCENE_FRAMES.dor },
+  { C: V3Agitacao, d: SCENE_FRAMES.agitacao },
+  { C: V4Solucao, d: SCENE_FRAMES.solucao },
+  { C: V5Onboarding, d: SCENE_FRAMES.onboarding },
+  { C: V6Modulos, d: SCENE_FRAMES.modulos },
+  { C: V7IA, d: SCENE_FRAMES.ia },
+  { C: V8Payoff, d: SCENE_FRAMES.payoff },
+  { C: V9CTA, d: SCENE_FRAMES.cta },
 ];
 
 const FlashOverlay: React.FC = () => {
@@ -74,7 +71,7 @@ const FlashOverlay: React.FC = () => {
   );
 };
 
-export const Main: React.FC = () => {
+export const MainVertical: React.FC = () => {
   const starts: number[] = [];
   SCENES.reduce((acc, s, i) => {
     starts[i] = acc;
@@ -83,7 +80,7 @@ export const Main: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <Background />
+      <BackgroundVertical />
 
       <Series>
         {SCENES.map(({ C, d }, i) => (
@@ -95,18 +92,15 @@ export const Main: React.FC = () => {
 
       <FlashOverlay />
 
-      {HAS_NARRATION &&
-        NARRATION.map((src, i) => (
-          <Sequence key={src} from={starts[i]}>
-            <Audio src={staticFile(src)} />
-          </Sequence>
-        ))}
-
-      {HAS_MUSIC && (
-        <Sequence from={30}>
-          <Audio src={staticFile("audio/music/background.mp3")} volume={0.22} />
+      {NARRATION.map((src, i) => (
+        <Sequence key={src} from={starts[i]}>
+          <Audio src={staticFile(src)} />
         </Sequence>
-      )}
+      ))}
+
+      <Sequence from={30}>
+        <Audio src={staticFile("audio/music/background.mp3")} volume={0.22} />
+      </Sequence>
     </AbsoluteFill>
   );
 };

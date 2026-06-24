@@ -12,12 +12,11 @@ const CART = [
 ];
 const PAYMENTS = ["Dinheiro", "Crédito", "Débito", "PIX"];
 
-export const Scene6Modulos: React.FC = () => {
+export const V6Modulos: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const phase2 = frame >= 95;
-
   const phaseTransition = phase2
     ? interpolate(frame, [95, 100], [0, 1], {
         extrapolateLeft: "clamp",
@@ -35,17 +34,13 @@ export const Scene6Modulos: React.FC = () => {
             : undefined,
         }}
       >
-        {!phase2 ? (
-          <PdvPhase frame={frame} fps={fps} />
-        ) : (
-          <NfcePhase frame={frame - 95} fps={fps} opacity={phaseTransition} />
-        )}
+        {!phase2 ? <Pdv frame={frame} fps={fps} /> : <Nfce frame={frame - 95} fps={fps} opacity={phaseTransition} />}
       </div>
     </Scene>
   );
 };
 
-const PdvPhase: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
+const Pdv: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
   const browserReveal = spring({ frame: frame - 1, fps, config: SPRING_SNAPPY });
   const suggestion = spring({ frame: frame - 65, fps, config: SPRING });
 
@@ -57,35 +52,27 @@ const PdvPhase: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
         opacity: browserReveal,
       }}
     >
-      <BrowserWindow url="endurance.app/pdv" width={880}>
-        <div
-          style={{
-            fontFamily: FONT.body,
-            fontWeight: 700,
-            fontSize: 22,
-            color: COLORS.foreground,
-            marginBottom: 16,
-          }}
-        >
+      <BrowserWindow url="endurance.app/pdv" width={950}>
+        <div style={{ fontFamily: FONT.body, fontWeight: 700, fontSize: 34, color: COLORS.foreground, marginBottom: 22 }}>
           Frente de Caixa
         </div>
         {CART.map((item, i) => {
           const enter = spring({ frame: frame - i * 6, fps, config: SPRING_SNAPPY });
-          const x = interpolate(enter, [0, 1], [40, 0]);
+          const x = interpolate(enter, [0, 1], [50, 0]);
           return (
             <div
               key={item.name}
               style={{
                 display: "flex",
                 justifyContent: "space-between",
-                padding: "12px 16px",
+                padding: "20px 24px",
                 background: COLORS.bg,
-                borderRadius: 10,
-                marginBottom: 8,
+                borderRadius: 14,
+                marginBottom: 12,
                 opacity: enter,
                 transform: `translateX(${x}px)`,
                 fontFamily: FONT.body,
-                fontSize: 18,
+                fontSize: 28,
                 color: COLORS.foreground,
               }}
             >
@@ -98,18 +85,18 @@ const PdvPhase: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            padding: "14px 16px",
-            marginTop: 8,
+            padding: "20px 24px",
+            marginTop: 14,
             fontFamily: FONT.body,
             fontWeight: 700,
-            fontSize: 22,
+            fontSize: 36,
             color: COLORS.emeraldBright,
           }}
         >
           <span>Total</span>
           <span>R$ 38,60</span>
         </div>
-        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+        <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
           {PAYMENTS.map((p, i) => {
             const enter = spring({ frame: frame - (35 + i * 3), fps, config: SPRING });
             const isPix = p === "PIX";
@@ -119,14 +106,14 @@ const PdvPhase: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
                 style={{
                   flex: 1,
                   textAlign: "center",
-                  padding: "12px 0",
-                  borderRadius: 10,
+                  padding: "20px 0",
+                  borderRadius: 14,
                   background: isPix ? COLORS.emerald : COLORS.bg,
                   border: `1px solid ${COLORS.cardBorder}`,
                   color: isPix ? "#06120a" : COLORS.foreground,
                   fontFamily: FONT.body,
                   fontWeight: 600,
-                  fontSize: 16,
+                  fontSize: 22,
                   opacity: enter,
                   transform: `scale(${interpolate(enter, [0, 1], [0.8, 1])})`,
                   boxShadow: isPix ? `0 4px 16px ${COLORS.emeraldGlow}` : "none",
@@ -142,109 +129,81 @@ const PdvPhase: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
       <div
         style={{
           position: "absolute",
-          right: -30,
-          top: 120,
+          right: -10,
+          top: 180,
           opacity: suggestion,
-          transform: `translateX(${interpolate(suggestion, [0, 1], [20, 0])}px)`,
+          transform: `translateX(${interpolate(suggestion, [0, 1], [30, 0])}px)`,
         }}
       >
-        <Badge style={{ fontStyle: "italic", background: "rgba(16,185,129,0.18)" }}>
-          💡 Sugestão IA: Adicionar pão de forma?
+        <Badge style={{ fontStyle: "italic", background: "rgba(16,185,129,0.18)", fontSize: 18, padding: "10px 16px" }}>
+          💡 IA: Adicionar pão?
         </Badge>
       </div>
     </div>
   );
 };
 
-const NfcePhase: React.FC<{ frame: number; fps: number; opacity: number }> = ({
-  frame,
-  fps,
-  opacity,
-}) => {
+const Nfce: React.FC<{ frame: number; fps: number; opacity: number }> = ({ frame, fps, opacity }) => {
   const cardSlam = spring({ frame: frame - 1, fps, config: SPRING_SNAPPY });
   const cardScale = interpolate(cardSlam, [0, 1], [0.7, 1]);
   const qrProgress = interpolate(frame, [5, 22], [0, 64], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-
   const successGlow = frame > 25 ? 0.15 + 0.1 * Math.sin(frame * 0.12) : 0;
 
   return (
     <div
       style={{
-        width: 620,
-        padding: 32,
+        width: 880,
+        padding: 48,
         background: COLORS.card,
         border: `1px solid ${COLORS.cardBorder}`,
-        borderRadius: 16,
-        boxShadow: `0 25px 60px rgba(0,0,0,0.4), 0 0 ${40 * successGlow}px ${COLORS.emerald}`,
+        borderRadius: 22,
+        boxShadow: `0 25px 60px rgba(0,0,0,0.4), 0 0 ${50 * successGlow}px ${COLORS.emerald}`,
         transform: `scale(${cardScale})`,
         opacity,
       }}
     >
-      <div
-        style={{
-          fontFamily: FONT.body,
-          fontWeight: 700,
-          fontSize: 24,
-          color: COLORS.emeraldBright,
-        }}
-      >
-        NFC-e 000042 · Emitida com sucesso
+      <div style={{ fontFamily: FONT.body, fontWeight: 700, fontSize: 36, color: COLORS.emeraldBright }}>
+        NFC-e 000042 emitida ✓
       </div>
-      <div style={{ display: "flex", gap: 24, marginTop: 24, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 32, marginTop: 32, alignItems: "center" }}>
         <div
           style={{
-            width: 96,
-            height: 96,
+            width: 160,
+            height: 160,
             display: "grid",
             gridTemplateColumns: "repeat(8, 1fr)",
-            gap: 2,
+            gap: 3,
             background: "#fff",
-            padding: 8,
-            borderRadius: 8,
+            padding: 12,
+            borderRadius: 12,
+            flexShrink: 0,
           }}
         >
           {Array.from({ length: 64 }).map((_, k) => (
             <div
               key={k}
               style={{
-                background:
-                  k < qrProgress && (k * 7 + 3) % 5 < 3 ? "#0f1117" : "transparent",
-                borderRadius: 1,
+                background: k < qrProgress && (k * 7 + 3) % 5 < 3 ? "#0f1117" : "transparent",
+                borderRadius: 2,
               }}
             />
           ))}
         </div>
         <div>
-          <div style={{ fontFamily: FONT.body, fontSize: 16, color: COLORS.foreground }}>
+          <div style={{ fontFamily: FONT.body, fontSize: 26, color: COLORS.foreground }}>
             Total: R$ 38,60
           </div>
-          <div
-            style={{
-              fontFamily: FONT.body,
-              fontSize: 14,
-              color: COLORS.muted,
-              marginTop: 4,
-            }}
-          >
+          <div style={{ fontFamily: FONT.body, fontSize: 20, color: COLORS.muted, marginTop: 6 }}>
             3 itens · Mercadinho do Zé
           </div>
-          <div
-            style={{
-              fontFamily: MONO,
-              fontSize: 11,
-              color: COLORS.muted,
-              marginTop: 10,
-              maxWidth: 300,
-              wordBreak: "break-all",
-            }}
-          >
-            3512 3456 7890 1234 5678 9012 3456 7890 1234 5678
+          <div style={{ fontFamily: MONO, fontSize: 14, color: COLORS.muted, marginTop: 14, maxWidth: 380, wordBreak: "break-all" }}>
+            3512 3456 7890 1234 5678 9012
           </div>
-          <div style={{ marginTop: 12 }}>
-            <Badge tone="blue">DANFE disponível</Badge>
+          <div style={{ marginTop: 16 }}>
+            <Badge tone="blue" style={{ fontSize: 18, padding: "8px 16px" }}>DANFE disponível</Badge>
           </div>
         </div>
       </div>

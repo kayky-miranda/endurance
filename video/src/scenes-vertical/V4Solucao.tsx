@@ -3,10 +3,10 @@ import { Scene } from "../components/Scene";
 import { Badge } from "../components/Badge";
 import { Logo } from "../components/Logo";
 import { Typewriter } from "../components/Typewriter";
-import { COLORS, SPRING, SPRING_SNAPPY, SHADOW, SCENE_FRAMES } from "../theme";
+import { COLORS, SPRING_SNAPPY, SHADOW, SCENE_FRAMES } from "../theme";
 import { FONT } from "../fonts";
 
-export const Scene4Solucao: React.FC = () => {
+export const V4Solucao: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -32,54 +32,39 @@ export const Scene4Solucao: React.FC = () => {
     <Scene durationInFrames={SCENE_FRAMES.solucao}>
       <div
         style={{
-          width: 780,
-          padding: 40,
+          width: 900,
+          padding: 56,
           background: COLORS.card,
           border: `1px solid ${COLORS.cardBorder}`,
-          borderRadius: 16,
+          borderRadius: 22,
           boxShadow: SHADOW,
           transform: `scale(${cardScale})`,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <Logo size={32} radius={9} />
-          <span
-            style={{
-              fontFamily: FONT.body,
-              fontWeight: 600,
-              fontSize: 20,
-              color: COLORS.foreground,
-            }}
-          >
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          <Logo size={56} radius={14} />
+          <span style={{ fontFamily: FONT.body, fontWeight: 600, fontSize: 32, color: COLORS.foreground }}>
             ENDURANCE
           </span>
-          <Badge style={{ marginLeft: 4, fontSize: 12, padding: "3px 10px" }}>IA</Badge>
+          <Badge style={{ marginLeft: 6, fontSize: 18, padding: "5px 14px" }}>IA</Badge>
         </div>
 
-        <div
-          style={{
-            fontFamily: FONT.body,
-            fontWeight: 500,
-            fontSize: 14,
-            color: COLORS.muted,
-            marginTop: 28,
-          }}
-        >
+        <div style={{ fontFamily: FONT.body, fontWeight: 500, fontSize: 22, color: COLORS.muted, marginTop: 36 }}>
           Descreva seu negócio:
         </div>
 
         <div
           style={{
-            marginTop: 12,
-            padding: 20,
+            marginTop: 16,
+            padding: 28,
             background: COLORS.bg,
             border: `1px solid ${COLORS.cardBorder}`,
-            borderRadius: 12,
-            minHeight: 80,
+            borderRadius: 16,
+            minHeight: 140,
             fontFamily: FONT.body,
-            fontSize: 20,
+            fontSize: 30,
             color: COLORS.foreground,
-            lineHeight: 1.5,
+            lineHeight: 1.45,
           }}
         >
           <Typewriter
@@ -90,13 +75,13 @@ export const Scene4Solucao: React.FC = () => {
         </div>
 
         {thinking && (
-          <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+          <div style={{ display: "flex", gap: 12, marginTop: 28 }}>
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
                 style={{
-                  width: 12,
-                  height: 12,
+                  width: 18,
+                  height: 18,
                   borderRadius: "50%",
                   background: COLORS.emerald,
                   opacity: dotPulse(i),
@@ -110,14 +95,14 @@ export const Scene4Solucao: React.FC = () => {
         {frame >= 68 && (
           <div
             style={{
-              marginTop: 20,
+              marginTop: 28,
               opacity: answerReveal,
               transform: `scale(${answerScale})`,
               filter: `drop-shadow(0 0 ${20 * glowPulse}px ${COLORS.emerald})`,
             }}
           >
-            <Badge style={{ fontSize: 16, padding: "10px 18px" }}>
-              ✓ Nicho identificado: Mercado/Varejo · {confPct}% de confiança
+            <Badge style={{ fontSize: 22, padding: "14px 22px" }}>
+              ✓ Nicho: Mercado/Varejo · {confPct}% de confiança
             </Badge>
           </div>
         )}
