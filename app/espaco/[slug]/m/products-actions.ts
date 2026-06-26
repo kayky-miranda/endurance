@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
 import { logActivity } from "@/lib/endurance/activity-log";
+import { ProductSchema, StockAdjustSchema, firstError } from "@/lib/validation";
 import {
   applyStockMovement,
   InsufficientStockError,
@@ -30,10 +31,10 @@ export async function createProductAction(input: NewProduct): Promise<Result> {
   if (!gate.ok) return gate;
   const s = gate.session;
 
-  const name = (input.name ?? "").trim();
-  if (!name) return { ok: false, error: "Informe o nome do produto." };
+  const parsed = ProductSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const { name, barcode, category, price, stock: initial } = parsed.data;
 
-  const barcode = (input.barcode ?? "").trim();
   if (barcode) {
     const dup = await prisma.product.findFirst({
       where: { organizationId: s.org, barcode },
@@ -45,7 +46,6 @@ export async function createProductAction(input: NewProduct): Promise<Result> {
       };
   }
 
-  const initial = Math.max(0, Math.trunc(Number(input.stock) || 0));
   // Cria com saldo 0 e registra o estoque inicial pelo RAZÃO (entrada
   // "saldo_inicial"), para que toda existência de saldo tenha origem auditável.
   const created = await prisma.$transaction(async (tx) => {
@@ -54,8 +54,8 @@ export async function createProductAction(input: NewProduct): Promise<Result> {
         organizationId: s.org,
         name,
         barcode,
-        category: (input.category ?? "").trim(),
-        price: Math.max(0, Number(input.price) || 0),
+        category,
+        price,
         stock: 0,
       },
     });
@@ -99,11 +99,14 @@ export async function adjustStockAction(
   if (!gate.ok) return gate;
   const s = gate.session;
 
-  const p = await prisma.product.findUnique({ where: { id } });
+  const parsed = StockAdjustSchema.safeParse({ id, delta });
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const { id: productId, delta: move } = parsed.data;
+
+  const p = await prisma.product.findUnique({ where: { id: productId } });
   if (!p || p.organizationId !== s.org)
     return { ok: false, error: "Produto não encontrado." };
 
-  const move = Math.trunc(delta);
   if (move === 0) return { ok: true };
 
   // Ajuste manual pelo RAZÃO (entrada/saída de ajuste), com saldo e responsável.
@@ -111,7 +114,7 @@ export async function adjustStockAction(
     const r = await prisma.$transaction((tx) =>
       applyStockMovement(tx, {
         organizationId: s.org,
-        productId: id,
+        productId,
         delta: move,
         reason: move > 0 ? "ajuste_entrada" : "ajuste_saida",
         refType: "adjust",
@@ -123,7 +126,7 @@ export async function adjustStockAction(
       s,
       "stock.adjust",
       `Ajustou estoque de ${p.name}: ${r.before} → ${r.after} (${move >= 0 ? "+" : ""}${move})`,
-      id,
+      productId,
     );
     return { ok: true };
   } catch (e) {

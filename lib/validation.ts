@@ -81,6 +81,129 @@ export const AcceptInviteSchema = z.object({
   password: strongPasswordField,
 });
 
+// -- Compostos: módulos operacionais (produtos, financeiro, fiscal) --------
+
+/** Produto novo (createProductAction). Numéricos são lenientes: valor inválido vira 0. */
+export const ProductSchema = z.object({
+  name: z
+    .string({ message: "Informe o nome do produto." })
+    .trim()
+    .min(1, "Informe o nome do produto.")
+    .max(120, "Nome do produto muito longo."),
+  barcode: z.string().trim().max(64, "Código de barras muito longo.").optional().default(""),
+  category: z.string().trim().max(80, "Categoria muito longa.").optional().default(""),
+  price: z
+    .coerce.number()
+    .catch(0)
+    .transform((n) => (Number.isFinite(n) && n > 0 ? n : 0)),
+  stock: z
+    .coerce.number()
+    .catch(0)
+    .transform((n) => Math.max(0, Math.trunc(Number.isFinite(n) ? n : 0))),
+});
+export type ProductInput = z.infer<typeof ProductSchema>;
+
+/** Ajuste manual de estoque (adjustStockAction). delta inteiro, pode ser negativo. */
+export const StockAdjustSchema = z.object({
+  id: z.string().trim().min(1, "Produto inválido."),
+  delta: z
+    .coerce.number()
+    .catch(0)
+    .transform((n) => Math.trunc(Number.isFinite(n) ? n : 0)),
+});
+
+/** Lançamento financeiro (createEntryAction). */
+export const FinanceEntrySchema = z.object({
+  kind: z.enum(["receber", "pagar"]).catch("receber"),
+  description: z
+    .string({ message: "Informe a descrição." })
+    .trim()
+    .min(1, "Informe a descrição.")
+    .max(120, "Descrição muito longa."),
+  category: z
+    .string()
+    .trim()
+    .max(40, "Categoria muito longa.")
+    .optional()
+    .transform((c) => (c && c.length ? c : "Outros")),
+  amount: z
+    .coerce.number()
+    .catch(0)
+    .refine((n) => n > 0, "Informe um valor válido.")
+    .transform((n) => Math.round(n * 100) / 100),
+  dueDate: z
+    .string()
+    .trim()
+    .optional()
+    .default("")
+    .refine(
+      (d) => d === "" || !Number.isNaN(new Date(`${d}T12:00:00`).getTime()),
+      "Data de vencimento inválida.",
+    ),
+});
+export type FinanceEntryInput = z.infer<typeof FinanceEntrySchema>;
+
+/** Configuração fiscal (saveFiscalConfigAction). Cada campo já sai sanitizado. */
+export const FiscalConfigSchema = z.object({
+  cnpj: z
+    .string()
+    .optional()
+    .default("")
+    .transform((v) => v.replace(/\D/g, "").slice(0, 14))
+    .refine((v) => v.length === 14, "Informe um CNPJ válido (14 dígitos)."),
+  razaoSocial: z
+    .string()
+    .trim()
+    .max(120, "Razão social muito longa.")
+    .optional()
+    .default("")
+    .refine((v) => v.length > 0, "Informe a razão social."),
+  nomeFantasia: z.string().trim().max(120).optional().default(""),
+  ie: z.string().trim().max(20).optional().default(""),
+  crt: z
+    .string()
+    .optional()
+    .default("1")
+    .transform((v) => (v === "3" ? "3" : "1")),
+  uf: z
+    .string()
+    .optional()
+    .default("SP")
+    .transform((v) => (v || "SP").toUpperCase().slice(0, 2)),
+  municipio: z.string().trim().max(80).optional().default(""),
+  cMun: z
+    .string()
+    .optional()
+    .default("")
+    .transform((v) => v.replace(/\D/g, "").slice(0, 7)),
+  serie: z
+    .coerce.number()
+    .catch(1)
+    .transform((n) => Math.max(1, Math.min(999, Math.trunc(Number.isFinite(n) ? n : 1)))),
+  ambiente: z
+    .string()
+    .optional()
+    .default("2")
+    .transform((v) => (v === "1" ? "1" : "2")),
+  cscId: z
+    .string()
+    .optional()
+    .default("000001")
+    .transform((v) => v.replace(/\D/g, "").slice(0, 6) || "000001"),
+  csc: z.string().trim().max(64).optional().default(""),
+  provider: z
+    .string()
+    .optional()
+    .default("")
+    .transform((v) => (v === "focusnfe" ? "focusnfe" : "")),
+  defaultNcm: z
+    .string()
+    .optional()
+    .default("")
+    .transform((v) => v.replace(/\D/g, "").slice(0, 8)),
+});
+export type FiscalConfigData = z.infer<typeof FiscalConfigSchema>;
+
 // -- Helper -----------------------------------------------------------------
 
 /** Retorna a primeira mensagem de erro num formato curto e amigável. */

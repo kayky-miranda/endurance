@@ -9,6 +9,7 @@ import {
   type EmitResult,
 } from "@/lib/endurance/fiscal-service";
 import { logActivity } from "@/lib/endurance/activity-log";
+import { FiscalConfigSchema, firstError } from "@/lib/validation";
 
 export async function emitNfceAction(saleId: string): Promise<EmitResult> {
   // Gate reforçado: emissão fiscal exige e-mail verificado (LGPD + compliance).
@@ -67,26 +68,9 @@ export async function saveFiscalConfigAction(
   if (!gate.ok) return gate;
   const s = gate.session;
 
-  const data = {
-    cnpj: (input.cnpj ?? "").replace(/\D/g, "").slice(0, 14),
-    razaoSocial: (input.razaoSocial ?? "").trim().slice(0, 120),
-    nomeFantasia: (input.nomeFantasia ?? "").trim().slice(0, 120),
-    ie: (input.ie ?? "").trim().slice(0, 20),
-    crt: input.crt === "3" ? "3" : "1",
-    uf: (input.uf ?? "SP").toUpperCase().slice(0, 2),
-    municipio: (input.municipio ?? "").trim().slice(0, 80),
-    cMun: (input.cMun ?? "").replace(/\D/g, "").slice(0, 7),
-    serie: Math.max(1, Math.min(999, Math.trunc(Number(input.serie) || 1))),
-    ambiente: input.ambiente === "1" ? "1" : "2",
-    cscId: (input.cscId ?? "000001").replace(/\D/g, "").slice(0, 6) || "000001",
-    csc: (input.csc ?? "").trim().slice(0, 64),
-    provider: input.provider === "focusnfe" ? "focusnfe" : "",
-    defaultNcm: (input.defaultNcm ?? "").replace(/\D/g, "").slice(0, 8),
-  };
-  if (!data.cnpj || data.cnpj.length !== 14)
-    return { ok: false, error: "Informe um CNPJ válido (14 dígitos)." };
-  if (!data.razaoSocial)
-    return { ok: false, error: "Informe a razão social." };
+  const parsed = FiscalConfigSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const data = parsed.data;
 
   await prisma.fiscalConfig.upsert({
     where: { organizationId: s.org },

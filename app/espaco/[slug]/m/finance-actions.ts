@@ -9,6 +9,7 @@ import {
 } from "@/lib/endurance/finance";
 import { markReconciled } from "@/lib/endurance/reconciliation";
 import { logActivity } from "@/lib/endurance/activity-log";
+import { FinanceEntrySchema, firstError } from "@/lib/validation";
 
 type R = { ok: boolean; error?: string };
 
@@ -45,14 +46,19 @@ export async function createEntryAction(input: NewEntryInput): Promise<R> {
   const gate = await requirePermission("finance.reports");
   if (!gate.ok) return gate;
   const s = gate.session;
-  const res = await createEntry(s.org, input);
+
+  const parsed = FinanceEntrySchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const data = parsed.data;
+
+  const res = await createEntry(s.org, data);
   if (res.ok) {
     revalidatePath(`/espaco/${s.slug}/m/financeiro`);
-    const kind = input.kind === "pagar" ? "a pagar" : "a receber";
+    const kind = data.kind === "pagar" ? "a pagar" : "a receber";
     await logActivity(
       s,
       "finance.entry_create",
-      `Criou lançamento ${kind} "${(input.description ?? "").trim().slice(0, 60)}" (${brl(input.amount)})`,
+      `Criou lançamento ${kind} "${data.description.slice(0, 60)}" (${brl(data.amount)})`,
     );
   }
   return res;
