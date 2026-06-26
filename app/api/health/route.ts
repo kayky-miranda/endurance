@@ -1,36 +1,30 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { getHealthReport } from "@/lib/health";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
  * Health check para uptime externo. Retorna 200 se o app + banco estão de pé,
- * 503 se algum dependente caiu. Inclui ping leve no Postgres (~5ms).
+ * 503 se algum dependente crítico caiu. A lógica vive em lib/health.ts e é
+ * compartilhada com a página pública /status.
  */
 export async function GET() {
   const start = Date.now();
-  let dbOk = false;
-  let dbLatency = -1;
+  const report = await getHealthReport();
+  const db = report.checks.find((c) => c.key === "database");
 
-  try {
-    const t = Date.now();
-    await prisma.$queryRaw`SELECT 1`;
-    dbLatency = Date.now() - t;
-    dbOk = true;
-  } catch {
-    dbOk = false;
-  }
-
-  const status = dbOk ? 200 : 503;
   return NextResponse.json(
     {
-      status: dbOk ? "ok" : "degraded",
-      db: { ok: dbOk, latencyMs: dbLatency },
-      uptimeSec: Math.floor(process.uptime()),
-      version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "dev",
+      status: report.ok ? "ok" : "degraded",
+      db: { ok: db?.level === "ok", latencyMs: db?.latencyMs ?? -1 },
+      uptimeSec: report.uptimeSec,
+      version: report.version,
       responseMs: Date.now() - start,
     },
-    { status, headers: { "Cache-Control": "no-store" } },
+    {
+      status: report.ok ? 200 : 503,
+      headers: { "Cache-Control": "no-store" },
+    },
   );
 }
