@@ -30,7 +30,7 @@ export default async function EntrarPage({
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-12">
         <Link href="/" className="mb-8 flex items-center gap-2.5">
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
-            <BrandMark className="h-5 w-5" />
+            <BrandMark className="h-7 w-7" />
           </div>
           <span className="text-lg font-semibold tracking-tight">
             ENDURANCE

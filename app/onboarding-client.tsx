@@ -437,7 +437,7 @@ function Navbar({ aiEnabled }: { aiEnabled: boolean }) {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
         <div className="flex items-center gap-2.5">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
-            <BrandMark className="h-5 w-5" />
+            <BrandMark className="h-7 w-7" />
           </div>
           <span className="text-lg font-semibold tracking-tight">ENDURANCE</span>
           <span className="ml-1 hidden rounded-full border border-ink-600 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-400 sm:inline">

@@ -19,12 +19,11 @@ export function BrandMark({
       xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
-      <path d="M120,2 L115.71,94.36 L124.29,94.36 Z M120,238 L124.29,145.64 L115.71,145.64 Z M230,120 L145.64,115.71 L145.64,124.29 Z M10,120 L94.36,124.29 L94.36,115.71 Z M161.01,78.99 L133.2,97.6 L142.4,106.8 Z M161.01,161.01 L142.4,133.2 L133.2,142.4 Z M78.99,161.01 L106.8,142.4 L97.6,133.2 Z M78.99,78.99 L97.6,106.8 L106.8,97.6 Z" fill="currentColor"/>
-        <circle cx="120" cy="120" r="76" fill="none" stroke="currentColor" strokeWidth="5"/>
-        <circle cx="120" cy="120" r="68" fill="none" stroke="currentColor" strokeWidth="2"/>
-        <circle cx="120" cy="120" r="30" fill="none" stroke="currentColor" strokeWidth="3.5"/>
-        <circle cx="120" cy="120" r="25" fill="none" stroke="currentColor" strokeWidth="1.5"/>
-        <path d="M120,98 L126,120 L120,142 L114,120 Z M123.5,120 a3.5,3.5 0 1,0 -7,0 a3.5,3.5 0 1,0 7,0 Z" fill="currentColor" fillRule="evenodd"/>
+      <path d="M120,2 L114.66,92.51 L125.34,92.51 Z M120,238 L125.34,147.49 L114.66,147.49 Z M230,120 L147.49,114.66 L147.49,125.34 Z M10,120 L92.51,125.34 L92.51,114.66 Z M162.43,77.57 L133.57,95.51 L144.49,106.43 Z M162.43,162.43 L144.49,133.57 L133.57,144.49 Z M77.57,162.43 L106.43,144.49 L95.51,133.57 Z M77.57,77.57 L95.51,106.43 L106.43,95.51 Z" fill="currentColor"/>
+        <circle cx="120" cy="120" r="75" fill="none" stroke="currentColor" strokeWidth="7"/>
+        <circle cx="120" cy="120" r="64" fill="none" stroke="currentColor" strokeWidth="3"/>
+        <circle cx="120" cy="120" r="31" fill="none" stroke="currentColor" strokeWidth="5"/>
+        <path d="M120,92 L128,120 L120,148 L112,120 Z M124.5,120 a4.5,4.5 0 1,0 -9,0 a4.5,4.5 0 1,0 9,0 Z" fill="currentColor" fillRule="evenodd"/>
     </svg>
   );
 }

@@ -33,21 +33,21 @@ function spike(angle, tip, phi, rw) {
 // o anel. As asas (rw) ficam dentro do furo do hub, então os espigões nascem
 // limpos da borda do hub, sem entalhe.
 const cardinals = [
-  spike(0, 118, 9.5, 26),
-  spike(180, 118, 9.5, 26),
-  spike(90, 110, 9.5, 26),
-  spike(270, 110, 9.5, 26),
+  spike(0, 118, 11, 28),
+  spike(180, 118, 11, 28),
+  spike(90, 110, 11, 28),
+  spike(270, 110, 11, 28),
 ];
 // Diagonais — curtas e largas, terminando dentro do anel.
-const diagonals = [45, 135, 225, 315].map((a) => spike(a, 58, 14.5, 26));
+const diagonals = [45, 135, 225, 315].map((a) => spike(a, 60, 16, 28));
 
 const spikesPath = [...cardinals, ...diagonals].join(" ");
 
 // Agulha estilo bússola (losango fino vertical) com um furo central (ponto).
 // fill-rule evenodd → o círculo interno vira buraco (mostra o fundo).
 const needle =
-  `M120,98 L126,120 L120,142 L114,120 Z ` + // losango
-  `M123.5,120 a3.5,3.5 0 1,0 -7,0 a3.5,3.5 0 1,0 7,0 Z`; // ponto (furo)
+  `M120,92 L128,120 L120,148 L112,120 Z ` + // losango (maior)
+  `M124.5,120 a4.5,4.5 0 1,0 -9,0 a4.5,4.5 0 1,0 9,0 Z`; // ponto (furo)
 
 // Markup interno reutilizado por todas as variações. Usa currentColor.
 // Sem máscara: a base dos espigões fica em r≈25 (fora da agulha, r<22) e é
@@ -55,10 +55,9 @@ const needle =
 // (evita IDs duplicados quando o componente renderiza várias vezes na página).
 const INNER = `
   <path d="${spikesPath}" fill="currentColor"/>
-  <circle cx="${C}" cy="${C}" r="76" fill="none" stroke="currentColor" stroke-width="5"/>
-  <circle cx="${C}" cy="${C}" r="68" fill="none" stroke="currentColor" stroke-width="2"/>
-  <circle cx="${C}" cy="${C}" r="30" fill="none" stroke="currentColor" stroke-width="3.5"/>
-  <circle cx="${C}" cy="${C}" r="25" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  <circle cx="${C}" cy="${C}" r="75" fill="none" stroke="currentColor" stroke-width="7"/>
+  <circle cx="${C}" cy="${C}" r="64" fill="none" stroke="currentColor" stroke-width="3"/>
+  <circle cx="${C}" cy="${C}" r="31" fill="none" stroke="currentColor" stroke-width="5"/>
   <path d="${needle}" fill="currentColor" fill-rule="evenodd"/>
 `.trim();
 
@@ -160,6 +159,23 @@ async function main() {
       { waitUntil: "networkidle" },
     );
     await page.screenshot({ path: join(ROOT, "scripts", "_brand-preview", name + ".png") });
+    await page.close();
+  }
+
+  // Simulação do selo real no app (quadrado brand-tint + bússola), em tamanhos
+  // pequenos, ampliada 8x com nearest-neighbor pra inspeção da legibilidade.
+  for (const px of [28, 36, 44]) {
+    const box = Math.round(px * 1.28); // quadrado um pouco maior que a bússola
+    const page = await browser.newPage({ viewport: { width: box * 8, height: box * 8 } });
+    await page.setContent(
+      `<!doctype html><html><body style="margin:0;background:#1a1d27;display:grid;place-items:center;height:${box * 8}px;image-rendering:pixelated">
+        <div style="width:${box * 8}px;height:${box * 8}px;border-radius:${box}px;background:rgba(16,185,129,0.15);display:grid;place-items:center;box-shadow:inset 0 0 0 8px rgba(16,185,129,0.30)">
+          <div style="color:#6ee7c7;width:${px * 8}px;height:${px * 8}px">${masterSvg}</div>
+        </div>
+      </body></html>`,
+      { waitUntil: "networkidle" },
+    );
+    await page.screenshot({ path: join(ROOT, "scripts", "_brand-preview", "lockup-" + px + ".png") });
     await page.close();
   }
 

@@ -195,8 +195,8 @@ export default function Shell({
               Sair do caixa
             </Link>
             <div className="flex items-center gap-2">
-              <div className="grid h-7 w-7 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
-                <BrandMark className="h-4 w-4" />
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
+                <BrandMark className="h-6 w-6" />
               </div>
               <span className="font-semibold tracking-tight">Caixa</span>
               <span className="hidden text-sm text-slate-400 sm:inline">
@@ -323,8 +323,8 @@ export default function Shell({
                 className="h-9 w-9 shrink-0 rounded-lg object-contain bg-white/5 p-1"
               />
             ) : (
-              <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
-                <BrandMark className="h-5 w-5" />
+              <div className="grid h-9 w-9 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
+                <BrandMark className="h-7 w-7" />
               </div>
             )}
             <div className="min-w-0">
