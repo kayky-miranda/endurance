@@ -1,12 +1,11 @@
 import "server-only";
-import path from "path";
-import fs from "fs/promises";
 import { renderCarouselHTML, CAROUSEL_VIEW_WIDTH, CAROUSEL_VIEW_HEIGHT } from "./carousel-html";
+import { putObject } from "@/lib/storage";
 import type { SlideData, BrandKitData } from "./types";
 
 export interface RenderResult {
   campaignId: string;
-  slidePaths: string[]; // caminhos públicos: /campaigns/{id}/slide_N.png
+  slidePaths: string[]; // URLs públicas (storage local /campaigns/... ou S3/R2)
 }
 
 const TOTAL = 7;
@@ -17,9 +16,6 @@ export async function renderCarouselToPNGs(
   slides: SlideData[],
   brand: BrandKitData,
 ): Promise<RenderResult> {
-  const outDir = path.join(process.cwd(), "public", "campaigns", campaignId);
-  await fs.mkdir(outDir, { recursive: true });
-
   const html = renderCarouselHTML(slides, brand);
 
   // Lazy-import Playwright (Node-only, never bundled)
@@ -55,12 +51,15 @@ export async function renderCarouselToPNGs(
       })(${i})`);
       await page.waitForTimeout(200);
 
-      const outPath = path.join(outDir, `slide_${i + 1}.png`);
-      await page.screenshot({
-        path: outPath,
+      const buf = await page.screenshot({
         clip: { x: 0, y: 0, width: CAROUSEL_VIEW_WIDTH, height: CAROUSEL_VIEW_HEIGHT },
       });
-      slidePaths.push(`/campaigns/${campaignId}/slide_${i + 1}.png`);
+      const { url } = await putObject(
+        `campaigns/${campaignId}/slide_${i + 1}.png`,
+        buf,
+        "image/png",
+      );
+      slidePaths.push(url);
     }
 
     return { campaignId, slidePaths };
