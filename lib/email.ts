@@ -14,7 +14,19 @@ const RESEND_API = "https://api.resend.com/emails";
 
 const FROM = process.env.EMAIL_FROM || "ENDURANCE <noreply@endurance.app>";
 const APP_URL = process.env.APP_URL || "http://localhost:3200";
-const RESEND_KEY = process.env.RESEND_API_KEY;
+
+/** Timeout por tentativa — um POST pendurado não pode segurar a request. */
+const TIMEOUT_MS = 10_000;
+/** Tentativas totais (1 original + 2 retries) para falhas transitórias. */
+const MAX_ATTEMPTS = 3;
+/** Backoff base entre tentativas (multiplica pela tentativa: 300ms, 600ms). */
+const BACKOFF_MS = 300;
+
+if (!process.env.RESEND_API_KEY && process.env.NODE_ENV === "production") {
+  logger.warn(
+    "RESEND_API_KEY ausente em produção — e-mails ficarão em modo stub e NÃO serão entregues.",
+  );
+}
 
 interface SendOptions {
   to: string;
@@ -30,8 +42,44 @@ interface SendResult {
   stub?: boolean;
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Transitório = vale a pena tentar de novo (timeout/rede, throttle, 5xx). */
+function isTransient(status?: number): boolean {
+  return status === undefined || status === 429 || (status >= 500 && status <= 599);
+}
+
+type PostOutcome =
+  | { ok: true; id?: string }
+  | { ok: false; status?: number; detail: string };
+
+async function postToResend(key: string, body: string): Promise<PostOutcome> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(RESEND_API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body,
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      return { ok: false, status: res.status, detail };
+    }
+    const data = (await res.json().catch(() => ({}))) as { id?: string };
+    return { ok: true, id: data.id };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function sendEmail(opts: SendOptions): Promise<SendResult> {
-  if (!RESEND_KEY) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) {
     logger.info("E-mail (stub) — RESEND_API_KEY ausente", {
       to: opts.to,
       subject: opts.subject,
@@ -40,32 +88,44 @@ export async function sendEmail(opts: SendOptions): Promise<SendResult> {
     return { ok: true, stub: true };
   }
 
-  try {
-    const res = await fetch(RESEND_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RESEND_KEY}`,
-      },
-      body: JSON.stringify({
-        from: FROM,
-        to: [opts.to],
-        subject: opts.subject,
-        html: opts.html,
-        text: opts.text,
-      }),
-    });
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      logger.error("E-mail falhou no Resend", { status: res.status, detail });
-      return { ok: false, error: `resend_${res.status}` };
+  const body = JSON.stringify({
+    from: FROM,
+    to: [opts.to],
+    subject: opts.subject,
+    html: opts.html,
+    text: opts.text,
+  });
+
+  let lastError = "unknown";
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const out = await postToResend(key, body);
+      if (out.ok) {
+        if (attempt > 1)
+          logger.info("E-mail enviado após retry", { to: opts.to, attempt, id: out.id });
+        return { ok: true, id: out.id };
+      }
+      // Erro permanente (4xx que não 429: domínio não verificado, destinatário
+      // inválido, etc.) — retry não ajuda, falha logo.
+      if (!isTransient(out.status)) {
+        logger.error("E-mail falhou no Resend (permanente)", {
+          status: out.status,
+          detail: out.detail,
+        });
+        return { ok: false, error: `resend_${out.status}` };
+      }
+      lastError = `resend_${out.status}`;
+      logger.warn("E-mail — falha transitória do Resend", { status: out.status, attempt });
+    } catch (e) {
+      const aborted = e instanceof Error && e.name === "AbortError";
+      lastError = aborted ? "timeout" : "network";
+      logger.warn("E-mail — erro de rede/timeout", { attempt, aborted });
     }
-    const data = (await res.json()) as { id?: string };
-    return { ok: true, id: data.id };
-  } catch (e) {
-    logger.exception("E-mail falhou (network)", e);
-    return { ok: false, error: "network" };
+    if (attempt < MAX_ATTEMPTS) await sleep(BACKOFF_MS * attempt);
   }
+
+  logger.error("E-mail falhou após todas as tentativas", { to: opts.to, error: lastError });
+  return { ok: false, error: lastError };
 }
 
 // ---------------------------------------------------------------------------
