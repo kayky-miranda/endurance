@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import CookieConsent from "./cookie-consent";
 
@@ -10,6 +10,12 @@ export const metadata: Metadata = {
   description:
     "ERP completo com inteligência artificial: financeiro, vendas, estoque, compras, fiscal e mais em uma única plataforma.",
   metadataBase: new URL("https://endurance.com.br"),
+  applicationName: "ENDURANCE",
+  appleWebApp: { capable: true, title: "ENDURANCE", statusBarStyle: "black-translucent" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0f1117",
 };
 
 export default function RootLayout({

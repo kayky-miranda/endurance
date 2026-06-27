@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  Compass,
   ArrowRight,
   Sparkles,
   Play,
@@ -46,6 +45,7 @@ import {
   Target,
   type LucideIcon,
 } from "lucide-react";
+import { BrandMark } from "@/app/components/BrandMark";
 
 /* ------------------------------------------------------------------ *
  * Utilidades de animação
@@ -144,7 +144,7 @@ function Navbar() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5">
         <a href="#topo" className="flex items-center gap-2.5">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
-            <Compass className="h-5 w-5" strokeWidth={2} />
+            <BrandMark className="h-5 w-5" />
           </span>
           <span className="text-lg font-semibold tracking-tight">ENDURANCE</span>
           <span className="ml-1 hidden rounded-full border border-ink-600 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-400 sm:inline">
@@ -1202,7 +1202,7 @@ function Footer() {
         <div>
           <div className="flex items-center gap-2.5">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
-              <Compass className="h-5 w-5" />
+              <BrandMark className="h-5 w-5" />
             </span>
             <span className="text-lg font-semibold tracking-tight">
               ENDURANCE

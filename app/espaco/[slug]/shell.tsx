@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Compass,
   LayoutDashboard,
   Users,
   LogOut,
@@ -48,6 +47,7 @@ import {
   Palette,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { BrandMark } from "@/app/components/BrandMark";
 import { logoutAction } from "@/app/actions";
 import {
   moduleCategory,
@@ -196,7 +196,7 @@ export default function Shell({
             </Link>
             <div className="flex items-center gap-2">
               <div className="grid h-7 w-7 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
-                <Compass className="h-4 w-4" strokeWidth={2} />
+                <BrandMark className="h-4 w-4" />
               </div>
               <span className="font-semibold tracking-tight">Caixa</span>
               <span className="hidden text-sm text-slate-400 sm:inline">
@@ -324,7 +324,7 @@ export default function Shell({
               />
             ) : (
               <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
-                <Compass className="h-5 w-5" strokeWidth={2} />
+                <BrandMark className="h-5 w-5" />
               </div>
             )}
             <div className="min-w-0">

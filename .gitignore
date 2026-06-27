@@ -39,3 +39,6 @@ next-env.d.ts
 
 # scaffold remotion criado por engano (duplicado de video/)
 /endurance-video/
+
+# Previews de inspeção do gen-brand (não versionar)
+/scripts/_brand-preview/

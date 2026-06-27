@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Compass } from "lucide-react";
+import { BrandMark } from "@/app/components/BrandMark";
 
 /**
  * Layout enxuto para páginas legais (Termos, Privacidade). Sem chrome do app,
@@ -20,7 +20,7 @@ export default function LegalShell({
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-4">
           <Link href="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
-              <Compass className="h-5 w-5" />
+              <BrandMark className="h-5 w-5" />
             </span>
             ENDURANCE
           </Link>
