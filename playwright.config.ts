@@ -31,6 +31,10 @@ export default defineConfig({
       GOOGLE_API_KEY: "",
       ANTHROPIC_API_KEY: "",
       AI_PROVIDER: "",
+      // Vazia = e-mail em modo STUB (não chama o Resend de verdade). Garante
+      // determinismo nos fluxos de verificação/reset/convite — sem isso, o app
+      // tentaria enviar e-mail real para endereços @e2e.endurance.test.
+      RESEND_API_KEY: "",
     },
   },
 });
