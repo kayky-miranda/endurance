@@ -60,7 +60,7 @@ export async function createInviteAction(input: CreateInviteInput): Promise<Resu
   if (!gate.ok) return gate;
   const session = gate.session;
 
-  if (!hit(`invite:${session.org}`, 30, 60 * 60_000).ok)
+  if (!(await hit(`invite:${session.org}`, 30, 60 * 60_000)).ok)
     return { ok: false, error: "Muitos convites em pouco tempo. Aguarde uma hora." };
 
   // Gates de assinatura e seats.
@@ -152,7 +152,7 @@ export async function resendInviteAction(inviteId: string): Promise<Result> {
   if (!gate.ok) return gate;
   const session = gate.session;
 
-  if (!hit(`invite:resend:${session.sub}`, 20, 60 * 60_000).ok)
+  if (!(await hit(`invite:resend:${session.sub}`, 20, 60 * 60_000)).ok)
     return { ok: false, error: "Muitos reenvios. Aguarde uma hora." };
 
   const invite = await prisma.invite.findUnique({

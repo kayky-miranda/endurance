@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     );
 
   // Rate limit por organização — geração custa crédito + chamada de IA.
-  if (!hit(`ai:carousel:${session.org}`, 10, 60_000).ok) {
+  if (!(await hit(`ai:carousel:${session.org}`, 10, 60_000)).ok) {
     return NextResponse.json(
       { error: "Muitas gerações seguidas. Aguarde um instante." },
       { status: 429 },

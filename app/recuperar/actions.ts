@@ -18,7 +18,7 @@ export async function requestPasswordResetAction(emailRaw: string): Promise<Resu
   if (!email) return { ok: false, error: "Informe seu e-mail." };
 
   // Rate limit por IP — força bruta de enumeração também é abuso.
-  if (!hit(`reset:ip:${await clientIp()}`, 5, 10 * 60_000).ok)
+  if (!(await hit(`reset:ip:${await clientIp()}`, 5, 10 * 60_000)).ok)
     return { ok: false, error: "Muitas tentativas. Aguarde alguns minutos." };
 
   const user = await prisma.user.findUnique({ where: { email } });
@@ -71,7 +71,7 @@ export async function resetPasswordAction(
   if (newPassword.length > 128)
     return { ok: false, error: "Senha muito longa." };
 
-  if (!hit(`reset:apply:${await clientIp()}`, 10, 10 * 60_000).ok)
+  if (!(await hit(`reset:apply:${await clientIp()}`, 10, 10 * 60_000)).ok)
     return { ok: false, error: "Muitas tentativas. Aguarde alguns minutos." };
 
   const tokenHash = hashToken(tokenPlain);

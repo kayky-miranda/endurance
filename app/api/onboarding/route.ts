@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   // Endpoint público que dispara chamada paga à IA — limita por IP.
   const ip = await clientIp();
-  if (!hit(`ai:onboarding:${ip}`, 20, 60_000).ok) {
+  if (!(await hit(`ai:onboarding:${ip}`, 20, 60_000)).ok) {
     return NextResponse.json(
       { error: "Muitas tentativas. Aguarde um instante." },
       { status: 429 },

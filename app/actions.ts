@@ -59,7 +59,7 @@ export interface SignupInput {
 /** Cria o espaço + o usuário dono e já abre a sessão. */
 export async function signupAction(input: SignupInput): Promise<AuthResult> {
   // Rate limit por IP: cadastro é caro (cria org + usuário) e alvo de bots.
-  const rl = hit(`signup:${await clientIp()}`, 5, 10 * 60_000);
+  const rl = await hit(`signup:${await clientIp()}`, 5, 10 * 60_000);
   if (!rl.ok)
     return {
       ok: false,
@@ -118,7 +118,7 @@ export async function resendVerificationAction(): Promise<SimpleResult> {
   if (!session) return { ok: false, error: "Sessão expirada." };
 
   // Rate limit: 3 reenvios por usuário a cada 10 min.
-  if (!hit(`verify:resend:${session.sub}`, 3, 10 * 60_000).ok)
+  if (!(await hit(`verify:resend:${session.sub}`, 3, 10 * 60_000)).ok)
     return { ok: false, error: "Aguarde alguns minutos antes de reenviar." };
 
   const res = await sendVerificationFor(session.sub);
@@ -136,7 +136,7 @@ export async function loginAction(
 
   // Rate limit: por IP (rajada geral) e por e-mail (força bruta de senha —
   // conta só tentativas FALHAS, então errar pouco não bloqueia ninguém).
-  if (!hit(`login:ip:${await clientIp()}`, 20, 60_000).ok)
+  if (!(await hit(`login:ip:${await clientIp()}`, 20, 60_000)).ok)
     return { ok: false, error: "Muitas tentativas. Aguarde um instante." };
   const failKey = `login:fail:${email}`;
   const lock = peek(failKey, 5);
@@ -216,7 +216,7 @@ export async function verifyTotpLoginAction(
   const userId = store.get(PENDING_2FA_COOKIE)?.value;
   if (!userId) return { ok: false, error: "Sessão de login expirou — refaça o login." };
 
-  if (!hit(`2fa:login:${userId}`, 5, 5 * 60_000).ok)
+  if (!(await hit(`2fa:login:${userId}`, 5, 5 * 60_000)).ok)
     return { ok: false, error: "Muitas tentativas. Aguarde alguns minutos." };
 
   const user = await prisma.user.findUnique({

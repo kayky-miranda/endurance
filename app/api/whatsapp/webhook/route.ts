@@ -48,7 +48,7 @@ interface MetaStatusWebhook {
 export async function POST(req: Request): Promise<Response> {
   // Rate limit por IP.
   const ip = await clientIp();
-  if (!hit(`webhook:wa:${ip}`, 120, 60_000).ok) {
+  if (!(await hit(`webhook:wa:${ip}`, 120, 60_000)).ok) {
     logger.warn("WhatsApp webhook rate-limited", { ip });
     return Response.json({ ok: false, error: "rate_limited" }, { status: 429 });
   }

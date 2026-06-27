@@ -31,6 +31,7 @@ Em **Project → Settings → Environment Variables**, adicione (Production + Pr
 | `GEMINI_API_KEY`  | ⛔ opcional | IA do onboarding (tier grátis). Sem ela, roda em modo demonstração. |
 | `ANTHROPIC_API_KEY` | ⛔ opcional | Alternativa de IA (Claude).                                     |
 | `RESEND_API_KEY`  | ⚠️ recomendada | E-mail transacional (verificação, reset, convite). Sem ela, e-mails ficam em **modo stub** (logam no console, não são entregues). Veja a seção 4. |
+| `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | ⚠️ recomendada | Rate limit **global** entre instâncias serverless. Sem elas, o limite é por processo (fraco em produção). Banco grátis em [upstash.com](https://upstash.com). |
 | `EMAIL_FROM`      | ⛔ opcional | Remetente. Padrão `ENDURANCE <noreply@endurance.app>`. O domínio precisa estar verificado no Resend. |
 | `APP_URL`         | ✅ (se usar e-mail) | URL pública (ex.: `https://endurance.app`). Compõe os links dos e-mails; em dev cai em `http://localhost:3200`. |
 

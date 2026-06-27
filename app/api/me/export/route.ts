@@ -25,7 +25,7 @@ export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
 
-  if (!hit(`lgpd:export:${session.sub}`, 5, 24 * 60 * 60_000).ok)
+  if (!(await hit(`lgpd:export:${session.sub}`, 5, 24 * 60 * 60_000)).ok)
     return NextResponse.json(
       { error: "Limite diário de exportações atingido." },
       { status: 429 },

@@ -32,7 +32,7 @@ export async function startTotpSetupAction(): Promise<
   const session = await getSession();
   if (!session) return { ok: false, error: "Sessão expirada." };
 
-  if (!hit(`2fa:setup:${session.sub}`, 5, 10 * 60_000).ok)
+  if (!(await hit(`2fa:setup:${session.sub}`, 5, 10 * 60_000)).ok)
     return { ok: false, error: "Muitas tentativas. Aguarde alguns minutos." };
 
   const user = await prisma.user.findUnique({
@@ -113,7 +113,7 @@ export async function regenerateBackupCodesAction(): Promise<
   const session = await getSession();
   if (!session) return { ok: false, error: "Sessão expirada." };
 
-  if (!hit(`2fa:regen:${session.sub}`, 5, 60 * 60_000).ok)
+  if (!(await hit(`2fa:regen:${session.sub}`, 5, 60 * 60_000)).ok)
     return { ok: false, error: "Muitas tentativas. Aguarde uma hora." };
 
   const user = await prisma.user.findUnique({
@@ -139,7 +139,7 @@ export async function disable2faAction(password: string): Promise<R> {
   const session = await getSession();
   if (!session) return { ok: false, error: "Sessão expirada." };
 
-  if (!hit(`2fa:disable:${session.sub}`, 5, 60 * 60_000).ok)
+  if (!(await hit(`2fa:disable:${session.sub}`, 5, 60 * 60_000)).ok)
     return { ok: false, error: "Muitas tentativas. Aguarde uma hora." };
 
   const user = await prisma.user.findUnique({

@@ -21,7 +21,7 @@ export const runtime = "nodejs";
 export async function POST(req: Request): Promise<Response> {
   // Rate limit por IP — webhook é endpoint público.
   const ip = await clientIp();
-  if (!hit(`webhook:pix:${ip}`, 120, 60_000).ok) {
+  if (!(await hit(`webhook:pix:${ip}`, 120, 60_000)).ok) {
     logger.warn("PIX webhook rate-limited", { ip });
     return Response.json({ ok: false, error: "rate_limited" }, { status: 429 });
   }

@@ -28,7 +28,7 @@ export async function deleteAccountAction(input: {
   if (!session) return { ok: false, error: "Sessão expirada." };
 
   // Anti-brute force: 3 tentativas por usuário em 1h.
-  if (!hit(`acct:delete:${session.sub}`, 3, 60 * 60_000).ok)
+  if (!(await hit(`acct:delete:${session.sub}`, 3, 60 * 60_000)).ok)
     return { ok: false, error: "Muitas tentativas. Aguarde uma hora." };
 
   if (input.confirmation.trim() !== "EXCLUIR MINHA CONTA")
