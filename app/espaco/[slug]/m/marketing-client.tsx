@@ -144,7 +144,7 @@ export default function MarketingClient() {
             Nenhum carrossel criado ainda
           </p>
           <p className="mt-1 text-xs text-slate-400">
-            Clique em "Novo carrossel" para gerar com IA.
+            Clique em “Novo carrossel” para gerar com IA.
           </p>
         </div>
       ) : (

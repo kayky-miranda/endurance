@@ -23,8 +23,7 @@ export async function renderCarouselToPNGs(
   const html = renderCarouselHTML(slides, brand);
 
   // Lazy-import Playwright (Node-only, never bundled)
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { chromium } = require("playwright");
+  const { chromium } = await import("playwright");
 
   const browser = await chromium.launch({ headless: true });
   try {

@@ -68,7 +68,7 @@ export default function InviteModal({
               Convite enviado
             </div>
             <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">
-              O link expira em 7 dias. Você pode acompanhar e reenviar na aba "Convites pendentes".
+              O link expira em 7 dias. Você pode acompanhar e reenviar na aba “Convites pendentes”.
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button

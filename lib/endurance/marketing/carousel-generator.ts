@@ -91,9 +91,8 @@ function buildJsonSchema(total: number): object {
   };
 }
 
-function buildGeminiSchema(): object {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { Type } = require("@google/genai");
+async function buildGeminiSchema(): Promise<object> {
+  const { Type } = await import("@google/genai");
   const slideSchema = {
     type: Type.OBJECT,
     properties: {
@@ -186,7 +185,7 @@ export async function generateCarousel(
     system: SYSTEM,
     userPrompt: buildUserPrompt(input),
     jsonSchema: buildJsonSchema(7),
-    geminiSchema: buildGeminiSchema(),
+    geminiSchema: await buildGeminiSchema(),
   });
 
   const slides: SlideData[] = SLIDE_BLUEPRINT.map((bp, i) => {
