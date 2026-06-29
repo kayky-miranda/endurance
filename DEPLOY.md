@@ -33,6 +33,7 @@ Em **Project → Settings → Environment Variables**, adicione (Production + Pr
 | `RESEND_API_KEY`  | ⚠️ recomendada | E-mail transacional (verificação, reset, convite). Sem ela, e-mails ficam em **modo stub** (logam no console, não são entregues). Veja a seção 4. |
 | `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | ⚠️ recomendada | Rate limit **global** entre instâncias serverless. Sem elas, o limite é por processo (fraco em produção). Banco grátis em [upstash.com](https://upstash.com). |
 | `STORAGE_S3_*` + `STORAGE_PUBLIC_BASE_URL` | ✅ **obrigatória em prod** | Storage durável (S3/R2) para carrosséis, logos e XML fiscal. Sem elas, grava em `public/` — **efêmero no serverless** (some no deploy). Use Cloudflare R2 (barato) ou AWS S3. |
+| `ASAAS_API_KEY` + `ASAAS_ENV` + `ASAAS_WEBHOOK_TOKEN` | 🟡 cobrança | Assinatura recorrente via Asaas (PIX/boleto/cartão). Sem a chave, cobrança fica em modo manual (auto-gerido). Cadastre o webhook no painel Asaas apontando para `/api/billing/webhook` com o mesmo `ASAAS_WEBHOOK_TOKEN`. |
 | `EMAIL_FROM`      | ⛔ opcional | Remetente. Padrão `ENDURANCE <noreply@endurance.app>`. O domínio precisa estar verificado no Resend. |
 | `APP_URL`         | ✅ (se usar e-mail) | URL pública (ex.: `https://endurance.app`). Compõe os links dos e-mails; em dev cai em `http://localhost:3200`. |
 
