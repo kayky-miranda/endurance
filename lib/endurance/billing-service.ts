@@ -1,6 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/endurance/money";
+import { resolveBillingProvider } from "@/lib/endurance/billing-provider";
+import { logger } from "@/lib/logger";
 import {
   PLAN_CATALOG,
   planById,
@@ -147,6 +149,94 @@ export async function changePlan(
   return { ok: true, plan: plan.id, invoiced };
 }
 
+export type CheckoutResult =
+  | { ok: true; redirectUrl: string | null }
+  | { ok: false; error: string };
+
+/**
+ * Inicia a assinatura de um plano pago via gateway externo (Asaas): cria a
+ * cobrança recorrente, guarda as referências do gateway e devolve o link do
+ * checkout hospedado para o cliente pagar a 1ª cobrança. A confirmação de
+ * pagamento chega depois pelo webhook (que mantém o status sincronizado).
+ *
+ * O acesso é concedido na hora (status "active") e revogado pelo webhook se a
+ * cobrança vencer sem pagamento (PAYMENT_OVERDUE → past_due).
+ */
+export async function createExternalSubscription(
+  org: string,
+  rawPlan: string,
+  contactEmail: string,
+): Promise<CheckoutResult> {
+  const plan = planById(rawPlan);
+  if (!plan) return { ok: false, error: "Plano inválido." };
+  if (plan.contactSales)
+    return { ok: false, error: "O plano Enterprise é contratado com vendas." };
+  if (!isPaidPlan(plan.id) || plan.priceMonthly == null)
+    return { ok: false, error: "Este plano não é cobrado." };
+
+  const provider = resolveBillingProvider();
+  if (!provider.external)
+    return { ok: false, error: "Gateway de cobrança não configurado." };
+
+  const [organization, fiscal] = await Promise.all([
+    prisma.organization.findUnique({ where: { id: org }, select: { name: true } }),
+    prisma.fiscalConfig.findUnique({
+      where: { organizationId: org },
+      select: { cnpj: true },
+    }),
+  ]);
+  const cpfCnpj = (fiscal?.cnpj ?? "").replace(/\D/g, "");
+  if (cpfCnpj.length !== 11 && cpfCnpj.length !== 14)
+    return {
+      ok: false,
+      error: "Configure um CPF/CNPJ válido na aba Fiscal antes de assinar.",
+    };
+
+  const created = await provider.createSubscription({
+    orgId: org,
+    planId: plan.id,
+    valueMonthly: plan.priceMonthly,
+    customer: {
+      name: organization?.name ?? "Cliente ENDURANCE",
+      email: contactEmail,
+      cpfCnpj,
+    },
+  });
+  if (!created.ok || !created.subscriptionId)
+    return { ok: false, error: created.error ?? "Falha ao criar a assinatura no gateway." };
+
+  const seats = plan.seats > 0 ? plan.seats : 9999;
+  const now = new Date();
+  const periodEnd = nextPeriodEnd(now);
+  await prisma.subscription.upsert({
+    where: { organizationId: org },
+    create: {
+      organizationId: org,
+      plan: plan.id,
+      status: "active",
+      seats,
+      currentPeriodStart: now,
+      currentPeriodEnd: periodEnd,
+      cancelAtPeriodEnd: false,
+      asaasCustomerId: created.customerId ?? null,
+      asaasSubscriptionId: created.subscriptionId,
+    },
+    update: {
+      plan: plan.id,
+      status: "active",
+      seats,
+      currentPeriodStart: now,
+      currentPeriodEnd: periodEnd,
+      cancelAtPeriodEnd: false,
+      trialEndsAt: null,
+      asaasCustomerId: created.customerId ?? null,
+      asaasSubscriptionId: created.subscriptionId,
+    },
+  });
+
+  return { ok: true, redirectUrl: created.invoiceUrl ?? null };
+}
+
 /**
  * Agenda (ou desfaz) o cancelamento ao fim do ciclo. Mantém o acesso até o fim
  * do período já pago — comportamento padrão de assinaturas SaaS.
@@ -160,6 +250,21 @@ export async function setCancelAtPeriodEnd(
   });
   if (!sub)
     return { ok: false, error: "Nenhuma assinatura ativa para cancelar." };
+
+  // Cancela também no gateway para parar as cobranças futuras (o acesso local
+  // segue até o fim do ciclo já pago). Best-effort: não trava o cancelamento.
+  if (cancel && sub.asaasSubscriptionId) {
+    const provider = resolveBillingProvider();
+    if (provider.external) {
+      const c = await provider.cancelSubscription(sub.asaasSubscriptionId);
+      if (!c.ok)
+        logger.warn("Falha ao cancelar assinatura no gateway", {
+          org,
+          error: c.error,
+        });
+    }
+  }
+
   await prisma.subscription.update({
     where: { organizationId: org },
     data: { cancelAtPeriodEnd: cancel },
