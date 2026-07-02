@@ -92,7 +92,9 @@ function getSecret(): Uint8Array {
 }
 
 export async function signSession(payload: SessionPayload): Promise<string> {
-  return new SignJWT({ ...payload })
+  // `auth` = instante do login original. O middleware rotaciona o token a
+  // cada ~24h de uso, mas nunca além de 30 dias deste marco (teto absoluto).
+  return new SignJWT({ ...payload, auth: Math.floor(Date.now() / 1000) })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
