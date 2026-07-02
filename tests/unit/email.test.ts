@@ -5,7 +5,11 @@ vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), exception: vi.fn() },
 }));
 
-import { sendEmail } from "@/lib/email";
+import {
+  sendEmail,
+  sendPaymentOverdueEmail,
+  sendStockDigestEmail,
+} from "@/lib/email";
 
 const okResponse = (id = "id") => ({
   ok: true,
@@ -90,6 +94,31 @@ describe("sendEmail", () => {
     expect(r.ok).toBe(false);
     expect(r.error).toBe("resend_503");
     expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  it("templates de negócio compõem e enviam (stub sem chave)", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const overdue = await sendPaymentOverdueEmail({
+      to: "dono@x.com",
+      name: "Maria",
+      orgName: "Mercadinho do Zé",
+    });
+    expect(overdue).toEqual({ ok: true, stub: true });
+
+    const digest = await sendStockDigestEmail({
+      to: "dono@x.com",
+      name: "Maria",
+      orgName: "Mercadinho do Zé",
+      items: [
+        { name: "Arroz 5kg", stock: 0, daysLeft: null, level: "rompido" },
+        { name: "Feijão 1kg", stock: 4, daysLeft: 2.4, level: "critico" },
+      ],
+    });
+    expect(digest).toEqual({ ok: true, stub: true });
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("trata erro de rede como transitório e tenta de novo", async () => {

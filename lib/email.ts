@@ -201,6 +201,77 @@ export async function sendTeamInviteEmail(opts: {
   });
 }
 
+/** Cobrança atrasada (dunning): disparado quando a assinatura vira past_due. */
+export async function sendPaymentOverdueEmail(opts: {
+  to: string;
+  name: string;
+  orgName: string;
+}): Promise<SendResult> {
+  const url = `${APP_URL}`;
+  const html = wrap(
+    "Pagamento em atraso",
+    `<p>Olá, ${opts.name}!</p>
+     <p>A cobrança da assinatura do espaço <strong>${opts.orgName}</strong> no ${BRAND} está <strong>em atraso</strong>.</p>
+     <p>Para evitar a suspensão do acesso, regularize o pagamento pelo link da fatura que você recebeu — ou acesse a aba <strong>Assinatura</strong> dentro do sistema.</p>
+     <p style="margin:24px 0;">${button(url, "Abrir o ENDURANCE")}</p>
+     <p style="font-size:13px;color:#94a3b8;margin-top:24px;">Se o pagamento já foi feito, desconsidere — a confirmação pode levar alguns minutos.</p>`,
+  );
+  const text = `Olá ${opts.name},\n\nA cobrança da assinatura do espaço ${opts.orgName} no ${BRAND} está em atraso. Regularize para evitar a suspensão do acesso: ${url}`;
+  return sendEmail({
+    to: opts.to,
+    subject: `Pagamento em atraso — ${opts.orgName}`,
+    html,
+    text,
+  });
+}
+
+export interface StockDigestItem {
+  name: string;
+  stock: number;
+  daysLeft: number | null;
+  level: string; // rompido | critico
+}
+
+/** Digest diário de estoque crítico/rompido (enviado pelo cron). */
+export async function sendStockDigestEmail(opts: {
+  to: string;
+  name: string;
+  orgName: string;
+  items: StockDigestItem[];
+}): Promise<SendResult> {
+  const rows = opts.items
+    .map(
+      (i) =>
+        `<tr>
+          <td style="padding:6px 12px 6px 0;">${i.name}</td>
+          <td style="padding:6px 12px;text-align:right;">${i.stock} un.</td>
+          <td style="padding:6px 0;color:${i.level === "rompido" ? "#dc2626" : "#d97706"};font-weight:600;">
+            ${i.level === "rompido" ? "Esgotado" : i.daysLeft !== null ? `~${Math.max(1, Math.round(i.daysLeft))}d restantes` : "Crítico"}
+          </td>
+        </tr>`,
+    )
+    .join("");
+  const html = wrap(
+    "Alerta de estoque",
+    `<p>Olá, ${opts.name}!</p>
+     <p>Estes produtos do <strong>${opts.orgName}</strong> estão esgotados ou perto de acabar:</p>
+     <table style="width:100%;border-collapse:collapse;font-size:14px;margin:16px 0;">${rows}</table>
+     <p style="margin:24px 0;">${button(`${APP_URL}`, "Repor estoque")}</p>
+     <p style="font-size:13px;color:#94a3b8;">Você recebe este resumo no máximo uma vez por dia, apenas quando há itens críticos.</p>`,
+  );
+  const text =
+    `Olá ${opts.name},\n\nProdutos com estoque crítico no ${opts.orgName}:\n` +
+    opts.items
+      .map((i) => `- ${i.name}: ${i.stock} un. (${i.level === "rompido" ? "esgotado" : "crítico"})`)
+      .join("\n");
+  return sendEmail({
+    to: opts.to,
+    subject: `⚠ Estoque crítico — ${opts.items.length} produto${opts.items.length > 1 ? "s" : ""} no ${opts.orgName}`,
+    html,
+    text,
+  });
+}
+
 export async function sendPasswordResetEmail(opts: {
   to: string;
   name: string;

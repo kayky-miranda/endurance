@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { hit, clientIp } from "@/lib/rate-limit";
+import { sendPaymentOverdueEmail } from "@/lib/email";
 import {
   verifyAsaasWebhook,
   mapAsaasEvent,
@@ -59,6 +60,31 @@ export async function POST(request: Request) {
       rows: updated.count,
       verified: verify.verified,
     });
+
+    // Dunning: cobrança atrasada → avisa o dono por e-mail (best-effort;
+    // falha de e-mail não pode falhar o webhook, senão o gateway reentrega).
+    if (status === "past_due" && updated.count > 0) {
+      try {
+        const [owner, org] = await Promise.all([
+          prisma.user.findFirst({
+            where: { organizationId: orgId, role: "OWNER" },
+            select: { name: true, email: true },
+          }),
+          prisma.organization.findUnique({
+            where: { id: orgId },
+            select: { name: true },
+          }),
+        ]);
+        if (owner)
+          await sendPaymentOverdueEmail({
+            to: owner.email,
+            name: owner.name,
+            orgName: org?.name ?? "seu espaço",
+          });
+      } catch (e) {
+        logger.exception("Dunning — falha ao enviar e-mail de atraso", e);
+      }
+    }
   } else {
     logger.info("Webhook billing sem ação", { event, hasOrg: Boolean(orgId) });
   }
