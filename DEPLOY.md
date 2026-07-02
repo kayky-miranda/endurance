@@ -80,6 +80,22 @@ entregar de verdade:
 > O tier grátis do Resend cobre 100 e-mails/dia (3.000/mês), suficiente para
 > começar. A verificação de domínio costuma propagar em minutos.
 
+## 5. Checklist final de produção (ops)
+
+Passos manuais, um por serviço — o código já degrada graciosamente sem eles,
+mas em produção todos devem estar ligados:
+
+| # | Serviço | O que fazer |
+|---|---------|-------------|
+| 1 | **Upstash** (rate limit global) | Criar banco Redis grátis em upstash.com → copiar `UPSTASH_REDIS_REST_URL` + `TOKEN` para as envs. |
+| 2 | **Cloudflare R2** (storage) | Criar bucket + API token → preencher `STORAGE_S3_*`; habilitar o domínio público do bucket e apontar `STORAGE_PUBLIC_BASE_URL`. |
+| 3 | **Sentry** (monitoramento) | Criar projeto Next.js → colocar `SENTRY_DSN` (+ `SENTRY_ORG`/`SENTRY_PROJECT`) nas envs. O código já está instrumentado (no-op sem DSN). |
+| 4 | **Uptime** | Monitor externo (UptimeRobot/BetterStack) apontando para `/api/health` — retorna 503 se o banco cair. |
+| 5 | **Backups** (Neon) | Conferir retenção de PITR no projeto Neon (Settings → Storage) e **ensaiar um restore** em branch separado — backup não testado não é backup. |
+| 6 | **Asaas** (cobrança) | Cadastrar o webhook no painel (Integrações → Webhooks) apontando para `https://<dominio>/api/billing/webhook`, com um token forte no header e o mesmo valor em `ASAAS_WEBHOOK_TOKEN`. Em produção, trocar `ASAAS_ENV="production"` + chave de produção. ⚠️ A chave começa com `$` — escape como `\$aact_...` no `.env` local (o dotenv-expand do Next expande `$var`). Na Vercel (UI de envs) não precisa escapar. |
+| 7 | **Focus NFe** (fiscal) | Contratar o plano, subir o certificado A1 no painel do Focus e trocar o token de homologação pelo de produção. |
+| 8 | **Cron** | Os 3 crons (`expire-trials`, `housekeeping`, `stock-digest`) já estão no `vercel.json` — conferir em Vercel → Settings → Cron Jobs após o primeiro deploy, e definir `CRON_SECRET`. |
+
 ## Notas
 
 - `npm run build` = `prisma generate && next build`. O `prisma generate` roda no
