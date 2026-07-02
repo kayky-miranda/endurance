@@ -18,7 +18,7 @@ import {
 } from "@/lib/endurance/permissions";
 import { getSalesSummary } from "@/lib/endurance/sales-analytics";
 import { money } from "@/lib/endurance/money";
-import { SalesByDayChart, PaymentMixChart } from "./m/reports-charts";
+import { SalesByDayChart, PaymentMixChart } from "./m/charts-lazy";
 import OnboardingChecklist from "./onboarding-checklist";
 
 const brl = (n: number) =>

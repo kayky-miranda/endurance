@@ -10,7 +10,7 @@ import { getPurchasingAnalytics } from "@/lib/endurance/purchasing-analytics";
 import {
   PurchasesByMonthChart,
   CategoryChart,
-} from "../purchasing-charts";
+} from "../charts-lazy";
 import {
   loadModule,
   DeniedModule,

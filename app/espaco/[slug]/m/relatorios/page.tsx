@@ -3,7 +3,7 @@ import { ArrowLeft, FileText, ShoppingCart, TrendingUp, Trophy, Wallet } from "l
 import { getSalesSummary } from "@/lib/endurance/sales-analytics";
 import { getCashflow, type DRE } from "@/lib/endurance/cashflow";
 import InsightsPanel from "../insights-panel";
-import { SalesByDayChart, PaymentMixChart, CashflowChart } from "../reports-charts";
+import { SalesByDayChart, PaymentMixChart, CashflowChart } from "../charts-lazy";
 import { loadModule, DeniedModule, KpiCard, RankList, brl } from "../module-kit";
 
 // Painel executivo de vendas (alimentado pelas vendas reais do PDV).
