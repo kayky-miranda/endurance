@@ -94,15 +94,23 @@ async function hitRedis(
   }
 }
 
+/**
+ * Relaxa os limites (×100) para suítes E2E, onde dezenas de signups/logins
+ * saem do mesmo IP em minutos. Nunca ativa em produção, mesmo com a env.
+ */
+const RELAXED =
+  process.env.RATE_LIMIT_RELAXED === "1" && process.env.NODE_ENV !== "production";
+
 /** Consome 1 tentativa da janela e diz se ainda está dentro do limite. */
 export async function hit(
   key: string,
   limit: number,
   windowMs: number,
 ): Promise<RateVerdict> {
+  const max = RELAXED ? limit * 100 : limit;
   return DISTRIBUTED
-    ? hitRedis(key, limit, windowMs)
-    : hitMemory(key, limit, windowMs);
+    ? hitRedis(key, max, windowMs)
+    : hitMemory(key, max, windowMs);
 }
 
 // ---------------------------------------------------------------------------

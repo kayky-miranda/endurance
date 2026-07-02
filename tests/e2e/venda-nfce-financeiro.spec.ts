@@ -1,15 +1,29 @@
 import { expect, test } from "@playwright/test";
-import { createProduct, sellOneInCash, signupWorkspace } from "./helpers";
+import {
+  createProduct,
+  sellOneInCash,
+  signupWorkspace,
+  verifyOwnerEmail,
+} from "./helpers";
+import { disconnectTokens } from "./email-tokens-helper";
 
 /**
  * Fluxo 2 — Venda no PDV → emissão da NFC-e → recebível no financeiro.
  * Fecha o ciclo operacional: a venda baixa estoque, gera o documento fiscal
  * e o lançamento financeiro correspondente.
  */
+test.afterAll(async () => {
+  await disconnectTokens();
+});
+
 test("venda no PDV emite NFC-e e gera o recebível no financeiro", async ({
   page,
 }) => {
-  const slug = await signupWorkspace(page, "Mercadinho Fluxo Fiscal");
+  const { slug, email } = await signupWorkspace(page, "Mercadinho Fluxo Fiscal", {
+    withCredentials: true,
+  });
+  // A emissão fiscal exige e-mail verificado (gate de compliance).
+  await verifyOwnerEmail(page, email);
   await createProduct(page, slug, {
     name: "Café E2E 500g",
     price: "10",

@@ -1,4 +1,29 @@
 import { expect, type Page } from "@playwright/test";
+import { mintEmailVerifyToken } from "./email-tokens-helper";
+
+/** Pré-aceita o banner de cookies para ele não interceptar cliques. */
+export async function presetCookieConsent(page: Page): Promise<void> {
+  await page.context().addCookies([
+    {
+      name: "endurance:cookie-consent",
+      value: "essential",
+      domain: "localhost",
+      path: "/",
+      sameSite: "Lax" as const,
+    },
+  ]);
+}
+
+/**
+ * Verifica o e-mail do dono (cunha o token no banco e abre o link). Necessário
+ * para fluxos gateados por e-mail verificado, como a emissão de NFC-e.
+ */
+export async function verifyOwnerEmail(page: Page, email: string): Promise<void> {
+  const token = await mintEmailVerifyToken(email);
+  // Consome o link via request (mesmo cookie jar) em vez de navegar: o
+  // endpoint responde uma cadeia de redirects que abortaria o goto seguinte.
+  await page.request.get(`/api/verify-email/${token}`);
+}
 
 /**
  * Domínio reservado dos donos criados pelos E2E. O global-teardown apaga as
@@ -32,6 +57,7 @@ export async function signupWorkspace(
   const email = uniqueEmail();
   const password = "segredo123";
 
+  await presetCookieConsent(page);
   await page.goto("/onboarding");
   await page
     .locator("#desc")

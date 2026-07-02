@@ -35,6 +35,12 @@ export default defineConfig({
       // determinismo nos fluxos de verificação/reset/convite — sem isso, o app
       // tentaria enviar e-mail real para endereços @e2e.endurance.test.
       RESEND_API_KEY: "",
+      // A suíte faz dezenas de signups do mesmo IP em minutos — relaxa os
+      // limites (×100, só fora de produção) para os últimos specs não caírem
+      // em "Muitas tentativas de cadastro".
+      RATE_LIMIT_RELAXED: "1",
+      // Cobrança em modo manual nos E2E (sem criar assinaturas reais no Asaas).
+      ASAAS_API_KEY: "",
     },
   },
 });
