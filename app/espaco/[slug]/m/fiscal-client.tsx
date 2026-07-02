@@ -12,6 +12,7 @@ import {
   Clock,
   ExternalLink,
   AlertTriangle,
+  Search,
 } from "lucide-react";
 import {
   emitNfceAction,
@@ -19,6 +20,7 @@ import {
   saveFiscalConfigAction,
   type FiscalConfigInput,
 } from "./fiscal-actions";
+import { lookupCnpjAction } from "./lookup-actions";
 import type { NfceRow, FiscalConfigView } from "@/lib/endurance/fiscal-service";
 
 const brl = (n: number) =>
@@ -268,12 +270,35 @@ function ConfigForm({
   });
   const [err, setErr] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [looking, setLooking] = useState(false);
 
   function set<K extends keyof FiscalConfigInput>(
     k: K,
     v: FiscalConfigInput[K],
   ) {
     setForm((f) => ({ ...f, [k]: v }));
+  }
+
+  async function fillFromCnpj() {
+    setErr(null);
+    setLooking(true);
+    const res = await lookupCnpjAction(form.cnpj);
+    setLooking(false);
+    if (!res.ok) {
+      setErr(res.error);
+      return;
+    }
+    const d = res.data;
+    setForm((f) => ({
+      ...f,
+      razaoSocial: d.razaoSocial || f.razaoSocial,
+      nomeFantasia: d.nomeFantasia || f.nomeFantasia,
+      municipio: d.city || f.municipio,
+      uf: d.state || f.uf,
+      cMun: d.codigoMunicipioIbge || f.cMun,
+    }));
+    if (d.situacao && d.situacao.toUpperCase() !== "ATIVA")
+      setErr(`Atenção: situação cadastral na Receita é "${d.situacao}".`);
   }
 
   function save() {
@@ -296,12 +321,28 @@ function ConfigForm({
       </h2>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="CNPJ">
-          <input
-            value={form.cnpj}
-            onChange={(e) => set("cnpj", e.target.value)}
-            placeholder="00.000.000/0000-00"
-            className={inputCls}
-          />
+          <div className="flex gap-2">
+            <input
+              value={form.cnpj}
+              onChange={(e) => set("cnpj", e.target.value)}
+              placeholder="00.000.000/0000-00"
+              className={inputCls}
+            />
+            <button
+              type="button"
+              onClick={fillFromCnpj}
+              disabled={looking}
+              title="Buscar dados na Receita (preenche razão social, município e cód. IBGE)"
+              className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand-500 hover:text-brand-500 disabled:opacity-50 dark:border-ink-600 dark:text-slate-300"
+            >
+              {looking ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+              Buscar
+            </button>
+          </div>
         </Field>
         <Field label="Inscrição estadual">
           <input value={form.ie} onChange={(e) => set("ie", e.target.value)} className={inputCls} />

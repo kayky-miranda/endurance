@@ -31,6 +31,7 @@ import {
   removeSupplierContactAction,
   loadSupplierAction,
 } from "./suppliers-actions";
+import { lookupCnpjAction } from "./lookup-actions";
 
 const inputCls =
   "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100";
@@ -400,6 +401,36 @@ function SupplierDrawer({
   onClose: () => void;
   onSave: () => void;
 }) {
+  const [looking, setLooking] = useState(false);
+  const [lookupMsg, setLookupMsg] = useState<string | null>(null);
+
+  async function fillFromCnpj() {
+    setLookupMsg(null);
+    setLooking(true);
+    const res = await lookupCnpjAction(form.cnpj ?? "");
+    setLooking(false);
+    if (!res.ok) {
+      setLookupMsg(res.error);
+      return;
+    }
+    const d = res.data;
+    // Preenche cadastro e endereço; nome de exibição/contato só se vazios.
+    set("razaoSocial", d.razaoSocial);
+    if (d.nomeFantasia) set("nomeFantasia", d.nomeFantasia);
+    if (!form.name?.trim()) set("name", d.nomeFantasia || d.razaoSocial);
+    if (d.address) set("address", d.address);
+    if (d.city) set("city", d.city);
+    if (d.state) set("state", d.state);
+    if (d.zip) set("zip", d.zip);
+    if (d.email && !form.email?.trim()) set("email", d.email);
+    if (d.phone && !form.phone?.trim()) set("phone", d.phone);
+    setLookupMsg(
+      d.situacao && d.situacao.toUpperCase() !== "ATIVA"
+        ? `Atenção: situação cadastral na Receita é "${d.situacao}".`
+        : "Dados preenchidos a partir da Receita.",
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div
@@ -450,13 +481,34 @@ function SupplierDrawer({
               />
             </Field>
             <Field label="CNPJ">
-              <input
-                className={inputCls}
-                value={form.cnpj ?? ""}
-                onChange={(e) => set("cnpj", e.target.value)}
-                inputMode="numeric"
-                placeholder="00.000.000/0000-00"
-              />
+              <div className="flex gap-2">
+                <input
+                  className={inputCls}
+                  value={form.cnpj ?? ""}
+                  onChange={(e) => set("cnpj", e.target.value)}
+                  inputMode="numeric"
+                  placeholder="00.000.000/0000-00"
+                />
+                <button
+                  type="button"
+                  onClick={fillFromCnpj}
+                  disabled={looking}
+                  title="Buscar dados na Receita (preenche razão social, endereço e contato)"
+                  className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:border-brand-500 hover:text-brand-500 disabled:opacity-50 dark:border-ink-600 dark:text-slate-300"
+                >
+                  {looking ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                  Buscar
+                </button>
+              </div>
+              {lookupMsg && (
+                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  {lookupMsg}
+                </p>
+              )}
             </Field>
             <Field label="Inscrição estadual">
               <input
