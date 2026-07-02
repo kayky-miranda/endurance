@@ -97,12 +97,23 @@ export const asaasProvider: BillingProvider = {
     });
     if (!sub.ok) return { ok: false, error: sub.error };
 
-    // 3. Link de pagamento da 1ª cobrança (checkout hospedado).
-    const pays = await asaas<AsaasPaymentsList>(
-      `/subscriptions/${sub.data.id}/payments`,
-      "GET",
-    );
-    const invoiceUrl = pays.ok ? pays.data.data?.[0]?.invoiceUrl : undefined;
+    // 3. Link de pagamento da 1ª cobrança (checkout hospedado). O Asaas
+    // materializa o payment de forma assíncrona logo após criar a assinatura —
+    // sem retry, o GET imediato costuma voltar vazio (race observada em teste).
+    let invoiceUrl: string | undefined;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const pays = await asaas<AsaasPaymentsList>(
+        `/subscriptions/${sub.data.id}/payments`,
+        "GET",
+      );
+      invoiceUrl = pays.ok ? pays.data.data?.[0]?.invoiceUrl : undefined;
+      if (invoiceUrl) break;
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 1000 * attempt));
+    }
+    if (!invoiceUrl)
+      logger.warn("Asaas: assinatura criada mas 1ª cobrança sem invoiceUrl", {
+        subscriptionId: sub.data.id,
+      });
 
     return {
       ok: true,
