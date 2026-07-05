@@ -2,8 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/* -----------------------------------------------------------------------------
+   Design tokens (CSS variables) — fonte única para o white-label.
+   O shell autenticado injeta um <style> sobrescrevendo estas vars com a
+   paleta da org (ThemeSettings). Landing/login usam estes defaults.
+----------------------------------------------------------------------------- */
 :root {
   color-scheme: dark;
+
+  /* Brand — ciano glacial padrão (paleta cyan do Tailwind). */
+  --color-brand-50: #ecfeff;
+  --color-brand-200: #a5f3fc;
+  --color-brand-300: #67e8f9;
+  --color-brand-400: #22d3ee;
+  --color-brand-500: #06b6d4;
+  --color-brand-600: #0891b2;
+
+  /* Chrome (sidebar/header) — paleta "polar". */
+  --color-ink-950: #060912;
+  --color-ink-900: #0a0f1d;
+  --color-ink-800: #0f1628;
+  --color-ink-700: #18223a;
+  --color-ink-600: #273456;
+
+  /* Tokens derivados pra componentes mais polidos. */
+  --color-button-text: #060912; /* texto sobre a cor primary */
+  --color-card-bg: #ffffff; /* fundo dos cards no modo claro */
+  --color-card-bg-dark: #0a0f1d; /* fundo dos cards no modo escuro */
+  --color-text-strong: #0f172a; /* texto principal claro */
 }
 
 html,
@@ -238,6 +264,21 @@ body {
   animation: sheen 1.1s ease;
 }
 
+/* Mr. Chippy — balanço suave do avatar (respira/acena de leve) */
+@keyframes chippy-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-1.5px) rotate(-3deg);
+  }
+}
+.chippy-bob {
+  animation: chippy-bob 3.4s ease-in-out infinite;
+  transform-origin: 50% 80%;
+}
+
 /* Pulso de orbe (seção de IA) */
 @keyframes pulse-ring {
   0% {
@@ -262,6 +303,7 @@ body {
   .float,
   .marquee-track,
   .pulse-ring,
+  .chippy-bob,
   .btn-sheen::after {
     animation: none;
   }

@@ -92,13 +92,21 @@ export default function BillingClient({
   const seatPct =
     seatLimit > 0 ? Math.min(100, Math.round((seatsUsed / seatLimit) * 100)) : 0;
 
-  function run(fn: () => Promise<{ ok: boolean; error?: string }>, plan?: string) {
+  function run(
+    fn: () => Promise<{ ok: boolean; error?: string; redirectUrl?: string | null }>,
+    plan?: string,
+  ) {
     setMsg(null);
     setBusyPlan(plan ?? "__sub__");
     startTransition(async () => {
       const res = await fn();
       setBusyPlan(null);
       if (res.ok) {
+        if (res.redirectUrl) {
+          // Checkout do gateway: leva o cliente para pagar a 1ª cobrança.
+          window.location.href = res.redirectUrl;
+          return;
+        }
         setMsg({ tone: "ok", text: "Assinatura atualizada." });
         router.refresh();
       } else {

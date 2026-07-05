@@ -58,6 +58,8 @@ import {
   removeUserAction,
   resetPasswordAction,
 } from "./equipe-actions";
+import InviteModal from "./invite-modal";
+import InviteList from "./invite-list";
 
 export type MemberView = {
   id: string;
@@ -78,6 +80,15 @@ export type ActivityView = {
   actorName: string;
   action: string;
   detail: string;
+  createdAt: string;
+};
+
+export type InviteView = {
+  id: string;
+  email: string;
+  role: string;
+  profile: string;
+  expiresAt: string;
   createdAt: string;
 };
 
@@ -196,6 +207,7 @@ export default function EquipeClient({
   currentUserId,
   members,
   activity,
+  invites,
   permissions,
   permissionGroups,
   profiles,
@@ -204,16 +216,18 @@ export default function EquipeClient({
   currentUserId: string;
   members: MemberView[];
   activity: ActivityView[];
+  invites: InviteView[];
   permissions: PermissionDef[];
   permissionGroups: string[];
   profiles: ProfileDef[];
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"users" | "audit">("users");
+  const [tab, setTab] = useState<"users" | "invites" | "audit">("users");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "blocked">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [showCreate, setShowCreate] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
   const [editing, setEditing] = useState<MemberView | null>(null);
   const [resetting, setResetting] = useState<MemberView | null>(null);
   const [busyId, setBusyId] = useState("");
@@ -282,17 +296,30 @@ export default function EquipeClient({
             Crie usuários da sua empresa e defina permissões por perfil (RBAC).
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setError("");
-            setShowCreate(true);
-          }}
-          className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-brand-400"
-        >
-          <UserPlus className="h-4 w-4" />
-          Novo usuário
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setError("");
+              setShowInvite(true);
+            }}
+            className="inline-flex items-center gap-2 rounded-xl border border-brand-500 px-4 py-2.5 text-sm font-semibold text-brand-500 transition hover:bg-brand-500/10"
+          >
+            <Mail className="h-4 w-4" />
+            Convidar por e-mail
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setError("");
+              setShowCreate(true);
+            }}
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-brand-400"
+          >
+            <UserPlus className="h-4 w-4" />
+            Novo usuário
+          </button>
+        </div>
       </div>
 
       {/* Cards de estatística */}
@@ -306,6 +333,14 @@ export default function EquipeClient({
       <div className="mt-6 flex gap-1 border-b border-slate-200 dark:border-ink-700">
         <TabBtn active={tab === "users"} onClick={() => setTab("users")} icon={Users}>
           Usuários
+        </TabBtn>
+        <TabBtn active={tab === "invites"} onClick={() => setTab("invites")} icon={Mail}>
+          Convites
+          {invites.length > 0 && (
+            <span className="ml-1.5 rounded-full bg-brand-500 px-1.5 py-0.5 text-[10px] font-bold text-ink-950">
+              {invites.length}
+            </span>
+          )}
         </TabBtn>
         <TabBtn active={tab === "audit"} onClick={() => setTab("audit")} icon={History}>
           Auditoria
@@ -389,6 +424,8 @@ export default function EquipeClient({
             ))}
           </div>
         </div>
+      ) : tab === "invites" ? (
+        <InviteList invites={invites} profiles={profiles} />
       ) : (
         <AuditList activity={activity} />
       )}
@@ -403,6 +440,19 @@ export default function EquipeClient({
           onClose={() => setShowCreate(false)}
           onSaved={() => {
             setShowCreate(false);
+            router.refresh();
+          }}
+        />
+      )}
+      {showInvite && (
+        <InviteModal
+          profiles={profiles.map((p) => ({
+            id: p.id,
+            label: p.label,
+            description: p.description,
+          }))}
+          onClose={() => {
+            setShowInvite(false);
             router.refresh();
           }}
         />

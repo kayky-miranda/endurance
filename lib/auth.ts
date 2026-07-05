@@ -20,6 +20,7 @@ export interface SessionPayload {
   slug: string; // slug da organização (para redirecionar sem consultar o banco)
   profile?: string; // id do perfil pré-configurado
   permissions?: string[]; // ids de permissão (RBAC granular)
+  emailVerified?: boolean; // hidratado do banco em getSession()
 }
 
 /** OWNER e ADMIN podem gerenciar a equipe; MEMBER não. */
@@ -66,6 +67,24 @@ export async function requirePermission(
   return { ok: true, session };
 }
 
+/**
+ * Combina requirePermission com a exigência de e-mail verificado. Usar em
+ * mutações sensíveis: emissão fiscal (NFC-e/NF-e), troca de plano, qualquer
+ * coisa que tenha consequência financeira ou comprometimento jurídico.
+ */
+export async function requirePermissionVerified(
+  permId: import("@/lib/endurance/permissions").PermissionId,
+): Promise<PermissionCheck> {
+  const gate = await requirePermission(permId);
+  if (!gate.ok) return gate;
+  if (!gate.session.emailVerified)
+    return {
+      ok: false,
+      error: "Confirme seu e-mail antes de executar esta ação.",
+    };
+  return gate;
+}
+
 function getSecret(): Uint8Array {
   const secret = process.env.AUTH_SECRET;
   if (!secret) throw new Error("AUTH_SECRET não definido no ambiente (.env).");
@@ -73,7 +92,9 @@ function getSecret(): Uint8Array {
 }
 
 export async function signSession(payload: SessionPayload): Promise<string> {
-  return new SignJWT({ ...payload })
+  // `auth` = instante do login original. O middleware rotaciona o token a
+  // cada ~24h de uso, mas nunca além de 30 dias deste marco (teto absoluto).
+  return new SignJWT({ ...payload, auth: Math.floor(Date.now() / 1000) })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
@@ -120,6 +141,7 @@ const loadUserForSession = cache(async (id: string) => {
       permissions: true,
       status: true,
       organizationId: true,
+      emailVerifiedAt: true,
     },
   });
 });
@@ -149,6 +171,7 @@ export async function getSession(): Promise<SessionPayload | null> {
     role: user.role as Role,
     profile: user.profile,
     permissions: user.permissions,
+    emailVerified: !!user.emailVerifiedAt,
   };
 }
 
@@ -183,8 +206,12 @@ export async function requireOrgAccess(slug: string): Promise<SessionPayload> {
   return session;
 }
 
+// Salt rounds 12 (~250ms/hash em CPU comum). Hashes antigos com rounds=10
+// continuam validando — o custo fica embutido no próprio hash.
+const BCRYPT_ROUNDS = 12;
+
 export async function hashPassword(plain: string): Promise<string> {
-  return bcrypt.hash(plain, 10);
+  return bcrypt.hash(plain, BCRYPT_ROUNDS);
 }
 
 export async function verifyPassword(
@@ -192,4 +219,11 @@ export async function verifyPassword(
   hash: string,
 ): Promise<boolean> {
   return bcrypt.compare(plain, hash);
+}
+
+/** Verifica se um hash usa custo inferior ao atual (para rehash silencioso). */
+export function needsRehash(hash: string): boolean {
+  const m = hash.match(/^\$2[aby]\$(\d+)\$/);
+  if (!m) return true;
+  return Number(m[1]) < BCRYPT_ROUNDS;
 }

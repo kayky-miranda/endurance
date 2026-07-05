@@ -1,0 +1,25 @@
+{
+  "name": "endurance-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vídeo de introdução do Endurance (Remotion). Projeto isolado do app Next.js.",
+  "scripts": {
+    "dev": "remotion studio",
+    "studio": "remotion studio",
+    "render": "remotion render EnduranceIntro out/endurance-intro.mp4",
+    "render:still": "remotion still EnduranceIntro out/frame.png --frame=70",
+    "upgrade": "remotion upgrade"
+  },
+  "dependencies": {
+    "@remotion/google-fonts": "4.0.290",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "4.0.290"
+  },
+  "devDependencies": {
+    "@remotion/cli": "4.0.290",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}

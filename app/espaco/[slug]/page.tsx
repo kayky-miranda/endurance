@@ -18,7 +18,8 @@ import {
 } from "@/lib/endurance/permissions";
 import { getSalesSummary } from "@/lib/endurance/sales-analytics";
 import { money } from "@/lib/endurance/money";
-import { SalesByDayChart, PaymentMixChart } from "./m/reports-charts";
+import { SalesByDayChart, PaymentMixChart } from "./m/charts-lazy";
+import OnboardingChecklist from "./onboarding-checklist";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -129,6 +130,14 @@ export default async function EspacoPage({
           Um resumo do {ws.name} — dados reais das suas vendas.
         </p>
       </div>
+
+      {session && (
+        <OnboardingChecklist
+          orgId={session.org}
+          slug={slug}
+          emailVerified={session.emailVerified ?? false}
+        />
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s) => (

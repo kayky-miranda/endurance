@@ -20,6 +20,8 @@ import {
   type FiscalProvider,
   type NfceEmitInput,
 } from "./fiscal-provider";
+import { fetchXmlContent } from "./fiscal-xml";
+import { logger } from "@/lib/logger";
 import type { Prisma } from "@prisma/client";
 
 export interface FiscalConfigView {
@@ -198,6 +200,14 @@ async function emitNfceViaProvider(
     };
 
   const numero = r.numero ?? 0;
+  // Retenção legal: captura uma cópia própria do XML autorizado (best-effort).
+  const xml = await fetchXmlContent(r.xmlUrl);
+  if (!xml && r.xmlUrl)
+    logger.warn("NFC-e autorizada mas XML não pôde ser baixado do provedor", {
+      org,
+      saleId: sale.id,
+      chave: r.chave,
+    });
   const data = {
     organizationId: org,
     saleId: sale.id,
@@ -209,7 +219,7 @@ async function emitNfceViaProvider(
     ambiente: cfg.ambiente,
     protocolo: r.protocolo ?? "",
     qrCode: r.qrCodeUrl ?? "",
-    xml: "",
+    xml,
     valorTotal: sale.total,
     provider: provider.id,
     providerRef: sale.id,

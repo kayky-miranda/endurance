@@ -14,11 +14,34 @@ import {
 import { createWorkspace, EmailTakenError } from "@/lib/endurance/workspace";
 import { allPermissionIds } from "@/lib/endurance/permissions";
 import { hit, peek, record, clientIp } from "@/lib/rate-limit";
+import { sendVerificationFor } from "@/lib/endurance/email-verification";
+import { logger } from "@/lib/logger";
+import { SignupSchema, firstError } from "@/lib/validation";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-type AuthResult = { ok: true; slug: string } | { ok: false; error: string };
+/**
+ * Política de senha: ≥8 caracteres, com pelo menos uma letra e um número.
+ * Para ser amigável no cadastro de balcão (mercados/salões), não exigimos
+ * símbolos especiais — exigência mínima para passar em check de invasão de
+ * dicionário.
+ */
+function validatePassword(pw: string): { ok: true } | { ok: false; error: string } {
+  if (pw.length < 8) return { ok: false, error: "A senha precisa ter ao menos 8 caracteres." };
+  if (pw.length > 128) return { ok: false, error: "Senha muito longa (limite 128 caracteres)." };
+  if (!/[a-zA-Z]/.test(pw)) return { ok: false, error: "A senha precisa ter ao menos uma letra." };
+  if (!/[0-9]/.test(pw)) return { ok: false, error: "A senha precisa ter ao menos um número." };
+  return { ok: true };
+}
+
+type AuthResult =
+  | { ok: true; slug: string }
+  | { ok: true; needs2fa: true } // senha OK mas falta TOTP
+  | { ok: false; error: string };
 type SimpleResult = { ok: true } | { ok: false; error: string };
+
+const PENDING_2FA_COOKIE = "endurance_pending_2fa";
+const PENDING_2FA_TTL_SEC = 5 * 60;
 
 export interface SignupInput {
   name: string; // nome do negócio
@@ -36,32 +59,29 @@ export interface SignupInput {
 /** Cria o espaço + o usuário dono e já abre a sessão. */
 export async function signupAction(input: SignupInput): Promise<AuthResult> {
   // Rate limit por IP: cadastro é caro (cria org + usuário) e alvo de bots.
-  const rl = hit(`signup:${await clientIp()}`, 5, 10 * 60_000);
+  const rl = await hit(`signup:${await clientIp()}`, 5, 10 * 60_000);
   if (!rl.ok)
     return {
       ok: false,
       error: "Muitas tentativas de cadastro. Tente novamente em alguns minutos.",
     };
 
-  const ownerName = (input.ownerName ?? "").trim();
-  const email = (input.email ?? "").trim().toLowerCase();
-  const password = input.password ?? "";
-
-  if (!ownerName) return { ok: false, error: "Informe o seu nome." };
-  if (!EMAIL_RE.test(email)) return { ok: false, error: "E-mail inválido." };
-  if (password.length < 6)
-    return { ok: false, error: "A senha precisa ter ao menos 6 caracteres." };
+  // Validação centralizada — Zod cobre formato, comprimento e política de senha.
+  const parsed = SignupSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const data = parsed.data;
+  const { ownerName, email, password } = data;
 
   try {
     const passwordHash = await hashPassword(password);
     const { slug, userId, orgId } = await createWorkspace({
-      name: input.name,
-      niche: input.niche,
-      city: input.city,
-      state: input.state,
-      country: input.country,
-      segment: input.segment,
-      moduleIds: input.moduleIds,
+      name: data.name,
+      niche: data.niche,
+      city: data.city,
+      state: data.state,
+      country: data.country,
+      segment: data.segment,
+      moduleIds: data.moduleIds,
       owner: { name: ownerName, email, passwordHash },
     });
     await createSession({
@@ -74,13 +94,36 @@ export async function signupAction(input: SignupInput): Promise<AuthResult> {
       profile: "administrador",
       permissions: allPermissionIds(),
     });
+    // Dispara verificação de e-mail em background — se falhar, o usuário pode
+    // re-solicitar via banner. Não bloqueia o signup.
+    sendVerificationFor(userId).catch((e) =>
+      logger.exception("Falha ao disparar verificação no signup", e),
+    );
     return { ok: true, slug };
   } catch (e) {
     if (e instanceof EmailTakenError)
       return { ok: false, error: "Esse e-mail já tem conta — faça login." };
-    console.error("[signup] erro:", e);
+    logger.exception("Signup falhou", e);
     return { ok: false, error: "Não consegui criar a conta." };
   }
+}
+
+/**
+ * Reenvia o e-mail de verificação para o usuário logado. Acionada pelo banner
+ * do dashboard quando emailVerifiedAt está null.
+ */
+export async function resendVerificationAction(): Promise<SimpleResult> {
+  const { getSession } = await import("@/lib/auth");
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Sessão expirada." };
+
+  // Rate limit: 3 reenvios por usuário a cada 10 min.
+  if (!(await hit(`verify:resend:${session.sub}`, 3, 10 * 60_000)).ok)
+    return { ok: false, error: "Aguarde alguns minutos antes de reenviar." };
+
+  const res = await sendVerificationFor(session.sub);
+  if (!res.ok) return { ok: false, error: "Não consegui enviar o e-mail. Tente em alguns minutos." };
+  return { ok: true };
 }
 
 export async function loginAction(
@@ -93,7 +136,7 @@ export async function loginAction(
 
   // Rate limit: por IP (rajada geral) e por e-mail (força bruta de senha —
   // conta só tentativas FALHAS, então errar pouco não bloqueia ninguém).
-  if (!hit(`login:ip:${await clientIp()}`, 20, 60_000).ok)
+  if (!(await hit(`login:ip:${await clientIp()}`, 20, 60_000)).ok)
     return { ok: false, error: "Muitas tentativas. Aguarde um instante." };
   const failKey = `login:fail:${email}`;
   const lock = peek(failKey, 5);
@@ -121,6 +164,22 @@ export async function loginAction(
       error: "Usuário bloqueado. Fale com o administrador do espaço.",
     };
 
+  // Se o usuário tem 2FA ativo, NÃO criamos a sessão ainda. Marcamos um
+  // cookie "pending" com o id do usuário e devolvemos needs2fa pro client
+  // prompt do código. verifyTotpLoginAction abaixo finaliza o login.
+  if (user.totpEnabledAt && user.totpSecret) {
+    const { cookies } = await import("next/headers");
+    const store = await cookies();
+    store.set(PENDING_2FA_COOKIE, user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: PENDING_2FA_TTL_SEC,
+    });
+    return { ok: true, needs2fa: true };
+  }
+
   // Registra o último acesso (auditoria / coluna "Último acesso").
   await prisma.user.update({
     where: { id: user.id },
@@ -137,6 +196,76 @@ export async function loginAction(
     profile: user.profile,
     permissions: user.permissions,
   });
+  return { ok: true, slug: user.organization.slug };
+}
+
+/**
+ * Verifica o código TOTP do login em 2 etapas. Lê o cookie pending_2fa
+ * (gravado em loginAction quando o usuário tem 2FA ativo), confere o código
+ * e só então cria a sessão real.
+ */
+export async function verifyTotpLoginAction(
+  code: string,
+  isBackupCode = false,
+): Promise<AuthResult> {
+  const { cookies } = await import("next/headers");
+  const { verifyTotpCode, normalizeBackupCode, hashBackupCode } = await import(
+    "@/lib/totp"
+  );
+  const store = await cookies();
+  const userId = store.get(PENDING_2FA_COOKIE)?.value;
+  if (!userId) return { ok: false, error: "Sessão de login expirou — refaça o login." };
+
+  if (!(await hit(`2fa:login:${userId}`, 5, 5 * 60_000)).ok)
+    return { ok: false, error: "Muitas tentativas. Aguarde alguns minutos." };
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { organization: true },
+  });
+  if (!user || !user.totpSecret || !user.totpEnabledAt)
+    return { ok: false, error: "Configuração de 2FA inválida." };
+  if (user.status === "blocked")
+    return { ok: false, error: "Usuário bloqueado." };
+
+  if (isBackupCode) {
+    const hashed = hashBackupCode(code);
+    const idx = user.totpBackupCodes.indexOf(hashed);
+    if (idx < 0) return { ok: false, error: "Código de recuperação inválido." };
+    // Remove o código usado (single-use) + segue login.
+    const remaining = user.totpBackupCodes.filter((_, i) => i !== idx);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        totpBackupCodes: remaining,
+        lastLoginAt: new Date(),
+      },
+    });
+    logger.info("Login via backup code", {
+      userId: user.id,
+      remaining: remaining.length,
+    });
+  } else {
+    if (!verifyTotpCode(user.totpSecret, code))
+      return { ok: false, error: "Código incorreto." };
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+  }
+
+  await createSession({
+    sub: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role as Role,
+    org: user.organizationId,
+    slug: user.organization.slug,
+    profile: user.profile,
+    permissions: user.permissions,
+  });
+
+  store.delete(PENDING_2FA_COOKIE);
   return { ok: true, slug: user.organization.slug };
 }
 

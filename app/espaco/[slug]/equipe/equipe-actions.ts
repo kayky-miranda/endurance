@@ -54,13 +54,22 @@ export async function createUserAction(input: CreateUserInput): Promise<R> {
   if (!gate.ok) return gate;
   const session = gate.session;
 
-  const name = (input.name ?? "").trim();
-  const email = (input.email ?? "").trim().toLowerCase();
-  const password = input.password ?? "";
-  if (!name) return { ok: false, error: "Informe o nome." };
-  if (!EMAIL_RE.test(email)) return { ok: false, error: "E-mail inválido." };
-  if (password.length < 6)
-    return { ok: false, error: "A senha precisa ter ao menos 6 caracteres." };
+  // Gate de assinatura: past_due / canceled / trial expirado bloqueiam mutação.
+  const { assertSubscriptionActive, checkSeatAvailability } = await import(
+    "@/lib/endurance/plan-limits"
+  );
+  const sub = await assertSubscriptionActive(session.org);
+  if (!sub.ok) return { ok: false, error: sub.error! };
+
+  // Gate de seats: cada plano tem o seu limite (0 = ilimitado).
+  const seat = await checkSeatAvailability(session.org);
+  if (!seat.ok) return { ok: false, error: seat.error! };
+
+  // Validação centralizada via Zod (formato, comprimento, política de senha).
+  const { CreateUserSchema, firstError } = await import("@/lib/validation");
+  const parsed = CreateUserSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const { name, email, password } = parsed.data;
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return { ok: false, error: "E-mail já cadastrado." };

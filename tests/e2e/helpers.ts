@@ -1,4 +1,29 @@
 import { expect, type Page } from "@playwright/test";
+import { mintEmailVerifyToken } from "./email-tokens-helper";
+
+/** Pré-aceita o banner de cookies para ele não interceptar cliques. */
+export async function presetCookieConsent(page: Page): Promise<void> {
+  await page.context().addCookies([
+    {
+      name: "endurance:cookie-consent",
+      value: "essential",
+      domain: "localhost",
+      path: "/",
+      sameSite: "Lax" as const,
+    },
+  ]);
+}
+
+/**
+ * Verifica o e-mail do dono (cunha o token no banco e abre o link). Necessário
+ * para fluxos gateados por e-mail verificado, como a emissão de NFC-e.
+ */
+export async function verifyOwnerEmail(page: Page, email: string): Promise<void> {
+  const token = await mintEmailVerifyToken(email);
+  // Consome o link via request (mesmo cookie jar) em vez de navegar: o
+  // endpoint responde uma cadeia de redirects que abortaria o goto seguinte.
+  await page.request.get(`/api/verify-email/${token}`);
+}
 
 /**
  * Domínio reservado dos donos criados pelos E2E. O global-teardown apaga as
@@ -12,12 +37,27 @@ export function uniqueEmail(): string {
 
 /**
  * Cria um espaço novo pelo onboarding real (classificador offline) e devolve o
- * slug. Deixa a sessão do dono logada no contexto da página.
+ * slug + credenciais usadas (úteis pra fluxos que precisam relogar).
+ * Deixa a sessão do dono logada no contexto da página.
  */
 export async function signupWorkspace(
   page: Page,
   bizName: string,
-): Promise<string> {
+): Promise<string>;
+export async function signupWorkspace(
+  page: Page,
+  bizName: string,
+  opts: { withCredentials: true },
+): Promise<{ slug: string; email: string; password: string }>;
+export async function signupWorkspace(
+  page: Page,
+  bizName: string,
+  opts?: { withCredentials?: boolean },
+): Promise<string | { slug: string; email: string; password: string }> {
+  const email = uniqueEmail();
+  const password = "segredo123";
+
+  await presetCookieConsent(page);
   await page.goto("/onboarding");
   await page
     .locator("#desc")
@@ -28,12 +68,13 @@ export async function signupWorkspace(
 
   await page.getByPlaceholder("Nome do negócio").fill(bizName);
   await page.getByPlaceholder("Seu nome").fill("Dono E2E");
-  await page.getByPlaceholder("Seu e-mail").fill(uniqueEmail());
-  await page.getByPlaceholder("Senha (mín. 6 caracteres)").fill("segredo123");
+  await page.getByPlaceholder("Seu e-mail").fill(email);
+  await page.locator('input[type="password"]').fill(password);
   await page.getByRole("button", { name: "Criar meu espaço" }).click();
 
   await page.waitForURL(/\/espaco\/[^/?#]+$/, { timeout: 60_000 });
-  return new URL(page.url()).pathname.split("/")[2];
+  const slug = new URL(page.url()).pathname.split("/")[2];
+  return opts?.withCredentials ? { slug, email, password } : slug;
 }
 
 /** Cadastra um produto pela tela de produtos. */

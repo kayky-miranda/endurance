@@ -8,7 +8,6 @@ import {
   Building2,
   Check,
   ArrowRight,
-  Compass,
   AlertCircle,
   Ship,
   MessageSquare,
@@ -19,6 +18,7 @@ import {
   Lock,
   Store,
 } from "lucide-react";
+import { BrandMark } from "@/app/components/BrandMark";
 import type { OnboardingResult } from "@/lib/endurance/types";
 import { signupAction } from "./actions";
 
@@ -95,13 +95,14 @@ export default function OnboardingClient({
         email,
         password,
       });
-      if (res.ok) {
+      if (res.ok && "slug" in res) {
         // Navegação completa: o cookie de sessão já foi gravado pela action.
         window.location.href = `/espaco/${res.slug}`;
-      } else {
+      } else if (!res.ok) {
         setError(res.error);
         setCreating(false);
       }
+      // ok && needs2fa não cabe no signup (usuário acabou de criar conta sem 2FA).
     } catch {
       setError("Algo deu errado ao criar a conta.");
       setCreating(false);
@@ -390,7 +391,7 @@ export default function OnboardingClient({
                 <Field
                   icon={Lock}
                   type="password"
-                  placeholder="Senha (mín. 6 caracteres)"
+                  placeholder="Senha (mín. 8 caracteres, com letra e número)"
                   value={password}
                   onChange={setPassword}
                   onEnter={handleSignup}
@@ -436,7 +437,7 @@ function Navbar({ aiEnabled }: { aiEnabled: boolean }) {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
         <div className="flex items-center gap-2.5">
           <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
-            <Compass className="h-5 w-5" strokeWidth={2} />
+            <BrandMark className="h-7 w-7" />
           </div>
           <span className="text-lg font-semibold tracking-tight">ENDURANCE</span>
           <span className="ml-1 hidden rounded-full border border-ink-600 px-2 py-0.5 text-[10px] uppercase tracking-wider text-slate-400 sm:inline">

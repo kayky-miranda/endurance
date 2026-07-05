@@ -5,6 +5,7 @@ import {
   effectivePermissions,
   modulePermission,
 } from "@/lib/endurance/permissions";
+import { resolveTheme, themeToCss } from "@/lib/theme";
 import Shell from "./shell";
 
 export default async function EspacoLayout({
@@ -19,6 +20,10 @@ export default async function EspacoLayout({
   const ws = await getWorkspace(slug);
   if (!ws) notFound();
 
+  // Tema white-label da org (cacheado por request via React cache()).
+  const theme = await resolveTheme(session.org);
+  const themeCss = themeToCss(theme);
+
   // Permissões efetivas (OWNER/ADMIN têm tudo). Fonte única do RBAC de
   // navegação: o menu só mostra módulos cuja permissão o usuário tem.
   const perms = new Set(effectivePermissions(session.role, session.permissions));
@@ -32,17 +37,24 @@ export default async function EspacoLayout({
     .map((m) => ({ id: m.id, label: m.label, core: m.core }));
 
   return (
-    <Shell
-      orgName={ws.name}
-      nicheLabel={ws.nicheLabel}
-      slug={slug}
-      modules={modules}
-      userName={session.name}
-      canManage={canManageTeamSession(session)}
-      canManageBilling={perms.has("subscription.manage")}
-      canViewDashboard={canViewDashboard}
-    >
-      {children}
-    </Shell>
+    <>
+      {/* Override das CSS vars do globals.css com a paleta da org. */}
+      <style dangerouslySetInnerHTML={{ __html: themeCss }} />
+      <Shell
+        orgName={ws.name}
+        nicheLabel={ws.nicheLabel}
+        slug={slug}
+        modules={modules}
+        userName={session.name}
+        userEmail={session.email}
+        emailVerified={session.emailVerified ?? false}
+        canManage={canManageTeamSession(session)}
+        canManageBilling={perms.has("subscription.manage")}
+        canViewDashboard={canViewDashboard}
+        logoDataUrl={theme.logoDataUrl}
+      >
+        {children}
+      </Shell>
+    </>
   );
 }

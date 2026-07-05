@@ -33,3 +33,12 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /pix-screens/
+
+# marketing (carrosseis renderizados — armazenamento efêmero, ir pra blob storage)
+/public/campaigns/
+
+# scaffold remotion criado por engano (duplicado de video/)
+/endurance-video/
+
+# Previews de inspeção do gen-brand (não versionar)
+/scripts/_brand-preview/

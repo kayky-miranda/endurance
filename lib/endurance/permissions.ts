@@ -16,12 +16,16 @@ export type PermissionId =
   | "pdv.sell"
   | "customers.manage"
   | "suppliers.manage"
+  | "purchasing.request"
+  | "purchasing.approve"
+  | "purchasing.manage"
   | "finance.reports"
   | "reports.export"
   | "team.manage"
   | "integrations.config"
   | "subscription.manage"
-  | "settings.general";
+  | "settings.general"
+  | "marketing.manage";
 
 export interface PermissionDef {
   id: PermissionId;
@@ -68,8 +72,27 @@ export const PERMISSIONS: PermissionDef[] = [
   {
     id: "suppliers.manage",
     label: "Gerenciar Fornecedores",
-    description: "Fornecedores e pedidos de compra.",
+    description: "Cadastro de fornecedores e vínculo com produtos.",
     group: "Catálogo & Estoque",
+  },
+  // ---- Suprimentos / Compras ----
+  {
+    id: "purchasing.request",
+    label: "Solicitar Compras",
+    description: "Criar e acompanhar solicitações de compra de materiais.",
+    group: "Suprimentos",
+  },
+  {
+    id: "purchasing.approve",
+    label: "Aprovar Compras",
+    description: "Aprovar, rejeitar ou solicitar ajustes nas requisições.",
+    group: "Suprimentos",
+  },
+  {
+    id: "purchasing.manage",
+    label: "Gerenciar Compras",
+    description: "Cotações, pedidos de compra e recebimento de materiais.",
+    group: "Suprimentos",
   },
   // ---- Fiscal & Financeiro ----
   {
@@ -114,6 +137,13 @@ export const PERMISSIONS: PermissionDef[] = [
     label: "Configurações Gerais do Sistema",
     description: "Dados da empresa e preferências do espaço.",
     group: "Administração",
+  },
+  // ---- Marketing ----
+  {
+    id: "marketing.manage",
+    label: "Marketing com IA",
+    description: "Criar e publicar carrosséis para Instagram com IA.",
+    group: "Operação",
   },
 ];
 
@@ -174,10 +204,14 @@ export const PROFILES: ProfileDef[] = [
       "products.manage",
       "stock.manage",
       "suppliers.manage",
+      "purchasing.request",
+      "purchasing.approve",
+      "purchasing.manage",
       "fiscal.manage",
       "finance.reports",
       "reports.export",
       "team.manage",
+      "marketing.manage",
     ],
   },
   {
@@ -202,6 +236,8 @@ export const PROFILES: ProfileDef[] = [
       "products.manage",
       "stock.manage",
       "suppliers.manage",
+      "purchasing.request",
+      "purchasing.manage",
     ],
   },
   {
@@ -281,15 +317,24 @@ export const MODULE_PERMISSION: Record<string, PermissionId> = {
   precificacao: "products.manage",
   codigo_barras: "products.manage",
   estoque: "stock.manage",
+  movimentacoes: "stock.manage",
   caixa: "pdv.sell",
   pdv: "pdv.sell",
   crm: "customers.manage",
   fornecedores: "suppliers.manage",
+  // Suprimentos / Compras
+  compras: "purchasing.manage",
+  solicitacoes: "purchasing.request",
+  aprovacoes: "purchasing.approve",
+  cotacoes: "purchasing.manage",
+  pedidos_compra: "purchasing.manage",
+  recebimento: "purchasing.manage",
   nfce: "fiscal.manage",
   nfe: "fiscal.manage",
   acesso: "team.manage",
   notificacoes: "integrations.config",
   importacao: "settings.general",
+  marketing: "marketing.manage",
   // Nichos academia/salão: cobrança e comissões são financeiro; planos é
   // catálogo de preços (mesma permissão da precificação).
   mensalidades: "finance.reports",

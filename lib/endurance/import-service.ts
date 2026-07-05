@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { importSpec, type ImportEntitySpec } from "./import-spec";
+import { applyStockMovement } from "./stock-ledger";
 
 const norm = (s: string) =>
   (s ?? "")
@@ -248,17 +249,30 @@ async function commitRow(
       return;
     case "produtos": {
       const category = (o.category ?? "").trim();
-      await prisma.product.create({
-        data: {
-          organizationId: org,
-          name: o.name.trim(),
-          sku: (o.sku ?? "").trim(),
-          barcode: (o.barcode ?? "").trim(),
-          category,
-          price: parseNumber(o.price) ?? 0,
-          cost: parseNumber(o.cost) ?? 0,
-          stock: Math.trunc(parseNumber(o.stock) ?? 0),
-        },
+      const initial = Math.trunc(parseNumber(o.stock) ?? 0);
+      await prisma.$transaction(async (tx) => {
+        const p = await tx.product.create({
+          data: {
+            organizationId: org,
+            name: o.name.trim(),
+            sku: (o.sku ?? "").trim(),
+            barcode: (o.barcode ?? "").trim(),
+            category,
+            price: parseNumber(o.price) ?? 0,
+            cost: parseNumber(o.cost) ?? 0,
+            stock: 0,
+          },
+        });
+        if (initial > 0)
+          await applyStockMovement(tx, {
+            organizationId: org,
+            productId: p.id,
+            delta: initial,
+            reason: "saldo_inicial",
+            refType: "import",
+            note: "Importação em massa",
+            allowNegative: true,
+          });
       });
       if (category)
         await prisma.category
@@ -287,9 +301,24 @@ async function commitRow(
     case "estoque": {
       const id = matchProduct(o, ctx);
       if (!id) throw new Error("no match");
-      await prisma.product.update({
-        where: { id },
-        data: { stock: Math.trunc(parseNumber(o.stock) ?? 0) },
+      const target = Math.trunc(parseNumber(o.stock) ?? 0);
+      // Ajuste de saldo por importação registrado no RAZÃO (delta vs. saldo atual).
+      await prisma.$transaction(async (tx) => {
+        const cur = await tx.product.findUnique({
+          where: { id },
+          select: { stock: true },
+        });
+        const delta = target - (cur?.stock ?? 0);
+        if (delta !== 0)
+          await applyStockMovement(tx, {
+            organizationId: org,
+            productId: id,
+            delta,
+            reason: "importacao",
+            refType: "import",
+            note: "Ajuste de saldo por importação",
+            allowNegative: true,
+          });
       });
       return;
     }

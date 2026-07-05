@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Compass,
   LayoutDashboard,
   Users,
   LogOut,
@@ -42,10 +41,21 @@ import {
   Box,
   Banknote,
   UploadCloud,
+  GitCompare,
+  ShoppingCart,
+  PackageCheck,
+  Palette,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { BrandMark } from "@/app/components/BrandMark";
 import { logoutAction } from "@/app/actions";
+import {
+  moduleCategory,
+  MODULE_CATEGORIES,
+  allModuleIds,
+} from "@/lib/endurance/catalog";
 import AssistantWidget from "./assistant-widget";
+import VerifyEmailBanner from "./verify-email-banner";
 
 export type ShellModule = { id: string; label: string; core: boolean };
 
@@ -84,6 +94,13 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   anamnese: FileText,
   confirmacao_auto: BadgeCheck,
   recibo: Receipt,
+  // Suprimentos / Compras
+  compras: BarChart3,
+  solicitacoes: ClipboardList,
+  aprovacoes: BadgeCheck,
+  cotacoes: GitCompare,
+  pedidos_compra: ShoppingCart,
+  recebimento: PackageCheck,
 };
 
 export default function Shell({
@@ -92,9 +109,12 @@ export default function Shell({
   slug,
   modules,
   userName,
+  userEmail,
+  emailVerified,
   canManage,
   canManageBilling = false,
   canViewDashboard = true,
+  logoDataUrl = null,
   children,
 }: {
   orgName: string;
@@ -102,9 +122,12 @@ export default function Shell({
   slug: string;
   modules: ShellModule[];
   userName: string;
+  userEmail: string;
+  emailVerified: boolean;
   canManage: boolean;
   canManageBilling?: boolean;
   canViewDashboard?: boolean;
+  logoDataUrl?: string | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -172,8 +195,8 @@ export default function Shell({
               Sair do caixa
             </Link>
             <div className="flex items-center gap-2">
-              <div className="grid h-7 w-7 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
-                <Compass className="h-4 w-4" strokeWidth={2} />
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
+                <BrandMark className="h-6 w-6" />
               </div>
               <span className="font-semibold tracking-tight">Caixa</span>
               <span className="hidden text-sm text-slate-400 sm:inline">
@@ -208,14 +231,68 @@ export default function Shell({
             </div>
           </header>
           <main className="flex-1 overflow-auto p-4 sm:p-6">{children}</main>
-          <AssistantWidget />
+          <AssistantWidget userName={userName} />
         </div>
       </div>
     );
   }
 
-  const core = modules.filter((m) => m.core);
-  const niche = modules.filter((m) => !m.core);
+  // Itens da navegação agrupados nas categorias do catálogo. Os itens fixos
+  // (Visão geral, Usuários, Plano) entram nas suas categorias junto dos módulos.
+  type NavEntry = {
+    category: (typeof MODULE_CATEGORIES)[number];
+    href: string;
+    icon: LucideIcon;
+    label: string;
+  };
+  const entries: NavEntry[] = [];
+  if (canViewDashboard)
+    entries.push({
+      category: "Dashboards",
+      href: base,
+      icon: LayoutDashboard,
+      label: "Visão geral",
+    });
+  // Ordena os módulos pela sequência canônica do catálogo (fluxo lógico),
+  // independente da ordem em que foram ativados no espaço (OrgModule).
+  const order = allModuleIds();
+  const orderedModules = [...modules].sort(
+    (a, b) => order.indexOf(a.id) - order.indexOf(b.id),
+  );
+  for (const m of orderedModules)
+    entries.push({
+      category: moduleCategory(m.id),
+      href: `${base}/m/${m.id}`,
+      icon: MODULE_ICONS[m.id] ?? Box,
+      label: m.label,
+    });
+  if (canManage)
+    entries.push({
+      category: "Administração",
+      href: `${base}/equipe`,
+      icon: Users,
+      label: "Usuários",
+    });
+  if (canManage)
+    entries.push({
+      category: "Administração",
+      href: `${base}/aparencia`,
+      icon: Palette,
+      label: "Aparência",
+    });
+  if (canManageBilling)
+    entries.push({
+      category: "Administração",
+      href: `${base}/assinatura`,
+      icon: CreditCard,
+      label: "Plano e cobrança",
+    });
+
+  // Visão geral é exata; os demais destacam também as sub-rotas (ex.: cotação/[id]).
+  const isActive = (href: string) =>
+    href === base
+      ? pathname === base
+      : pathname === href || pathname.startsWith(`${href}/`);
 
   const initial = (userName || "?").trim().charAt(0).toUpperCase();
 
@@ -238,9 +315,18 @@ export default function Shell({
           }`}
         >
           <div className="flex h-16 items-center gap-2.5 border-b border-ink-800 px-5">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
-              <Compass className="h-5 w-5" strokeWidth={2} />
-            </div>
+            {logoDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoDataUrl}
+                alt={orgName}
+                className="h-9 w-9 shrink-0 rounded-lg object-contain bg-white/5 p-1"
+              />
+            ) : (
+              <div className="grid h-9 w-9 place-items-center rounded-lg bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
+                <BrandMark className="h-7 w-7" />
+              </div>
+            )}
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-slate-100">
                 {orgName}
@@ -259,63 +345,23 @@ export default function Shell({
           </div>
 
           <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
-            {canViewDashboard && (
-              <NavGroup>
-                <NavItem
-                  href={base}
-                  icon={LayoutDashboard}
-                  label="Visão geral"
-                  active={pathname === base}
-                />
-              </NavGroup>
-            )}
-
-            <NavGroup title="O essencial">
-              {core.map((m) => (
-                <NavItem
-                  key={m.id}
-                  href={`${base}/m/${m.id}`}
-                  icon={MODULE_ICONS[m.id] ?? Box}
-                  label={m.label}
-                  active={pathname === `${base}/m/${m.id}`}
-                />
-              ))}
-            </NavGroup>
-
-            {niche.length > 0 && (
-              <NavGroup title={nicheLabel}>
-                {niche.map((m) => (
-                  <NavItem
-                    key={m.id}
-                    href={`${base}/m/${m.id}`}
-                    icon={MODULE_ICONS[m.id] ?? Box}
-                    label={m.label}
-                    active={pathname === `${base}/m/${m.id}`}
-                  />
-                ))}
-              </NavGroup>
-            )}
-
-            {(canManage || canManageBilling) && (
-              <NavGroup title="Gestão">
-                {canManage && (
-                  <NavItem
-                    href={`${base}/equipe`}
-                    icon={Users}
-                    label="Usuários"
-                    active={pathname === `${base}/equipe`}
-                  />
-                )}
-                {canManageBilling && (
-                  <NavItem
-                    href={`${base}/assinatura`}
-                    icon={CreditCard}
-                    label="Plano e cobrança"
-                    active={pathname === `${base}/assinatura`}
-                  />
-                )}
-              </NavGroup>
-            )}
+            {MODULE_CATEGORIES.map((cat) => {
+              const items = entries.filter((e) => e.category === cat);
+              if (items.length === 0) return null;
+              return (
+                <NavGroup key={cat} title={cat}>
+                  {items.map((e) => (
+                    <NavItem
+                      key={e.href}
+                      href={e.href}
+                      icon={e.icon}
+                      label={e.label}
+                      active={isActive(e.href)}
+                    />
+                  ))}
+                </NavGroup>
+              );
+            })}
           </nav>
 
           <div className="border-t border-ink-800 p-3">
@@ -378,9 +424,11 @@ export default function Shell({
             </div>
           </header>
 
+          {!emailVerified && <VerifyEmailBanner email={userEmail} />}
+
           <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         </div>
-        <AssistantWidget />
+        <AssistantWidget userName={userName} />
       </div>
     </div>
   );

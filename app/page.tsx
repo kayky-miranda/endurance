@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Landing from "./landing";
+import { SoftwareJsonLd, OrganizationJsonLd } from "./json-ld";
 
 export const metadata: Metadata = {
   title: {
@@ -34,5 +35,11 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  return <Landing />;
+  return (
+    <>
+      <SoftwareJsonLd />
+      <OrganizationJsonLd />
+      <Landing />
+    </>
+  );
 }

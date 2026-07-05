@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { uniqueEmail } from "./helpers";
+import { uniqueEmail, presetCookieConsent } from "./helpers";
 
 /**
  * Fluxo 1 — Onboarding → workspace.
@@ -7,6 +7,7 @@ import { uniqueEmail } from "./helpers";
  * sugeridos, cria a conta e chega ao espaço logado com o menu montado.
  */
 test("onboarding cria o workspace com os módulos do nicho", async ({ page }) => {
+  await presetCookieConsent(page);
   await page.goto("/onboarding");
 
   await page
@@ -34,7 +35,7 @@ test("onboarding cria o workspace com os módulos do nicho", async ({ page }) =>
   await page.getByPlaceholder("Nome do negócio").fill("Mercadinho E2E");
   await page.getByPlaceholder("Seu nome").fill("Dono E2E");
   await page.getByPlaceholder("Seu e-mail").fill(uniqueEmail());
-  await page.getByPlaceholder("Senha (mín. 6 caracteres)").fill("segredo123");
+  await page.getByPlaceholder(/Senha \(mín\./).fill("segredo123");
   await page.getByRole("button", { name: "Criar meu espaço" }).click();
 
   // Sessão criada e espaço persistido: cai na visão geral do tenant.

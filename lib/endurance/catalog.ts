@@ -115,6 +115,12 @@ export interface ModuleDef {
 export const MODULES: ModuleDef[] = [
   // ---- Core (compartilhado por todos os nichos) ----
   {
+    id: "marketing",
+    label: "Marketing com IA",
+    description: "Crie carrosséis profissionais para Instagram em segundos com IA.",
+    scope: "core",
+  },
+  {
     id: "acesso",
     label: "Acesso & multiusuário",
     description: "Login, papéis e dados isolados por empresa (multi-tenant).",
@@ -165,6 +171,12 @@ export const MODULES: ModuleDef[] = [
     scope: ["mercado_varejo"],
   },
   {
+    id: "movimentacoes",
+    label: "Movimentações de estoque",
+    description: "Razão completo do estoque: toda entrada e saída auditada.",
+    scope: ["mercado_varejo"],
+  },
+  {
     id: "caixa",
     label: "Fechamento de caixa",
     description: "Abertura, sangria/suprimento e conferência do caixa.",
@@ -185,7 +197,45 @@ export const MODULES: ModuleDef[] = [
   {
     id: "fornecedores",
     label: "Fornecedores",
-    description: "Cadastro de fornecedores e pedidos de compra.",
+    description: "Cadastro completo de fornecedores e vínculo com produtos.",
+    scope: ["mercado_varejo"],
+  },
+
+  // ---- Suprimentos / Compras (mercado/varejo) ----
+  {
+    id: "compras",
+    label: "Compras (painel)",
+    description: "Painel de suprimentos: KPIs, gastos e desempenho de compras.",
+    scope: ["mercado_varejo"],
+  },
+  {
+    id: "solicitacoes",
+    label: "Solicitações de compra",
+    description: "Requisição de materiais com aprovação em múltiplos níveis.",
+    scope: ["mercado_varejo"],
+  },
+  {
+    id: "aprovacoes",
+    label: "Aprovações de compra",
+    description: "Aprovar, rejeitar ou pedir ajustes nas solicitações.",
+    scope: ["mercado_varejo"],
+  },
+  {
+    id: "cotacoes",
+    label: "Cotações",
+    description: "Cotação com vários fornecedores e comparativo de propostas.",
+    scope: ["mercado_varejo"],
+  },
+  {
+    id: "pedidos_compra",
+    label: "Pedidos de compra",
+    description: "Emissão e acompanhamento de pedidos ao fornecedor.",
+    scope: ["mercado_varejo"],
+  },
+  {
+    id: "recebimento",
+    label: "Recebimento de materiais",
+    description: "Conferência de entregas, divergências e entrada no estoque.",
     scope: ["mercado_varejo"],
   },
   {
@@ -338,6 +388,78 @@ const MODULE_BY_ID = new Map(MODULES.map((m) => [m.id, m]));
 
 export function moduleById(id: string): ModuleDef | undefined {
   return MODULE_BY_ID.get(id);
+}
+
+// ---------------------------------------------------------------------------
+// Categorias da navegação lateral. Agrupam os módulos (e os itens fixos do
+// menu) em seções na ordem abaixo. É a fonte da verdade do agrupamento da
+// sidebar — adicionar um módulo a uma categoria é uma linha em MODULE_CATEGORY.
+// ---------------------------------------------------------------------------
+export const MODULE_CATEGORIES = [
+  "Dashboards",
+  "Operação",
+  "Catálogo & Estoque",
+  "Suprimentos",
+  "Fiscal & Financeiro",
+  "Administração",
+] as const;
+export type ModuleCategory = (typeof MODULE_CATEGORIES)[number];
+
+const MODULE_CATEGORY: Record<string, ModuleCategory> = {
+  // Dashboards
+  relatorios: "Dashboards",
+  marketing: "Operação",
+  // Operação
+  pdv: "Operação",
+  caixa: "Operação",
+  crm: "Operação",
+  codigo_barras: "Operação",
+  agenda: "Operação",
+  agenda_consultas: "Operação",
+  comandas: "Operação",
+  alunos: "Operação",
+  prontuario: "Operação",
+  anamnese: "Operação",
+  avaliacao: "Operação",
+  evolucao: "Operação",
+  qr_acesso: "Operação",
+  // Catálogo & Estoque
+  produtos: "Catálogo & Estoque",
+  estoque: "Catálogo & Estoque",
+  movimentacoes: "Catálogo & Estoque",
+  precificacao: "Catálogo & Estoque",
+  estoque_produtos: "Catálogo & Estoque",
+  equipamentos: "Catálogo & Estoque",
+  planos: "Catálogo & Estoque",
+  planos_alimentares: "Catálogo & Estoque",
+  // Suprimentos
+  compras: "Suprimentos",
+  fornecedores: "Suprimentos",
+  solicitacoes: "Suprimentos",
+  aprovacoes: "Suprimentos",
+  cotacoes: "Suprimentos",
+  pedidos_compra: "Suprimentos",
+  recebimento: "Suprimentos",
+  // Fiscal & Financeiro
+  financeiro: "Fiscal & Financeiro",
+  nfce: "Fiscal & Financeiro",
+  nfe: "Fiscal & Financeiro",
+  mensalidades: "Fiscal & Financeiro",
+  comissoes: "Fiscal & Financeiro",
+  recibo: "Fiscal & Financeiro",
+  // Administração
+  acesso: "Administração",
+  notificacoes: "Administração",
+  importacao: "Administração",
+  fidelidade: "Administração",
+  lembrete_whatsapp: "Administração",
+  chatbot_cobranca: "Administração",
+  confirmacao_auto: "Administração",
+};
+
+/** Categoria de um módulo (default "Operação" para qualquer não mapeado). */
+export function moduleCategory(id: string): ModuleCategory {
+  return MODULE_CATEGORY[id] ?? "Operação";
 }
 
 // RBAC: o gating de módulos vive em `permissions.ts` (MODULE_PERMISSION +

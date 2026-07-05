@@ -1,4 +1,7 @@
 import { updateMessageStatusByRef } from "@/lib/endurance/whatsapp-service";
+import { verifyMetaSignature } from "@/lib/webhook-signature";
+import { hit, clientIp } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 
@@ -7,6 +10,10 @@ export const runtime = "nodejs";
  *  - GET: verificação do endpoint (hub.challenge) com WHATSAPP_VERIFY_TOKEN.
  *  - POST: atualizações de status de entrega (sent/delivered/read/failed) →
  *    atualiza o status da `WhatsAppMessage` pelo id do provedor (wamid).
+ *
+ * Assinatura HMAC do header `x-hub-signature-256` é validada com META_APP_SECRET.
+ * Em dev/sandbox sem o segredo o evento segue, mas o log marca não verificado.
+ *
  * Sem inbound/chatbot — só status de entrega.
  */
 
@@ -39,8 +46,23 @@ interface MetaStatusWebhook {
 }
 
 export async function POST(req: Request): Promise<Response> {
+  // Rate limit por IP.
+  const ip = await clientIp();
+  if (!(await hit(`webhook:wa:${ip}`, 120, 60_000)).ok) {
+    logger.warn("WhatsApp webhook rate-limited", { ip });
+    return Response.json({ ok: false, error: "rate_limited" }, { status: 429 });
+  }
+
+  // Lê o corpo bruto (precisamos pra validar HMAC antes de parse).
+  const raw = await req.text();
+  const sig = verifyMetaSignature(req.headers.get("x-hub-signature-256"), raw);
+  if (!sig.ok) {
+    logger.warn("WhatsApp webhook assinatura inválida", { reason: sig.reason });
+    return Response.json({ ok: false, error: "invalid_signature" }, { status: 401 });
+  }
+
   try {
-    const body = (await req.json()) as MetaStatusWebhook;
+    const body = JSON.parse(raw) as MetaStatusWebhook;
     const statuses =
       body.entry?.flatMap(
         (e) => e.changes?.flatMap((c) => c.value?.statuses ?? []) ?? [],
@@ -49,9 +71,10 @@ export async function POST(req: Request): Promise<Response> {
       const mapped = s.status ? STATUS_MAP[s.status] : undefined;
       if (s.id && mapped) await updateMessageStatusByRef(s.id, mapped);
     }
+    logger.info("WhatsApp webhook processado", { count: statuses.length, verified: sig.verified });
     return Response.json({ ok: true });
   } catch (e) {
-    console.error("[api:whatsapp:webhook]", e);
+    logger.exception("WhatsApp webhook erro", e);
     return Response.json({ ok: false }, { status: 200 });
   }
 }
