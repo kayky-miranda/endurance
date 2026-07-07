@@ -42,3 +42,5 @@ next-env.d.ts
 
 # Previews de inspeção do gen-brand (não versionar)
 /scripts/_brand-preview/
+
+.vercel

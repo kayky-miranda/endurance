@@ -1,0 +1,10 @@
+# Não faz parte do app Next — não subir pro deploy.
+video
+endurance-video
+tests
+test-results
+playwright-report
+pix-screens
+pix-telas
+scripts/_brand-preview
+*.md
