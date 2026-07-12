@@ -121,6 +121,8 @@ export interface BillingView {
   trialEndsAt: string | null;
   /** A assinatura ainda não foi materializada no banco (default virtual). */
   virtual: boolean;
+  /** Plano aguardando confirmação de pagamento no gateway (checkout iniciado). */
+  pendingPlan: PlanId | null;
 }
 
 const PLAN_BY_ID = new Map(PLAN_CATALOG.map((p) => [p.id, p]));

@@ -105,6 +105,10 @@ model Subscription {
   // Referências do gateway de cobrança recorrente (Asaas). Null no modo manual.
   asaasCustomerId     String?
   asaasSubscriptionId String?
+  // Plano aguardando confirmação de pagamento no gateway. O checkout grava só
+  // a INTENÇÃO aqui; plano/status reais só mudam quando o webhook confirma o
+  // pagamento (PAYMENT_CONFIRMED/RECEIVED). Limpo ao aplicar ou desistir.
+  pendingPlan         String?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 

@@ -25,6 +25,7 @@ function defaultBilling(): BillingView {
     cancelAtPeriodEnd: false,
     trialEndsAt: null,
     virtual: true,
+    pendingPlan: null,
   };
 }
 
@@ -54,6 +55,7 @@ export async function loadBilling(
         cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
         trialEndsAt: sub.trialEndsAt ? sub.trialEndsAt.toISOString() : null,
         virtual: false,
+        pendingPlan: sub.pendingPlan ? asPlanId(sub.pendingPlan) : null,
       }
     : defaultBilling();
 
@@ -156,11 +158,13 @@ export type CheckoutResult =
 /**
  * Inicia a assinatura de um plano pago via gateway externo (Asaas): cria a
  * cobrança recorrente, guarda as referências do gateway e devolve o link do
- * checkout hospedado para o cliente pagar a 1ª cobrança. A confirmação de
- * pagamento chega depois pelo webhook (que mantém o status sincronizado).
+ * checkout hospedado para o cliente pagar a 1ª cobrança.
  *
- * O acesso é concedido na hora (status "active") e revogado pelo webhook se a
- * cobrança vencer sem pagamento (PAYMENT_OVERDUE → past_due).
+ * IMPORTANTE: aqui só registramos a INTENÇÃO (`pendingPlan`) — o plano e o
+ * status do espaço NÃO mudam neste momento. Quem promove o plano é o webhook
+ * (`applyGatewayEvent`), somente após o Asaas confirmar o pagamento
+ * (PAYMENT_CONFIRMED/RECEIVED). Se o usuário fechar o checkout sem pagar,
+ * nada muda na conta dele.
  */
 export async function createExternalSubscription(
   org: string,
@@ -178,12 +182,13 @@ export async function createExternalSubscription(
   if (!provider.external)
     return { ok: false, error: "Gateway de cobrança não configurado." };
 
-  const [organization, fiscal] = await Promise.all([
+  const [organization, fiscal, existing] = await Promise.all([
     prisma.organization.findUnique({ where: { id: org }, select: { name: true } }),
     prisma.fiscalConfig.findUnique({
       where: { organizationId: org },
       select: { cnpj: true },
     }),
+    prisma.subscription.findUnique({ where: { organizationId: org } }),
   ]);
   const cpfCnpj = (fiscal?.cnpj ?? "").replace(/\D/g, "");
   if (cpfCnpj.length !== 11 && cpfCnpj.length !== 14)
@@ -205,36 +210,167 @@ export async function createExternalSubscription(
   if (!created.ok || !created.subscriptionId)
     return { ok: false, error: created.error ?? "Falha ao criar a assinatura no gateway." };
 
-  const seats = plan.seats > 0 ? plan.seats : 9999;
+  // Um checkout novo substitui a assinatura anterior no gateway (se houver):
+  // cancela a antiga para não deixar cobrança órfã/duplicada rodando no Asaas.
+  if (
+    existing?.asaasSubscriptionId &&
+    existing.asaasSubscriptionId !== created.subscriptionId
+  ) {
+    const c = await provider.cancelSubscription(existing.asaasSubscriptionId);
+    if (!c.ok)
+      logger.warn("Falha ao cancelar assinatura anterior no gateway", {
+        org,
+        subscriptionId: existing.asaasSubscriptionId,
+        error: c.error,
+      });
+  }
+
+  // Materializa/atualiza a linha SEM tocar em plan/status/seats/período — só a
+  // intenção (pendingPlan) e as referências do gateway.
   const now = new Date();
-  const periodEnd = nextPeriodEnd(now);
   await prisma.subscription.upsert({
     where: { organizationId: org },
     create: {
       organizationId: org,
-      plan: plan.id,
-      status: "active",
-      seats,
+      // Espaço que nunca teve assinatura entra com o default (Starter em
+      // teste) — o plano pago só vale depois do pagamento confirmado.
+      plan: "starter",
+      status: "trialing",
+      seats: planById("starter")!.seats,
       currentPeriodStart: now,
-      currentPeriodEnd: periodEnd,
+      currentPeriodEnd: nextPeriodEnd(now),
       cancelAtPeriodEnd: false,
+      pendingPlan: plan.id,
       asaasCustomerId: created.customerId ?? null,
       asaasSubscriptionId: created.subscriptionId,
     },
     update: {
-      plan: plan.id,
-      status: "active",
-      seats,
-      currentPeriodStart: now,
-      currentPeriodEnd: periodEnd,
-      cancelAtPeriodEnd: false,
-      trialEndsAt: null,
+      pendingPlan: plan.id,
       asaasCustomerId: created.customerId ?? null,
       asaasSubscriptionId: created.subscriptionId,
     },
   });
 
   return { ok: true, redirectUrl: created.invoiceUrl ?? null };
+}
+
+export type GatewayEventResult = {
+  /** Quantas assinaturas foram alteradas (0 = evento sem correspondência). */
+  rows: number;
+  /** O evento promoveu um pendingPlan a plano efetivo. */
+  activatedPlan: PlanId | null;
+  /** O evento marcou uma assinatura ativa como inadimplente (para dunning). */
+  becamePastDue: boolean;
+};
+
+/**
+ * Aplica um evento do gateway (chamado pelo webhook, após validar o token).
+ * É o ÚNICO ponto que promove plano por pagamento — o checkout nunca o faz.
+ *
+ * Idempotente por construção: o pendingPlan é limpo na ativação, então um
+ * webhook reentregue (o Asaas reenvia até receber 200, e CONFIRMED/RECEIVED
+ * chegam em dupla para a mesma cobrança) não reaplica o plano nem emite
+ * fatura duplicada — cai no caminho de renovação, que é determinístico.
+ */
+export async function applyGatewayEvent(
+  org: string,
+  status: SubStatus,
+): Promise<GatewayEventResult> {
+  const sub = await prisma.subscription.findUnique({
+    where: { organizationId: org },
+  });
+  if (!sub) return { rows: 0, activatedPlan: null, becamePastDue: false };
+
+  const now = new Date();
+
+  if (status === "active") {
+    const pending = sub.pendingPlan ? planById(sub.pendingPlan) : undefined;
+
+    if (pending) {
+      // 1º pagamento do checkout confirmado → promove o plano pendente.
+      const seats = pending.seats > 0 ? pending.seats : 9999;
+      const periodEnd = nextPeriodEnd(now);
+      const applied = await prisma.subscription.updateMany({
+        // Guarda de idempotência: só aplica se o pendingPlan ainda é este.
+        where: { organizationId: org, pendingPlan: sub.pendingPlan },
+        data: {
+          plan: pending.id,
+          status: "active",
+          seats,
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+          cancelAtPeriodEnd: false,
+          trialEndsAt: null,
+          pendingPlan: null,
+        },
+      });
+      if (applied.count > 0) {
+        await prisma.invoice.create({
+          data: {
+            organizationId: org,
+            subscriptionId: sub.id,
+            number: await nextInvoiceNumber(org),
+            plan: pending.id,
+            amount: pending.priceMonthly ?? 0,
+            status: "paga",
+            periodStart: now,
+            periodEnd,
+            paidAt: now,
+          },
+        });
+        return { rows: 1, activatedPlan: pending.id, becamePastDue: false };
+      }
+      // Outro webhook aplicou primeiro — segue como renovação (abaixo).
+    }
+
+    // Renovação (ou reentrega do evento): confirma o status e avança o ciclo.
+    await prisma.subscription.update({
+      where: { organizationId: org },
+      data: {
+        status: "active",
+        currentPeriodStart: now,
+        currentPeriodEnd: nextPeriodEnd(now),
+      },
+    });
+    return { rows: 1, activatedPlan: null, becamePastDue: false };
+  }
+
+  // past_due/canceled com checkout pendente = o usuário desistiu ou a 1ª
+  // cobrança venceu sem pagamento. O plano atual fica intacto — só limpamos a
+  // intenção e cancelamos a assinatura órfã no gateway (best-effort).
+  if (sub.pendingPlan) {
+    if (sub.asaasSubscriptionId) {
+      const provider = resolveBillingProvider();
+      if (provider.external) {
+        const c = await provider.cancelSubscription(sub.asaasSubscriptionId);
+        if (!c.ok)
+          logger.warn("Falha ao cancelar checkout abandonado no gateway", {
+            org,
+            error: c.error,
+          });
+      }
+    }
+    await prisma.subscription.update({
+      where: { organizationId: org },
+      data: { pendingPlan: null, asaasSubscriptionId: null },
+    });
+    return { rows: 1, activatedPlan: null, becamePastDue: false };
+  }
+
+  // Assinatura já ativa que atrasou/cancelou de verdade.
+  const wasActive = sub.status === "active";
+  await prisma.subscription.update({
+    where: { organizationId: org },
+    data:
+      status === "canceled"
+        ? { status, cancelAtPeriodEnd: true }
+        : { status },
+  });
+  return {
+    rows: 1,
+    activatedPlan: null,
+    becamePastDue: status === "past_due" && wasActive,
+  };
 }
 
 /**

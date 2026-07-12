@@ -93,7 +93,12 @@ export default function BillingClient({
     seatLimit > 0 ? Math.min(100, Math.round((seatsUsed / seatLimit) * 100)) : 0;
 
   function run(
-    fn: () => Promise<{ ok: boolean; error?: string; redirectUrl?: string | null }>,
+    fn: () => Promise<{
+      ok: boolean;
+      error?: string;
+      redirectUrl?: string | null;
+      pendingPayment?: boolean;
+    }>,
     plan?: string,
   ) {
     setMsg(null);
@@ -104,10 +109,16 @@ export default function BillingClient({
       if (res.ok) {
         if (res.redirectUrl) {
           // Checkout do gateway: leva o cliente para pagar a 1ª cobrança.
+          // O plano só muda quando o webhook confirmar o pagamento.
           window.location.href = res.redirectUrl;
           return;
         }
-        setMsg({ tone: "ok", text: "Assinatura atualizada." });
+        setMsg({
+          tone: "ok",
+          text: res.pendingPayment
+            ? "Cobrança criada — o plano será ativado após a confirmação do pagamento."
+            : "Assinatura atualizada.",
+        });
         router.refresh();
       } else {
         setMsg({ tone: "err", text: res.error ?? "Não foi possível concluir." });
@@ -143,6 +154,21 @@ export default function BillingClient({
           }`}
         >
           {msg.text}
+        </div>
+      )}
+
+      {/* Checkout iniciado mas ainda sem pagamento confirmado: o plano só
+          muda quando o webhook do gateway confirmar. */}
+      {billing.pendingPlan && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+          Pagamento pendente: a mudança para o plano{" "}
+          <strong>
+            {plans.find((p) => p.id === billing.pendingPlan)?.name ??
+              billing.pendingPlan}
+          </strong>{" "}
+          será aplicada assim que o pagamento for confirmado. Enquanto isso,
+          seu plano atual permanece ativo. Se desistir, basta não concluir o
+          pagamento — nada será alterado.
         </div>
       )}
 

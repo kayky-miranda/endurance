@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { hit, clientIp } from "@/lib/rate-limit";
 import { sendPaymentOverdueEmail } from "@/lib/email";
+import { applyGatewayEvent } from "@/lib/endurance/billing-service";
 import {
   verifyAsaasWebhook,
   mapAsaasEvent,
@@ -46,24 +47,21 @@ export async function POST(request: Request) {
   const status = mapAsaasEvent(event);
 
   if (status && orgId) {
-    const updated = await prisma.subscription.updateMany({
-      where: { organizationId: orgId },
-      data:
-        status === "canceled"
-          ? { status, cancelAtPeriodEnd: true }
-          : { status },
-    });
+    // Toda a decisão (promover pendingPlan, renovar ciclo, inadimplência)
+    // vive no serviço — o webhook só valida, traduz o evento e delega.
+    const result = await applyGatewayEvent(orgId, status);
     logger.info("Webhook billing aplicado", {
       event,
       orgId,
       status,
-      rows: updated.count,
+      rows: result.rows,
+      activatedPlan: result.activatedPlan,
       verified: verify.verified,
     });
 
     // Dunning: cobrança atrasada → avisa o dono por e-mail (best-effort;
     // falha de e-mail não pode falhar o webhook, senão o gateway reentrega).
-    if (status === "past_due" && updated.count > 0) {
+    if (result.becamePastDue) {
       try {
         const [owner, org] = await Promise.all([
           prisma.user.findFirst({

@@ -11,7 +11,13 @@ import { planById, isPaidPlan } from "@/lib/endurance/billing";
 import { resolveBillingProvider } from "@/lib/endurance/billing-provider";
 import { logActivity } from "@/lib/endurance/activity-log";
 
-type R = { ok: boolean; error?: string; redirectUrl?: string | null };
+type R = {
+  ok: boolean;
+  error?: string;
+  redirectUrl?: string | null;
+  /** Checkout criado no gateway — o plano só muda após o pagamento. */
+  pendingPayment?: boolean;
+};
 
 /**
  * Troca o plano do espaço. Com gateway externo (Asaas) e plano pago, cria a
@@ -37,7 +43,7 @@ export async function changePlanAction(planId: string): Promise<R> {
       "subscription.change",
       `Iniciou a assinatura do plano ${plan.name} (checkout)`,
     );
-    return { ok: true, redirectUrl: res.redirectUrl };
+    return { ok: true, redirectUrl: res.redirectUrl, pendingPayment: true };
   }
 
   // Caminho manual (auto-gerido): troca imediata.
