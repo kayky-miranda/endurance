@@ -56,6 +56,7 @@ import {
 } from "@/lib/endurance/catalog";
 import AssistantWidget from "./assistant-widget";
 import VerifyEmailBanner from "./verify-email-banner";
+import UserMenu from "./user-menu";
 
 export type ShellModule = { id: string; label: string; core: boolean };
 
@@ -143,6 +144,16 @@ export default function Shell({
   useEffect(() => {
     localStorage.setItem("endurance-theme", dark ? "dark" : "light");
   }, [dark]);
+
+  // A página de Configurações troca o tema via este evento; o Shell (que
+  // persiste no layout entre navegações) reage ao vivo, sem exigir reload.
+  useEffect(() => {
+    function onSetTheme(e: Event) {
+      setDark((e as CustomEvent<{ dark: boolean }>).detail.dark);
+    }
+    window.addEventListener("endurance:set-theme", onSetTheme);
+    return () => window.removeEventListener("endurance:set-theme", onSetTheme);
+  }, []);
 
   // Fecha o drawer ao navegar.
   useEffect(() => setOpen(false), [pathname]);
@@ -294,8 +305,6 @@ export default function Shell({
       ? pathname === base
       : pathname === href || pathname.startsWith(`${href}/`);
 
-  const initial = (userName || "?").trim().charAt(0).toUpperCase();
-
   return (
     <div className={dark ? "dark" : ""}>
       <div className="min-h-screen bg-slate-100 text-slate-800 dark:bg-ink-950 dark:text-slate-100">
@@ -413,14 +422,7 @@ export default function Shell({
                 <Bell className="h-4 w-4" />
                 <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-brand-500" />
               </button>
-              <div className="flex items-center gap-2 pl-1">
-                <div className="grid h-9 w-9 place-items-center rounded-full bg-brand-500 text-sm font-semibold text-ink-950">
-                  {initial}
-                </div>
-                <span className="hidden text-sm font-medium sm:inline">
-                  {userName}
-                </span>
-              </div>
+              <UserMenu slug={slug} userName={userName} userEmail={userEmail} />
             </div>
           </header>
 

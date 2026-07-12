@@ -16,6 +16,7 @@ import {
   enable2faAction,
   disable2faAction,
   regenerateBackupCodesAction,
+  changePasswordAction,
 } from "./security-actions";
 
 export default function SecuritySection({
@@ -27,6 +28,7 @@ export default function SecuritySection({
 }) {
   const [setupOpen, setSetupOpen] = useState(false);
   const [disableOpen, setDisableOpen] = useState(false);
+  const [pwdOpen, setPwdOpen] = useState(false);
   const [regenCodes, setRegenCodes] = useState<string[] | null>(null);
   const [regenLoading, setRegenLoading] = useState(false);
 
@@ -54,7 +56,26 @@ export default function SecuritySection({
         especialmente para perfis com acesso a dados financeiros e fiscais.
       </p>
 
+      {/* Senha */}
       <div className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-slate-200 p-3 dark:border-ink-700">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Lock className="h-4 w-4 text-slate-400" />
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Senha</p>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            Use uma senha forte e exclusiva. Exige a senha atual para alterar.
+          </p>
+        </div>
+        <button
+          onClick={() => setPwdOpen(true)}
+          className="shrink-0 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-ink-700 dark:text-slate-200 dark:hover:bg-ink-800"
+        >
+          Alterar senha
+        </button>
+      </div>
+
+      <div className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-slate-200 p-3 dark:border-ink-700">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             {totpEnabled ? (
@@ -143,7 +164,121 @@ export default function SecuritySection({
 
       {setupOpen && <SetupModal onClose={() => setSetupOpen(false)} />}
       {disableOpen && <DisableModal onClose={() => setDisableOpen(false)} />}
+      {pwdOpen && <ChangePasswordModal onClose={() => setPwdOpen(false)} />}
     </section>
+  );
+}
+
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (next !== confirm) {
+      setError("A confirmação não confere com a nova senha.");
+      return;
+    }
+    setLoading(true);
+    const res = await changePasswordAction(current, next);
+    setLoading(false);
+    if (res.ok) {
+      setDone(true);
+      setTimeout(onClose, 1600);
+    } else {
+      setError(res.error);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-ink-900">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-bold text-slate-900 dark:text-white">Alterar senha</h3>
+          <button
+            onClick={onClose}
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-ink-800"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {done ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/40">
+            <div className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-300">
+              <Check className="h-4 w-4" />
+              Senha alterada
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="space-y-3">
+            <PwdField label="Senha atual" value={current} onChange={setCurrent} autoComplete="current-password" />
+            <PwdField label="Nova senha" value={next} onChange={setNext} autoComplete="new-password" />
+            <PwdField label="Confirmar nova senha" value={confirm} onChange={setConfirm} autoComplete="new-password" />
+            <p className="text-[11px] text-slate-500">
+              Mínimo 8 caracteres, com ao menos uma letra e um número.
+            </p>
+            {error && (
+              <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                {error}
+              </p>
+            )}
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-ink-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={loading || !current || !next || !confirm}
+                className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold hover:bg-brand-600 disabled:opacity-50"
+                style={{ color: "var(--color-button-text)" }}
+              >
+                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Salvar
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PwdField({
+  label,
+  value,
+  onChange,
+  autoComplete,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  autoComplete: string;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</span>
+      <div className="mt-1 flex items-center rounded-xl border border-slate-300 bg-white px-3 dark:border-ink-700 dark:bg-ink-800">
+        <Lock className="h-4 w-4 text-slate-400" />
+        <input
+          type="password"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required
+          autoComplete={autoComplete}
+          className="ml-2 w-full bg-transparent py-2.5 text-sm focus:outline-none dark:text-white"
+        />
+      </div>
+    </label>
   );
 }
 

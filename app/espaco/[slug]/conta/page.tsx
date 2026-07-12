@@ -13,7 +13,16 @@ export default async function MinhaContaPage({
 
   const user = await prisma.user.findUnique({
     where: { id: session.sub },
-    select: { totpEnabledAt: true, totpBackupCodes: true },
+    select: {
+      totpEnabledAt: true,
+      totpBackupCodes: true,
+      phone: true,
+      jobTitle: true,
+      profile: true,
+      createdAt: true,
+      lastLoginAt: true,
+      organization: { select: { name: true } },
+    },
   });
 
   return (
@@ -30,6 +39,12 @@ export default async function MinhaContaPage({
         email={session.email}
         role={session.role}
         emailVerified={session.emailVerified ?? false}
+        phone={user?.phone ?? ""}
+        jobTitle={user?.jobTitle ?? ""}
+        profile={user?.profile ?? ""}
+        orgName={user?.organization?.name ?? "—"}
+        createdAt={user?.createdAt?.toISOString() ?? null}
+        lastLoginAt={user?.lastLoginAt?.toISOString() ?? null}
       />
 
       <SecuritySection

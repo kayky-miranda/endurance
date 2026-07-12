@@ -3,7 +3,12 @@
 import { cookies } from "next/headers";
 import QRCode from "qrcode";
 import { prisma } from "@/lib/db";
-import { getSession, verifyPassword } from "@/lib/auth";
+import {
+  getSession,
+  verifyPassword,
+  hashPassword,
+  passwordPolicyError,
+} from "@/lib/auth";
 import {
   generateTotpSecret,
   buildOtpauthUrl,
@@ -159,5 +164,44 @@ export async function disable2faAction(password: string): Promise<R> {
 
   await logActivity(session, "2fa.disable", "2FA TOTP desativado");
   logger.info("2FA desativado", { userId: session.sub });
+  return { ok: true };
+}
+
+/**
+ * Troca de senha do próprio usuário. Exige a senha atual (defesa contra
+ * sessão sequestrada) e aplica a mesma política do cadastro (passwordPolicyError).
+ */
+export async function changePasswordAction(
+  currentPassword: string,
+  newPassword: string,
+): Promise<R> {
+  const session = await getSession();
+  if (!session) return { ok: false, error: "Sessão expirada." };
+
+  if (!(await hit(`pwd:change:${session.sub}`, 5, 60 * 60_000)).ok)
+    return { ok: false, error: "Muitas tentativas. Aguarde uma hora." };
+
+  const policyError = passwordPolicyError(newPassword);
+  if (policyError) return { ok: false, error: policyError };
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.sub },
+    select: { passwordHash: true },
+  });
+  if (!user) return { ok: false, error: "Usuário não encontrado." };
+
+  if (!(await verifyPassword(currentPassword, user.passwordHash)))
+    return { ok: false, error: "Senha atual incorreta." };
+
+  if (await verifyPassword(newPassword, user.passwordHash))
+    return { ok: false, error: "A nova senha precisa ser diferente da atual." };
+
+  await prisma.user.update({
+    where: { id: session.sub },
+    data: { passwordHash: await hashPassword(newPassword) },
+  });
+
+  await logActivity(session, "password.change", "Senha alterada");
+  logger.info("Senha alterada", { userId: session.sub });
   return { ok: true };
 }

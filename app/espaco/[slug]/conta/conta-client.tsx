@@ -1,22 +1,78 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Trash2, Loader2, ShieldCheck, ShieldAlert } from "lucide-react";
+import {
+  Download,
+  Trash2,
+  Loader2,
+  ShieldCheck,
+  ShieldAlert,
+  MailCheck,
+  Check,
+} from "lucide-react";
 import { deleteAccountAction } from "./conta-actions";
+import { resendVerificationAction } from "@/app/actions";
+
+const ROLE_LABELS: Record<string, string> = {
+  OWNER: "Proprietário",
+  ADMIN: "Administrador",
+  MEMBER: "Membro",
+};
+
+function formatDate(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function ContaClient({
   name,
   email,
   role,
   emailVerified,
+  phone,
+  jobTitle,
+  profile,
+  orgName,
+  createdAt,
+  lastLoginAt,
 }: {
   name: string;
   email: string;
   role: string;
   emailVerified: boolean;
+  phone: string;
+  jobTitle: string;
+  profile: string;
+  orgName: string;
+  createdAt: string | null;
+  lastLoginAt: string | null;
 }) {
   const [exporting, setExporting] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifySent, setVerifySent] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const initial = (name || "?").trim().charAt(0).toUpperCase();
+  const roleLabel = ROLE_LABELS[role] ?? role;
+
+  async function resendVerification() {
+    setVerifying(true);
+    setVerifyError(null);
+    const res = await resendVerificationAction();
+    setVerifying(false);
+    if (res.ok) {
+      setVerifySent(true);
+      setTimeout(() => setVerifySent(false), 8000);
+    } else {
+      setVerifyError(res.error);
+    }
+  }
 
   async function exportData() {
     setExporting(true);
@@ -45,33 +101,75 @@ export default function ContaClient({
   return (
     <>
       <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-ink-700 dark:bg-ink-900">
-        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Perfil</h2>
-        <dl className="mt-3 grid gap-2 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-slate-500">Nome</dt>
-            <dd className="text-slate-800 dark:text-slate-200">{name}</dd>
+        {/* Cabeçalho do perfil: avatar + nome + status do e-mail */}
+        <div className="flex items-center gap-4">
+          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-brand-500 text-xl font-semibold text-ink-950">
+            {initial}
           </div>
-          <div className="flex justify-between">
-            <dt className="text-slate-500">E-mail</dt>
-            <dd className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200">
-              {email}
+          <div className="min-w-0">
+            <p className="truncate text-base font-bold text-slate-900 dark:text-white">{name}</p>
+            <div className="mt-0.5 flex items-center gap-1.5 text-sm text-slate-500">
+              <span className="truncate">{email}</span>
               {emailVerified ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200">
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200">
                   <ShieldCheck className="h-3 w-3" />
-                  verificado
+                  E-mail verificado
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/60 dark:text-amber-200">
+                <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/60 dark:text-amber-200">
                   <ShieldAlert className="h-3 w-3" />
-                  não verificado
+                  E-mail não verificado
                 </span>
               )}
-            </dd>
+            </div>
           </div>
-          <div className="flex justify-between">
-            <dt className="text-slate-500">Papel</dt>
-            <dd className="text-slate-800 dark:text-slate-200">{role}</dd>
+        </div>
+
+        {/* Chamada de verificação em destaque quando o e-mail não está confirmado */}
+        {!emailVerified && (
+          <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
+            <p className="text-xs text-amber-800 dark:text-amber-200">
+              Confirme seu e-mail para liberar emissão fiscal e troca de plano. Enviamos um link para{" "}
+              <span className="font-mono">{email}</span>.
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              {verifySent ? (
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200">
+                  <Check className="h-3.5 w-3.5" />
+                  E-mail de verificação enviado
+                </span>
+              ) : (
+                <button
+                  onClick={resendVerification}
+                  disabled={verifying}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+                >
+                  {verifying ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <MailCheck className="h-3.5 w-3.5" />
+                  )}
+                  {verifying ? "Enviando…" : "Verificar e-mail"}
+                </button>
+              )}
+              {verifyError && (
+                <span className="text-xs text-rose-700 dark:text-rose-300">{verifyError}</span>
+              )}
+            </div>
           </div>
+        )}
+
+        {/* Dados detalhados */}
+        <dl className="mt-4 grid gap-x-4 gap-y-2.5 border-t border-slate-100 pt-4 text-sm sm:grid-cols-2 dark:border-ink-800">
+          <InfoRow label="Nome completo" value={name} />
+          <InfoRow label="E-mail" value={email} />
+          <InfoRow label="Telefone" value={phone || "—"} />
+          <InfoRow label="Cargo" value={jobTitle || "—"} />
+          <InfoRow label="Empresa" value={orgName} />
+          <InfoRow label="Papel / nível de acesso" value={roleLabel} />
+          {profile && <InfoRow label="Perfil" value={profile} />}
+          <InfoRow label="Conta criada em" value={formatDate(createdAt)} />
+          <InfoRow label="Último acesso" value={formatDate(lastLoginAt)} />
         </dl>
       </section>
 
@@ -121,6 +219,17 @@ export default function ContaClient({
 
       {showDelete && <DeleteConfirmModal onClose={() => setShowDelete(false)} />}
     </>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col">
+      <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+        {label}
+      </dt>
+      <dd className="mt-0.5 truncate text-slate-800 dark:text-slate-200">{value}</dd>
+    </div>
   );
 }
 

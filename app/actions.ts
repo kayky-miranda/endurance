@@ -8,6 +8,7 @@ import {
   destroySession,
   hashPassword,
   verifyPassword,
+  passwordPolicyError,
   requirePermission,
   type Role,
 } from "@/lib/auth";
@@ -27,11 +28,8 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * dicionário.
  */
 function validatePassword(pw: string): { ok: true } | { ok: false; error: string } {
-  if (pw.length < 8) return { ok: false, error: "A senha precisa ter ao menos 8 caracteres." };
-  if (pw.length > 128) return { ok: false, error: "Senha muito longa (limite 128 caracteres)." };
-  if (!/[a-zA-Z]/.test(pw)) return { ok: false, error: "A senha precisa ter ao menos uma letra." };
-  if (!/[0-9]/.test(pw)) return { ok: false, error: "A senha precisa ter ao menos um número." };
-  return { ok: true };
+  const err = passwordPolicyError(pw);
+  return err ? { ok: false, error: err } : { ok: true };
 }
 
 type AuthResult =

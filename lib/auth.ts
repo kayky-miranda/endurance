@@ -214,6 +214,19 @@ export async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, BCRYPT_ROUNDS);
 }
 
+/**
+ * Política de senha: ≥8 caracteres, com ao menos uma letra e um número.
+ * Fonte única — usada no cadastro, na recuperação e na troca de senha.
+ * Retorna a mensagem de erro (pt-BR) ou null se a senha for válida.
+ */
+export function passwordPolicyError(pw: string): string | null {
+  if (pw.length < 8) return "A senha precisa ter ao menos 8 caracteres.";
+  if (pw.length > 128) return "Senha muito longa (limite 128 caracteres).";
+  if (!/[a-zA-Z]/.test(pw)) return "A senha precisa ter ao menos uma letra.";
+  if (!/[0-9]/.test(pw)) return "A senha precisa ter ao menos um número.";
+  return null;
+}
+
 export async function verifyPassword(
   plain: string,
   hash: string,
