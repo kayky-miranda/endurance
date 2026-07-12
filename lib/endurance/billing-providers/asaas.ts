@@ -15,7 +15,18 @@ import type {
  * Docs: https://docs.asaas.com/
  */
 
-const API_KEY = process.env.ASAAS_API_KEY;
+// A chave do Asaas contém `$` (`$aact_prod_...`), que o pipeline de env da
+// Vercel esvazia. Fallback: `ASAAS_API_KEY_B64` (base64, sem `$`) é decodificada
+// aqui. Preferimos a chave direta se ela vier preenchida.
+function resolveApiKey(): string | undefined {
+  const direct = process.env.ASAAS_API_KEY;
+  if (direct) return direct;
+  const b64 = process.env.ASAAS_API_KEY_B64;
+  if (b64) return Buffer.from(b64, "base64").toString("utf8");
+  return undefined;
+}
+
+const API_KEY = resolveApiKey();
 const ENV = process.env.ASAAS_ENV === "production" ? "production" : "sandbox";
 const BASE =
   ENV === "production"

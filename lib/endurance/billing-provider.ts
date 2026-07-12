@@ -47,5 +47,10 @@ import { manualProvider } from "./billing-providers/manual";
 
 /** Escolhe o provedor conforme as envs disponíveis. */
 export function resolveBillingProvider(): BillingProvider {
-  return process.env.ASAAS_API_KEY ? asaasProvider : manualProvider;
+  // ASAAS_API_KEY tem `$` e a Vercel a esvazia; ASAAS_API_KEY_B64 (base64) é o
+  // fallback à prova de `$`. Qualquer um dos dois habilita o gateway Asaas.
+  const hasAsaas = Boolean(
+    process.env.ASAAS_API_KEY || process.env.ASAAS_API_KEY_B64,
+  );
+  return hasAsaas ? asaasProvider : manualProvider;
 }
