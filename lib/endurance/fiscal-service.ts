@@ -19,6 +19,7 @@ import {
   type FiscalAmbiente,
   type FiscalProvider,
   type NfceEmitInput,
+  type NfceEmitItem,
 } from "./fiscal-provider";
 import { fetchXmlContent } from "./fiscal-xml";
 import { logger } from "@/lib/logger";
@@ -141,6 +142,53 @@ export async function emitNfce(org: string, saleId: string): Promise<EmitResult>
 }
 
 /** Emissão real via provedor: o provedor assina/transmite e devolve a chave. */
+/** Item de venda com o mínimo necessário para montar a linha fiscal. */
+interface SaleLineLike {
+  productId: string | null;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+}
+interface ProductFiscal {
+  id: string;
+  ncm: string;
+  unit: string;
+}
+
+/**
+ * Resolve NCM e unidade de cada item da nota (função pura, testável).
+ * Regra: usa o NCM do PRODUTO (8 díg.) quando houver; senão o NCM padrão da
+ * empresa. A unidade vem do produto (fallback "UN"). Coleta em `semNcm` os
+ * itens que ficaram sem NCM válido, para o chamador bloquear a emissão.
+ */
+export function resolveNfceItems(
+  items: SaleLineLike[],
+  products: ProductFiscal[],
+  companyDefaultNcm: string,
+): { itens: NfceEmitItem[]; semNcm: string[] } {
+  const defaultNcm = (companyDefaultNcm ?? "").replace(/\D/g, "");
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const semNcm: string[] = [];
+
+  const itens = items.map((it) => {
+    const prod = it.productId ? byId.get(it.productId) : undefined;
+    const prodNcm = (prod?.ncm ?? "").replace(/\D/g, "");
+    const ncm = prodNcm.length === 8 ? prodNcm : defaultNcm;
+    if (ncm.length !== 8) semNcm.push(it.name);
+    return {
+      codigo: it.productId ?? "",
+      descricao: it.name,
+      ncm,
+      cfop: "5102",
+      unidade: (prod?.unit || "un").toUpperCase(),
+      quantidade: it.quantity,
+      valorUnitario: it.unitPrice,
+    };
+  });
+
+  return { itens, semNcm };
+}
+
 async function emitNfceViaProvider(
   org: string,
   sale: SaleWithRelations,
@@ -148,13 +196,39 @@ async function emitNfceViaProvider(
   ambiente: FiscalAmbiente,
   provider: FiscalProvider,
 ): Promise<EmitResult> {
-  const ncm = (cfg.defaultNcm ?? "").replace(/\D/g, "");
-  if (ncm.length !== 8)
+  // Carrega os produtos das linhas para usar NCM e unidade REAIS de cada item;
+  // o defaultNcm da empresa só entra como fallback quando o produto não tem NCM.
+  const productIds = sale.items
+    .map((it) => it.productId)
+    .filter((id): id is string => Boolean(id));
+  const products = productIds.length
+    ? await prisma.product.findMany({
+        where: { organizationId: org, id: { in: productIds } },
+        select: { id: true, ncm: true, unit: true },
+      })
+    : [];
+
+  const resolved = resolveNfceItems(
+    sale.items.map((it) => ({
+      productId: it.productId,
+      name: it.name,
+      quantity: it.quantity,
+      unitPrice: money(it.unitPrice),
+    })),
+    products,
+    cfg.defaultNcm,
+  );
+
+  // A SEFAZ valida o NCM (8 díg.) de cada item — bloqueia antes de transmitir
+  // se algum item ficou sem NCM próprio E sem NCM padrão da empresa.
+  if (resolved.semNcm.length)
     return {
       ok: false,
       error:
-        "Configure o NCM padrão (8 dígitos) dos produtos antes de emitir com o provedor real.",
+        `Sem NCM (8 dígitos) para: ${resolved.semNcm.join(", ")}. ` +
+        "Defina o NCM no cadastro do produto ou configure o NCM padrão da empresa na aba Fiscal.",
     };
+  const itens = resolved.itens;
 
   const emissao = new Date();
   const input: NfceEmitInput = {
@@ -165,15 +239,7 @@ async function emitNfceViaProvider(
     dest: sale.customer?.document
       ? { nome: sale.customer.name, doc: sale.customer.document }
       : null,
-    itens: sale.items.map((it) => ({
-      codigo: it.productId ?? "",
-      descricao: it.name,
-      ncm,
-      cfop: "5102",
-      unidade: "UN",
-      quantidade: it.quantity,
-      valorUnitario: money(it.unitPrice),
-    })),
+    itens,
     pagamentos: sale.payments.map((p) => ({
       metodo: p.method,
       valor: money(p.amount),

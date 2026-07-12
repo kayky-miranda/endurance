@@ -496,6 +496,7 @@ model Product {
   cost           Decimal  @default(0) @db.Decimal(12, 2)
   stock          Int      @default(0)
   unit           String   @default("un") // unidade (un, cx, kg, l...)
+  ncm            String   @default("") // NCM fiscal do produto (8 díg.); vazio = usa o defaultNcm da empresa
   minStock       Int      @default(0) // estoque mínimo (ponto de alerta/reposição)
   createdAt      DateTime @default(now())
 

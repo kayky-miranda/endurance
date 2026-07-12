@@ -42,6 +42,7 @@ export default function ProductsClient({
   const [name, setName] = useState("");
   const [barcode, setBarcode] = useState("");
   const [category, setCategory] = useState("");
+  const [ncm, setNcm] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [busy, setBusy] = useState(false);
@@ -56,6 +57,7 @@ export default function ProductsClient({
       name,
       barcode,
       category,
+      ncm,
       price: parseFloat(price.replace(",", ".")) || 0,
       stock: parseInt(stock, 10) || 0,
     });
@@ -64,6 +66,7 @@ export default function ProductsClient({
       setName("");
       setBarcode("");
       setCategory("");
+      setNcm("");
       setPrice("");
       setStock("");
       router.refresh();
@@ -108,6 +111,14 @@ export default function ProductsClient({
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="Categoria"
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+            />
+            <input
+              value={ncm}
+              onChange={(e) => setNcm(e.target.value.replace(/\D/g, "").slice(0, 8))}
+              inputMode="numeric"
+              placeholder="NCM (8 díg., fiscal)"
+              title="Código NCM do produto para emissão de nota fiscal. Deixe vazio para usar o NCM padrão da empresa."
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
             />
             <input

@@ -16,6 +16,7 @@ export interface NewProduct {
   name: string;
   barcode?: string;
   category?: string;
+  ncm?: string;
   price?: number;
   stock?: number;
 }
@@ -33,7 +34,7 @@ export async function createProductAction(input: NewProduct): Promise<Result> {
 
   const parsed = ProductSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
-  const { name, barcode, category, price, stock: initial } = parsed.data;
+  const { name, barcode, category, ncm, price, stock: initial } = parsed.data;
 
   if (barcode) {
     const dup = await prisma.product.findFirst({
@@ -55,6 +56,7 @@ export async function createProductAction(input: NewProduct): Promise<Result> {
         name,
         barcode,
         category,
+        ncm,
         price,
         stock: 0,
       },

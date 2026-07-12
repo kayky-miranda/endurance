@@ -92,6 +92,17 @@ export const ProductSchema = z.object({
     .max(120, "Nome do produto muito longo."),
   barcode: z.string().trim().max(64, "Código de barras muito longo.").optional().default(""),
   category: z.string().trim().max(80, "Categoria muito longa.").optional().default(""),
+  // NCM fiscal (8 dígitos). Opcional: vazio herda o NCM padrão da empresa na
+  // emissão. Se informado, exige exatamente 8 dígitos (padrão SEFAZ).
+  ncm: z
+    .string()
+    .trim()
+    .optional()
+    .default("")
+    .transform((s) => s.replace(/\D/g, ""))
+    .refine((s) => s === "" || s.length === 8, {
+      message: "O NCM deve ter 8 dígitos.",
+    }),
   price: z
     .coerce.number()
     .catch(0)
