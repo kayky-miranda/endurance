@@ -20,6 +20,7 @@ import { getSalesSummary } from "@/lib/endurance/sales-analytics";
 import { money } from "@/lib/endurance/money";
 import { SalesByDayChart, PaymentMixChart } from "./m/charts-lazy";
 import OnboardingChecklist from "./onboarding-checklist";
+import { KpiCard } from "./m/module-kit";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -92,7 +93,6 @@ export default async function EspacoPage({
       sub: `Hoje: ${brl(summary?.hojeFaturamento ?? 0)}`,
       icon: DollarSign,
       from: "from-cyan-500",
-      to: "to-cyan-600",
     },
     {
       label: "Vendas (30d)",
@@ -100,7 +100,6 @@ export default async function EspacoPage({
       sub: `Hoje: ${summary?.hojeVendas ?? 0}`,
       icon: ShoppingCart,
       from: "from-violet-500",
-      to: "to-violet-600",
     },
     {
       label: "Ticket médio",
@@ -108,7 +107,6 @@ export default async function EspacoPage({
       sub: `${summary?.itens ?? 0} itens vendidos`,
       icon: TrendingUp,
       from: "from-emerald-500",
-      to: "to-emerald-600",
     },
     {
       label: "Clientes",
@@ -116,7 +114,6 @@ export default async function EspacoPage({
       sub: "cadastrados",
       icon: Users,
       from: "from-amber-500",
-      to: "to-amber-600",
     },
   ];
 
@@ -141,21 +138,14 @@ export default async function EspacoPage({
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((s) => (
-          <div
+          <KpiCard
             key={s.label}
-            className={`rounded-2xl bg-gradient-to-br ${s.from} ${s.to} p-5 text-white shadow-lg`}
-          >
-            <div className="flex items-start justify-between">
-              <div className="min-w-0">
-                <p className="text-sm/5 text-white/80">{s.label}</p>
-                <p className="mt-1 truncate text-2xl font-bold">{s.value}</p>
-              </div>
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/20">
-                <s.icon className="h-5 w-5" />
-              </div>
-            </div>
-            <p className="mt-3 text-xs text-white/90">{s.sub}</p>
-          </div>
+            label={s.label}
+            value={s.value}
+            sub={s.sub}
+            icon={s.icon}
+            from={s.from}
+          />
         ))}
       </div>
 

@@ -469,13 +469,25 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition ${
+      title={label}
+      className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-colors duration-150 ${
         active
           ? "bg-brand-500/15 font-medium text-brand-300"
-          : "text-slate-400 hover:bg-ink-800 hover:text-slate-100"
+          : "text-slate-400 hover:bg-ink-800/80 hover:text-slate-100"
       }`}
     >
-      <Icon className="h-4 w-4 shrink-0" />
+      {/* Indicador do item ativo (barra de acento à esquerda) */}
+      <span
+        className={`absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r bg-brand-400 transition-opacity ${
+          active ? "opacity-100" : "opacity-0"
+        }`}
+        aria-hidden
+      />
+      <Icon
+        className={`h-4 w-4 shrink-0 transition-transform duration-150 ${
+          active ? "" : "group-hover:translate-x-0.5"
+        }`}
+      />
       <span className="truncate">{label}</span>
     </Link>
   );

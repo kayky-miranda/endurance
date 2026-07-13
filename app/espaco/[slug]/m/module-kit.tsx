@@ -107,35 +107,98 @@ export function EmptyCard({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * KPI do Design System — padrão premium/neutro (referência: Linear/Stripe):
+ * fundo neutro, borda sutil, ícone em chip colorido e valor em destaque
+ * tipográfico. A cor de acento aparece SÓ no chip do ícone — nunca domina o
+ * card (os antigos gradientes fortes viravam um arco-íris no dashboard).
+ *
+ * Compat: as props `from`/`to` dos call-sites antigos ("from-cyan-500" etc.)
+ * seguem aceitas — `from` vira o tom de acento do chip e `to` é ignorada.
+ */
+const KPI_TONES: Record<string, { chip: string; ring: string }> = {
+  cyan: {
+    chip: "bg-brand-500/10 text-brand-600 dark:text-brand-300",
+    ring: "hover:border-brand-500/40",
+  },
+  violet: {
+    chip: "bg-violet-500/10 text-violet-600 dark:text-violet-300",
+    ring: "hover:border-violet-500/40",
+  },
+  emerald: {
+    chip: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
+    ring: "hover:border-emerald-500/40",
+  },
+  amber: {
+    chip: "bg-amber-500/10 text-amber-600 dark:text-amber-300",
+    ring: "hover:border-amber-500/40",
+  },
+  orange: {
+    chip: "bg-amber-500/10 text-amber-600 dark:text-amber-300",
+    ring: "hover:border-amber-500/40",
+  },
+  rose: {
+    chip: "bg-rose-500/10 text-rose-600 dark:text-rose-300",
+    ring: "hover:border-rose-500/40",
+  },
+  red: {
+    chip: "bg-rose-500/10 text-rose-600 dark:text-rose-300",
+    ring: "hover:border-rose-500/40",
+  },
+  sky: {
+    chip: "bg-sky-500/10 text-sky-600 dark:text-sky-300",
+    ring: "hover:border-sky-500/40",
+  },
+  indigo: {
+    chip: "bg-violet-500/10 text-violet-600 dark:text-violet-300",
+    ring: "hover:border-violet-500/40",
+  },
+};
+
+function kpiTone(from?: string) {
+  const color = (from ?? "").match(/from-([a-z]+)-/)?.[1] ?? "cyan";
+  return KPI_TONES[color] ?? KPI_TONES.cyan;
+}
+
 export function KpiCard({
   icon: Icon,
   label,
   value,
   sub,
   from,
-  to,
 }: {
   icon: LucideIcon;
   label: string;
   value: string;
   sub?: string;
-  from: string;
-  to: string;
+  /** Legado: "from-cyan-500" etc. — usado só para derivar o tom do chip. */
+  from?: string;
+  /** Legado: ignorado (o gradiente foi substituído pelo padrão neutro). */
+  to?: string;
 }) {
+  const t = kpiTone(from);
   return (
     <div
-      className={`rounded-2xl bg-gradient-to-br ${from} ${to} p-5 text-white shadow-lg`}
+      className={`group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-ink-700 dark:bg-ink-900 ${t.ring}`}
     >
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm/5 text-white/80">{label}</p>
-          <p className="mt-1 truncate text-2xl font-bold">{value}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            {label}
+          </p>
+          <p className="mt-1.5 truncate text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            {value}
+          </p>
         </div>
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/20">
+        <span
+          className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl transition group-hover:scale-110 ${t.chip}`}
+        >
           <Icon className="h-5 w-5" />
-        </div>
+        </span>
       </div>
-      {sub && <p className="mt-3 text-xs text-white/90">{sub}</p>}
+      {sub && (
+        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{sub}</p>
+      )}
     </div>
   );
 }

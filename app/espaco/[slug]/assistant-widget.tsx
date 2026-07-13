@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  X,
   Send,
   Sparkles,
   Plus,
@@ -12,6 +11,7 @@ import {
   AlertTriangle,
   CircleDollarSign,
   BarChart3,
+  RotateCcw,
 } from "lucide-react";
 import type { AssistantEvent, Widget } from "@/lib/endurance/assistant";
 import MrChippy from "./mr-chippy";
@@ -49,6 +49,9 @@ function greeting(name?: string): string {
   const first = (name ?? "").trim().split(/\s+/)[0];
   return first ? `${part}, ${first}!` : `${part}!`;
 }
+
+/** Posição persistida do widget (top-left, px). null = padrão (canto inferior direito). */
+const POS_KEY = "endurance:chippy-pos";
 
 export default function AssistantWidget({ userName }: { userName?: string }) {
   const [open, setOpen] = useState(false);
@@ -155,13 +158,123 @@ export default function AssistantWidget({ userName }: { userName?: string }) {
     }
   }
 
+  /* ---------------- Drag & drop do widget ---------------- */
+  // pos = coordenadas top-left do contêiner; null = posição padrão (CSS).
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef({ px: 0, py: 0, ox: 0, oy: 0, moved: false });
+  // Após um arrasto, suprime o clique que o navegador dispara no pointerup —
+  // é isso que diferencia "arrastar" de "clicar para abrir".
+  const suppressClick = useRef(false);
+
+  const clampPos = (p: { x: number; y: number }) => {
+    const el = boxRef.current;
+    const w = el?.offsetWidth ?? 380;
+    const h = el?.offsetHeight ?? 64;
+    const M = 8; // margem mínima até a borda da viewport
+    return {
+      x: Math.min(Math.max(M, p.x), Math.max(M, window.innerWidth - w - M)),
+      y: Math.min(Math.max(M, p.y), Math.max(M, window.innerHeight - h - M)),
+    };
+  };
+
+  // Restaura a última posição salva (e garante que ela cabe na tela atual).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(POS_KEY);
+      if (!raw) return;
+      const p = JSON.parse(raw) as { x?: number; y?: number };
+      if (typeof p.x === "number" && typeof p.y === "number")
+        setPos(clampPos({ x: p.x, y: p.y }));
+    } catch {
+      /* posição corrompida → fica no padrão */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Mantém dentro da viewport ao redimensionar a janela e ao abrir o painel
+  // (o painel é maior que o botão flutuante).
+  useEffect(() => {
+    const reclamp = () => setPos((p) => (p ? clampPos(p) : p));
+    window.addEventListener("resize", reclamp);
+    const raf = requestAnimationFrame(reclamp);
+    return () => {
+      window.removeEventListener("resize", reclamp);
+      cancelAnimationFrame(raf);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  /** Inicia o arrasto (mouse OU touch, via Pointer Events). */
+  function startDrag(e: React.PointerEvent) {
+    // Botões dentro do header continuam clicáveis sem virar arrasto.
+    if ((e.target as HTMLElement).closest("[data-no-drag]")) return;
+    const el = boxRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    dragRef.current = {
+      px: e.clientX,
+      py: e.clientY,
+      ox: r.left,
+      oy: r.top,
+      moved: false,
+    };
+    const onMove = (ev: PointerEvent) => {
+      const d = dragRef.current;
+      const dx = ev.clientX - d.px;
+      const dy = ev.clientY - d.py;
+      // Limiar de 6px: abaixo disso é clique, não arrasto.
+      if (!d.moved && Math.hypot(dx, dy) < 6) return;
+      d.moved = true;
+      setPos(clampPos({ x: d.ox + dx, y: d.oy + dy }));
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      if (dragRef.current.moved) {
+        suppressClick.current = true;
+        setTimeout(() => (suppressClick.current = false), 0);
+        setPos((p) => {
+          if (p)
+            try {
+              localStorage.setItem(POS_KEY, JSON.stringify(p));
+            } catch {
+              /* storage cheio/bloqueado — segue sem persistir */
+            }
+          return p;
+        });
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
+  /** Volta o widget pra posição padrão (canto inferior direito). */
+  function resetPosition() {
+    setPos(null);
+    try {
+      localStorage.removeItem(POS_KEY);
+    } catch {
+      /* noop */
+    }
+  }
+
   return (
-    <>
+    <div
+      ref={boxRef}
+      className={`fixed z-50 ${pos ? "" : "bottom-5 right-5"}`}
+      style={pos ? { left: pos.x, top: pos.y } : undefined}
+    >
       {!open && (
         <button
-          onClick={() => setOpen(true)}
+          onPointerDown={startDrag}
+          onClick={() => {
+            if (suppressClick.current) return;
+            setOpen(true);
+          }}
           aria-label="Abrir o Mr. Chippy"
-          className="group fixed bottom-5 right-5 z-50 inline-flex items-center gap-2 rounded-full bg-brand-500 py-2 pl-2 pr-4 text-sm font-semibold text-ink-950 shadow-lg shadow-black/20 transition hover:bg-brand-400"
+          title="Clique para abrir · arraste para mover"
+          className="group inline-flex cursor-grab touch-none items-center gap-2 rounded-full bg-brand-500 py-2 pl-2 pr-4 text-sm font-semibold text-ink-950 shadow-lg shadow-black/20 transition hover:bg-brand-400 active:cursor-grabbing"
         >
           <span className="relative grid h-9 w-9 place-items-center">
             <span className="pulse-ring absolute inset-0 rounded-full bg-brand-300/50" />
@@ -174,9 +287,12 @@ export default function AssistantWidget({ userName }: { userName?: string }) {
       )}
 
       {open && (
-        <div className="fixed bottom-5 right-5 z-50 flex h-[min(88vh,680px)] w-[min(94vw,440px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-black/30 dark:border-ink-700 dark:bg-ink-900">
-          {/* Header */}
-          <header className="flex items-center gap-3 border-b border-slate-200 bg-gradient-to-r from-brand-500/15 to-transparent px-4 py-3 dark:border-ink-800">
+        <div className="chippy-pop flex h-[min(88vh,680px)] w-[min(94vw,440px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-black/30 dark:border-ink-700 dark:bg-ink-900">
+          {/* Header — também é a alça de arrasto do painel aberto */}
+          <header
+            onPointerDown={startDrag}
+            className="flex cursor-grab touch-none select-none items-center gap-3 border-b border-slate-200 bg-gradient-to-r from-brand-500/15 to-transparent px-4 py-3 active:cursor-grabbing dark:border-ink-800"
+          >
             <div className="grid h-9 w-9 place-items-center rounded-xl bg-brand-500/20 ring-1 ring-brand-500/30">
               <MrChippy className="h-7 w-7" mood={busy ? "thinking" : "idle"} />
             </div>
@@ -188,8 +304,19 @@ export default function AssistantWidget({ userName }: { userName?: string }) {
                 Seu companheiro de bordo · consulta dados em tempo real
               </p>
             </div>
+            {pos && (
+              <button
+                data-no-drag
+                onClick={resetPosition}
+                title="Restaurar posição padrão"
+                className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-ink-800 dark:hover:text-slate-200"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            )}
             {msgs.length > 0 && (
               <button
+                data-no-drag
                 onClick={() => setMsgs([])}
                 title="Nova conversa"
                 className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-ink-800 dark:hover:text-slate-200"
@@ -198,11 +325,13 @@ export default function AssistantWidget({ userName }: { userName?: string }) {
               </button>
             )}
             <button
+              data-no-drag
               onClick={() => setOpen(false)}
+              title="Minimizar"
               className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-ink-800 dark:hover:text-slate-200"
-              aria-label="Fechar"
+              aria-label="Minimizar"
             >
-              <X className="h-5 w-5" />
+              <Minus className="h-5 w-5" />
             </button>
           </header>
 
@@ -263,7 +392,7 @@ export default function AssistantWidget({ userName }: { userName?: string }) {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
