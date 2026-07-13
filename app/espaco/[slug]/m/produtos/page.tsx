@@ -24,6 +24,8 @@ export default async function ProdutosPage({
     name: p.name,
     barcode: p.barcode,
     category: p.category,
+    ncm: p.ncm,
+    unit: p.unit,
     price: money(p.price),
     stock: p.stock,
   }));

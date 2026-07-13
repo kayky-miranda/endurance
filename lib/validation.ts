@@ -103,6 +103,14 @@ export const ProductSchema = z.object({
     .refine((s) => s === "" || s.length === 8, {
       message: "O NCM deve ter 8 dígitos.",
     }),
+  // Unidade comercial (un, cx, kg, l...). Usada na emissão fiscal.
+  unit: z
+    .string()
+    .trim()
+    .max(10, "Unidade muito longa.")
+    .optional()
+    .default("un")
+    .transform((s) => (s ? s.toLowerCase() : "un")),
   price: z
     .coerce.number()
     .catch(0)

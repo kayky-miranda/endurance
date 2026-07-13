@@ -78,6 +78,58 @@ export async function createProductAction(input: NewProduct): Promise<Result> {
   return { ok: true };
 }
 
+export interface EditProduct {
+  id: string;
+  name: string;
+  barcode?: string;
+  category?: string;
+  ncm?: string;
+  unit?: string;
+  price?: number;
+}
+
+/**
+ * Edita os dados cadastrais do produto (nome, categoria, código de barras,
+ * NCM, unidade e preço). O ESTOQUE não é alterado aqui — ele tem origem
+ * auditável pelo razão (adjustStockAction), então continua com os botões +/−.
+ */
+export async function updateProductAction(input: EditProduct): Promise<Result> {
+  const gate = await requirePermission("products.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+
+  const id = (input.id ?? "").trim();
+  if (!id) return { ok: false, error: "Produto inválido." };
+
+  const parsed = ProductSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const { name, barcode, category, ncm, unit, price } = parsed.data;
+
+  const existing = await prisma.product.findUnique({ where: { id } });
+  if (!existing || existing.organizationId !== s.org)
+    return { ok: false, error: "Produto não encontrado." };
+
+  // Código de barras é único por empresa — ignora o próprio produto na checagem.
+  if (barcode) {
+    const dup = await prisma.product.findFirst({
+      where: { organizationId: s.org, barcode, id: { not: id } },
+    });
+    if (dup)
+      return {
+        ok: false,
+        error: "Já existe um produto com esse código de barras.",
+      };
+  }
+
+  await prisma.product.update({
+    where: { id },
+    data: { name, barcode, category, ncm, unit, price },
+  });
+  revalidate(s.slug);
+  await logActivity(s, "product.update", `Editou o produto ${name}`, id);
+  return { ok: true };
+}
+
 export async function deleteProductAction(id: string): Promise<Result> {
   const gate = await requirePermission("products.manage");
   if (!gate.ok) return gate;
