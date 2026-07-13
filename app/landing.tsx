@@ -87,6 +87,108 @@ function Reveal({
   );
 }
 
+/**
+ * Contador animado: sobe até o valor quando entra na viewport (easing cúbico).
+ * Respeita prefers-reduced-motion (pula direto pro valor final).
+ */
+function CountUp({
+  to,
+  prefix = "",
+  suffix = "",
+  decimals = 0,
+  duration = 1400,
+}: {
+  to: number;
+  prefix?: string;
+  suffix?: string;
+  decimals?: number;
+  duration?: number;
+}) {
+  const ref = useRef<HTMLSpanElement | null>(null);
+  const [val, setVal] = useState(0);
+  const [started, setStarted] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setStarted(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.4 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!started) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setVal(to);
+      return;
+    }
+    let raf = 0;
+    const t0 = performance.now();
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - t0) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setVal(to * eased);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    // Garantia: se o rAF for suprimido (aba em segundo plano etc.), o valor
+    // final entra mesmo assim.
+    const guard = setTimeout(() => setVal(to), duration + 300);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(guard);
+    };
+  }, [started, to, duration]);
+
+  return (
+    <span ref={ref}>
+      {prefix}
+      {val.toLocaleString("pt-BR", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      })}
+      {suffix}
+    </span>
+  );
+}
+
+/**
+ * Card com spotlight: um realce radial segue o cursor (CSS vars --mx/--my
+ * lidas pelo ::before de .spot-card). Custo ~zero: só estilo, sem re-render.
+ */
+function SpotlightCard({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  return (
+    <div
+      ref={ref}
+      onMouseMove={(e) => {
+        const el = ref.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        el.style.setProperty("--mx", `${e.clientX - r.left}px`);
+        el.style.setProperty("--my", `${e.clientY - r.top}px`);
+      }}
+      className={`spot-card ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 /* ================================================================== *
  * LANDING
  * ================================================================== */
@@ -126,11 +228,28 @@ const NAV_LINKS = [
 function Navbar() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [active, setActive] = useState("");
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Scroll-spy: destaca o link da seção visível (faixa central da viewport).
+  useEffect(() => {
+    const els = NAV_LINKS.map((l) =>
+      document.getElementById(l.href.slice(1)),
+    ).filter((el): el is HTMLElement => Boolean(el));
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries)
+          if (e.isIntersecting) setActive(`#${e.target.id}`);
+      },
+      { rootMargin: "-40% 0px -55% 0px" },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
   }, []);
 
   return (
@@ -157,7 +276,11 @@ function Navbar() {
             <a
               key={l.href}
               href={l.href}
-              className="text-sm text-slate-400 transition hover:text-slate-100"
+              className={`nav-link text-sm transition ${
+                active === l.href
+                  ? "active text-slate-100"
+                  : "text-slate-400 hover:text-slate-100"
+              }`}
             >
               {l.label}
             </a>
@@ -190,7 +313,7 @@ function Navbar() {
       </div>
 
       {open && (
-        <div className="border-t border-ink-800 bg-ink-950/95 px-5 py-4 backdrop-blur-xl md:hidden">
+        <div className="menu-in border-t border-ink-800 bg-ink-950/95 px-5 py-4 backdrop-blur-xl md:hidden">
           <div className="flex flex-col gap-1">
             {NAV_LINKS.map((l) => (
               <a
@@ -242,7 +365,9 @@ function Hero() {
             <h1 className="mt-6 text-4xl font-bold leading-[1.06] tracking-tight sm:text-6xl">
               A gestão completa da sua empresa,
               <br className="hidden sm:block" />{" "}
-              <span className="text-gradient">guiada por inteligência</span>
+              <span className="text-gradient shine-text">
+                guiada por inteligência
+              </span>
             </h1>
           </Reveal>
           <Reveal delay={120}>
@@ -297,6 +422,22 @@ function Hero() {
 
 function DashboardMock() {
   const bars = [38, 52, 44, 70, 58, 86, 64, 92, 76];
+  const tiltRef = useRef<HTMLDivElement | null>(null);
+
+  // Tilt 3D sutil seguindo o cursor (só em ponteiro fino; reset ao sair).
+  function onTilt(e: React.MouseEvent<HTMLDivElement>) {
+    const el = tiltRef.current;
+    if (!el || !window.matchMedia("(pointer: fine)").matches) return;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - 0.5;
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    el.style.transform = `perspective(1200px) rotateX(${(-py * 3.5).toFixed(2)}deg) rotateY(${(px * 5).toFixed(2)}deg)`;
+  }
+  function resetTilt() {
+    const el = tiltRef.current;
+    if (el) el.style.transform = "";
+  }
+
   return (
     <div className="relative mx-auto max-w-5xl">
       {/* halo */}
@@ -304,7 +445,12 @@ function DashboardMock() {
         className="absolute -inset-x-10 -top-10 bottom-0 -z-10 rounded-[40px] bg-brand-500/20 blur-3xl"
         aria-hidden
       />
-      <div className="ring-gradient overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/80 shadow-2xl shadow-black/50 backdrop-blur glow">
+      <div
+        ref={tiltRef}
+        onMouseMove={onTilt}
+        onMouseLeave={resetTilt}
+        className="tilt ring-gradient overflow-hidden rounded-2xl border border-ink-700 bg-ink-900/80 shadow-2xl shadow-black/50 backdrop-blur glow"
+      >
         {/* janela */}
         <div className="flex items-center gap-2 border-b border-ink-800 bg-ink-950/60 px-4 py-2.5">
           <span className="h-3 w-3 rounded-full bg-red-400/70" />
@@ -344,8 +490,12 @@ function DashboardMock() {
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <p className="text-xs text-slate-500">Painel executivo</p>
-                <p className="text-sm font-semibold text-slate-100">
+                <p className="flex items-center gap-2 text-sm font-semibold text-slate-100">
                   Visão geral · Junho
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-medium text-emerald-300">
+                    <span className="pulse-dot inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    ao vivo
+                  </span>
                 </p>
               </div>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-500/15 px-2.5 py-1 text-[11px] text-brand-200">
@@ -355,9 +505,9 @@ function DashboardMock() {
 
             <div className="grid grid-cols-3 gap-3">
               {[
-                { l: "Faturamento", v: "R$ 248,7k", d: "+12,4%" },
-                { l: "Margem", v: "34,2%", d: "+2,1%" },
-                { l: "Ticket médio", v: "R$ 86,40", d: "+5,7%" },
+                { l: "Faturamento", to: 248.7, prefix: "R$ ", suffix: "k", decimals: 1, d: "+12,4%" },
+                { l: "Margem", to: 34.2, prefix: "", suffix: "%", decimals: 1, d: "+2,1%" },
+                { l: "Ticket médio", to: 86.4, prefix: "R$ ", suffix: "", decimals: 2, d: "+5,7%" },
               ].map((k) => (
                 <div
                   key={k.l}
@@ -365,7 +515,12 @@ function DashboardMock() {
                 >
                   <p className="text-[11px] text-slate-500">{k.l}</p>
                   <p className="mt-1 text-base font-semibold text-slate-100 sm:text-lg">
-                    {k.v}
+                    <CountUp
+                      to={k.to}
+                      prefix={k.prefix}
+                      suffix={k.suffix}
+                      decimals={k.decimals}
+                    />
                   </p>
                   <p className="text-[11px] font-medium text-emerald-400">
                     {k.d}
@@ -385,8 +540,8 @@ function DashboardMock() {
                 {bars.map((h, i) => (
                   <div
                     key={i}
-                    className="flex-1 rounded-t bg-gradient-to-t from-brand-600/40 to-brand-400"
-                    style={{ height: `${h}%` }}
+                    className="bar-grow flex-1 rounded-t bg-gradient-to-t from-brand-600/40 to-brand-400 transition-colors hover:to-brand-300"
+                    style={{ height: `${h}%`, animationDelay: `${300 + i * 70}ms` }}
                   />
                 ))}
               </div>
@@ -427,18 +582,34 @@ function DashboardMock() {
  * Trust strip
  * ------------------------------------------------------------------ */
 function TrustStrip() {
-  const stats = [
-    { v: "+40%", l: "produtividade da equipe" },
-    { v: "-30%", l: "tempo em tarefas manuais" },
-    { v: "99,9%", l: "disponibilidade" },
-    { v: "1 só", l: "lugar para tudo" },
+  const stats: {
+    l: string;
+    to?: number;
+    prefix?: string;
+    suffix?: string;
+    decimals?: number;
+    static?: string;
+  }[] = [
+    { to: 40, prefix: "+", suffix: "%", l: "produtividade da equipe" },
+    { to: 30, prefix: "-", suffix: "%", l: "tempo em tarefas manuais" },
+    { to: 99.9, suffix: "%", decimals: 1, l: "disponibilidade" },
+    { static: "1 só", l: "lugar para tudo" },
   ];
   return (
     <section className="border-y border-ink-800/70 bg-ink-950/40">
       <div className="mx-auto grid max-w-7xl grid-cols-2 gap-px px-5 py-8 sm:grid-cols-4">
         {stats.map((s, i) => (
           <Reveal key={s.l} delay={i * 80} className="text-center">
-            <p className="text-2xl font-bold text-gradient sm:text-3xl">{s.v}</p>
+            <p className="text-gradient text-2xl font-bold sm:text-3xl">
+              {s.static ?? (
+                <CountUp
+                  to={s.to!}
+                  prefix={s.prefix}
+                  suffix={s.suffix}
+                  decimals={s.decimals ?? 0}
+                />
+              )}
+            </p>
             <p className="mt-1 text-xs text-slate-500">{s.l}</p>
           </Reveal>
         ))}
@@ -489,7 +660,7 @@ function About() {
         <div className="mt-12 grid gap-4 md:grid-cols-3">
           {points.map((p, i) => (
             <Reveal key={p.title} delay={i * 90}>
-              <div className="ring-gradient h-full rounded-2xl border border-ink-700 bg-ink-900/60 p-6 transition hover:-translate-y-1 hover:border-brand-500/40">
+              <SpotlightCard className="ring-gradient h-full rounded-2xl border border-ink-700 bg-ink-900/60 p-6 transition hover:-translate-y-1 hover:border-brand-500/40">
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-500/15 text-brand-300">
                   <p.icon className="h-5 w-5" />
                 </span>
@@ -499,7 +670,7 @@ function About() {
                 <p className="mt-2 text-sm leading-relaxed text-slate-400">
                   {p.text}
                 </p>
-              </div>
+              </SpotlightCard>
             </Reveal>
           ))}
         </div>
@@ -548,9 +719,9 @@ function Features() {
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {MODULES.map((m, i) => (
             <Reveal key={m.title} delay={(i % 3) * 80}>
-              <div className="group h-full rounded-2xl border border-ink-700 bg-ink-900/50 p-5 transition hover:-translate-y-1 hover:border-brand-500/50 hover:bg-ink-800/50">
+              <SpotlightCard className="group h-full rounded-2xl border border-ink-700 bg-ink-900/50 p-5 transition hover:-translate-y-1 hover:border-brand-500/50 hover:bg-ink-800/50">
                 <div className="flex items-center gap-3">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-ink-800 text-brand-300 transition group-hover:bg-brand-500/15">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl bg-ink-800 text-brand-300 transition group-hover:scale-110 group-hover:bg-brand-500/15">
                     <m.icon className="h-5 w-5" />
                   </span>
                   <h3 className="text-base font-semibold text-slate-100">
@@ -560,7 +731,7 @@ function Features() {
                 <p className="mt-3 text-sm leading-relaxed text-slate-400">
                   {m.text}
                 </p>
-              </div>
+              </SpotlightCard>
             </Reveal>
           ))}
         </div>
@@ -607,7 +778,7 @@ function AISection() {
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               {AI_FEATURES.map((f, i) => (
                 <Reveal key={f.title} delay={(i % 2) * 70}>
-                  <div className="flex h-full items-start gap-3 rounded-xl border border-ink-700 bg-ink-900/50 p-3.5">
+                  <SpotlightCard className="flex h-full items-start gap-3 rounded-xl border border-ink-700 bg-ink-900/50 p-3.5 transition hover:border-brand-500/40">
                     <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-500/15 text-brand-300">
                       <f.icon className="h-4 w-4" />
                     </span>
@@ -619,7 +790,7 @@ function AISection() {
                         {f.text}
                       </p>
                     </div>
-                  </div>
+                  </SpotlightCard>
                 </Reveal>
               ))}
             </div>
@@ -712,7 +883,7 @@ function Benefits() {
               delay={(i % 4) * 70}
               className={i === 0 ? "lg:row-span-2" : ""}
             >
-              <div
+              <SpotlightCard
                 className={`flex h-full flex-col rounded-2xl border border-ink-700 p-6 transition hover:-translate-y-1 hover:border-brand-500/40 ${
                   i === 0
                     ? "bg-gradient-to-br from-brand-500/15 to-ink-900/40"
@@ -728,7 +899,7 @@ function Benefits() {
                 <p className="mt-2 text-sm leading-relaxed text-slate-400">
                   {b.text}
                 </p>
-              </div>
+              </SpotlightCard>
             </Reveal>
           ))}
         </div>
@@ -772,7 +943,7 @@ function Integrations() {
         <Reveal delay={80} className="mt-12">
           <div className="mx-auto grid max-w-4xl grid-cols-2 items-stretch gap-4 sm:grid-cols-4">
             {INTEGRATIONS.map((it) => (
-              <div
+              <SpotlightCard
                 key={it.label}
                 className="flex flex-col items-center gap-2 rounded-2xl border border-ink-700 bg-ink-900/50 p-5 text-center transition hover:-translate-y-1 hover:border-brand-500/50"
               >
@@ -782,7 +953,7 @@ function Integrations() {
                 <span className="text-xs font-medium text-slate-300">
                   {it.label}
                 </span>
-              </div>
+              </SpotlightCard>
             ))}
           </div>
         </Reveal>
@@ -991,11 +1162,11 @@ function Pricing() {
         <div className="mt-12 grid gap-5 lg:grid-cols-4">
           {PLANS.map((p, i) => (
             <Reveal key={p.name} delay={i * 70}>
-              <div
-                className={`relative flex h-full flex-col rounded-2xl border p-6 ${
+              <SpotlightCard
+                className={`relative flex h-full flex-col rounded-2xl border p-6 transition hover:-translate-y-1 ${
                   p.featured
-                    ? "ring-gradient border-brand-500/50 bg-ink-900/80 shadow-2xl shadow-brand-500/10"
-                    : "border-ink-700 bg-ink-900/50"
+                    ? "ring-gradient border-brand-500/50 bg-ink-900/80 shadow-2xl shadow-brand-500/10 lg:scale-[1.03]"
+                    : "border-ink-700 bg-ink-900/50 hover:border-brand-500/40"
                 }`}
               >
                 {p.featured && (
@@ -1036,7 +1207,7 @@ function Pricing() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </SpotlightCard>
             </Reveal>
           ))}
         </div>
