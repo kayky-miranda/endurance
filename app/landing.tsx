@@ -256,7 +256,7 @@ function Navbar() {
     <nav
       className={`sticky top-0 z-50 border-b transition-colors ${
         scrolled
-          ? "border-ink-800/80 bg-ink-950/80 backdrop-blur-xl"
+          ? "border-ink-800 bg-ink-950/80 backdrop-blur-xl"
           : "border-transparent bg-transparent"
       }`}
     >
@@ -596,7 +596,7 @@ function TrustStrip() {
     { static: "1 só", l: "lugar para tudo" },
   ];
   return (
-    <section className="border-y border-ink-800/70 bg-ink-950/40">
+    <section className="border-y border-ink-800 bg-ink-950/40">
       <div className="mx-auto grid max-w-7xl grid-cols-2 gap-px px-5 py-8 sm:grid-cols-4">
         {stats.map((s, i) => (
           <Reveal key={s.l} delay={i * 80} className="text-center">
@@ -700,7 +700,7 @@ const MODULES: { icon: LucideIcon; title: string; text: string }[] = [
 
 function Features() {
   return (
-    <section id="recursos" className="scroll-mt-20 border-t border-ink-800/70 py-24">
+    <section id="recursos" className="scroll-mt-20 border-t border-ink-800 py-24">
       <div className="mx-auto max-w-7xl px-5">
         <div className="mx-auto max-w-3xl text-center">
           <Reveal>
@@ -865,7 +865,7 @@ const BENEFITS: { icon: LucideIcon; title: string; text: string }[] = [
 
 function Benefits() {
   return (
-    <section className="border-t border-ink-800/70 py-24">
+    <section className="border-t border-ink-800 py-24">
       <div className="mx-auto max-w-7xl px-5">
         <div className="mx-auto max-w-3xl text-center">
           <Reveal>
@@ -924,7 +924,7 @@ const INTEGRATIONS: { icon: LucideIcon; label: string }[] = [
 
 function Integrations() {
   return (
-    <section className="border-t border-ink-800/70 py-24">
+    <section className="border-t border-ink-800 py-24">
       <div className="mx-auto max-w-7xl px-5">
         <div className="mx-auto max-w-3xl text-center">
           <Reveal>
@@ -989,7 +989,7 @@ const SHOW_ITEMS: { icon: LucideIcon; title: string; text: string }[] = [
 
 function Showcase() {
   return (
-    <section className="border-t border-ink-800/70 py-24">
+    <section className="border-t border-ink-800 py-24">
       <div className="mx-auto max-w-7xl px-5">
         <div className="mx-auto max-w-3xl text-center">
           <Reveal>
@@ -1144,7 +1144,7 @@ const PLANS = [
 
 function Pricing() {
   return (
-    <section id="planos" className="scroll-mt-20 border-t border-ink-800/70 py-24">
+    <section id="planos" className="scroll-mt-20 border-t border-ink-800 py-24">
       <div className="mx-auto max-w-7xl px-5">
         <div className="mx-auto max-w-3xl text-center">
           <Reveal>
@@ -1253,7 +1253,7 @@ const FAQS = [
 function Faq() {
   const [open, setOpen] = useState<number | null>(0);
   return (
-    <section id="faq" className="scroll-mt-20 border-t border-ink-800/70 py-24">
+    <section id="faq" className="scroll-mt-20 border-t border-ink-800 py-24">
       <div className="mx-auto max-w-3xl px-5">
         <div className="text-center">
           <Reveal>
@@ -1402,7 +1402,7 @@ function Footer() {
           </div>
         ))}
       </div>
-      <div className="border-t border-ink-800/70">
+      <div className="border-t border-ink-800">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-5 py-6 text-xs text-slate-600 sm:flex-row">
           <p>© {new Date().getFullYear()} ENDURANCE · Feito para resistir.</p>
           <div className="flex gap-5">
