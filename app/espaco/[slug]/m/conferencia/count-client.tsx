@@ -1,0 +1,488 @@
+"use client";
+
+import { useState, useTransition, useRef } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  ArrowLeft,
+  Loader2,
+  Plus,
+  Trash2,
+  Search,
+  ScanBarcode,
+  CheckCircle2,
+  ShieldCheck,
+  RotateCcw,
+  XCircle,
+  AlertCircle,
+  PackageSearch,
+  Target,
+} from "lucide-react";
+import {
+  searchProductsAction,
+  addItemAction,
+  addByBarcodeAction,
+  removeItemAction,
+  setCountedAction,
+  finalizeCountAction,
+  approveCountAction,
+  reopenCountAction,
+  adjustCountAction,
+  cancelCountAction,
+} from "./count-actions";
+import { CountStatusBadge, CountTypeBadge } from "./badges";
+import type { CountDetail } from "@/lib/endurance/stock-count";
+
+const brl = (n: number) =>
+  n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+type Item = CountDetail["items"][number];
+
+export default function CountClient({
+  slug,
+  count,
+  canApprove,
+}: {
+  slug: string;
+  count: CountDetail;
+  canApprove: boolean;
+}) {
+  const router = useRouter();
+  const [busy, startTransition] = useTransition();
+  const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  // Overrides otimistas da contagem (por itemId) sobre os dados do servidor.
+  const [counted, setCounted] = useState<Record<string, string>>({});
+
+  const editable = count.status === "rascunho" || count.status === "em_conferencia";
+  const awaiting = count.status === "aguardando_aprovacao";
+  const approved = count.status === "aprovada";
+
+  // Valor efetivo contado de um item (override otimista ou valor do servidor).
+  function countedOf(it: Item): number | null {
+    if (it.id in counted) {
+      const v = counted[it.id];
+      return v === "" ? null : Math.max(0, parseInt(v, 10) || 0);
+    }
+    return it.countedQty;
+  }
+  function divergenceOf(it: Item): number | null {
+    const c = countedOf(it);
+    return c == null ? null : c - it.systemQty;
+  }
+
+  // Totais ao vivo.
+  const countedItems = count.items.filter((it) => countedOf(it) != null);
+  const divergentItems = countedItems.filter((it) => divergenceOf(it) !== 0);
+  const divValue = divergentItems.reduce(
+    (s, it) => s + Math.abs(divergenceOf(it)!) * it.unitCost,
+    0,
+  );
+  const accuracy =
+    countedItems.length > 0
+      ? ((countedItems.length - divergentItems.length) / countedItems.length) * 100
+      : 100;
+
+  function commitCount(it: Item, raw: string) {
+    const parsed = raw.trim() === "" ? null : Math.max(0, parseInt(raw, 10) || 0);
+    startTransition(async () => {
+      const res = await setCountedAction(count.id, it.id, parsed);
+      if (!res.ok) {
+        setMsg({ tone: "err", text: res.error ?? "Falha ao salvar." });
+        // reverte o override
+        setCounted((prev) => {
+          const n = { ...prev };
+          delete n[it.id];
+          return n;
+        });
+      }
+    });
+  }
+
+  function runStatus(fn: () => Promise<{ ok: boolean; error?: string }>, okText: string) {
+    setMsg(null);
+    startTransition(async () => {
+      const res = await fn();
+      if (res.ok) {
+        setMsg({ tone: "ok", text: okText });
+        router.refresh();
+      } else {
+        setMsg({ tone: "err", text: res.error ?? "Não foi possível concluir." });
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Cabeçalho */}
+      <div>
+        <Link
+          href={`/espaco/${slug}/m/conferencia`}
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition hover:text-brand-500 dark:text-slate-400"
+        >
+          <ArrowLeft className="h-4 w-4" /> Conferências
+        </Link>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <h1 className="font-mono text-2xl font-bold tracking-tight">{count.number}</h1>
+          <CountTypeBadge type={count.type} />
+          <CountStatusBadge status={count.status} />
+        </div>
+        <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+          {count.location && <span>📍 {count.location}</span>}
+          <span>Responsável: {count.responsibleName || "—"}</span>
+          <span>Criada por {count.createdByName}</span>
+          {count.approvedByName && <span>Aprovada por {count.approvedByName}</span>}
+        </p>
+      </div>
+
+      {msg && (
+        <div
+          className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm ${
+            msg.tone === "ok"
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+              : "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
+          }`}
+        >
+          {msg.tone === "ok" ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+          ) : (
+            <AlertCircle className="h-4 w-4 shrink-0" />
+          )}
+          {msg.text}
+        </div>
+      )}
+
+      {/* Resumo ao vivo */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <MiniStat label="Itens" value={`${countedItems.length}/${count.items.length}`} />
+        <MiniStat
+          label="Divergências"
+          value={String(divergentItems.length)}
+          tone={divergentItems.length ? "rose" : "slate"}
+        />
+        <MiniStat label="Valor divergência" value={brl(divValue)} tone="amber" />
+        <MiniStat
+          label="Acuracidade"
+          value={`${accuracy.toFixed(1)}%`}
+          tone="emerald"
+          icon={<Target className="h-3.5 w-3.5" />}
+        />
+      </div>
+
+      {/* Ações de estado */}
+      <div className="flex flex-wrap items-center gap-2">
+        {editable && (
+          <button
+            onClick={() => runStatus(() => finalizeCountAction(count.id), "Conferência enviada para aprovação.")}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-ink-950 transition hover:bg-brand-400 disabled:opacity-40"
+          >
+            <ShieldCheck className="h-4 w-4" /> Finalizar para aprovação
+          </button>
+        )}
+        {awaiting && canApprove && (
+          <>
+            <button
+              onClick={() => runStatus(() => approveCountAction(count.id), "Divergências aprovadas.")}
+              disabled={busy}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40"
+            >
+              <CheckCircle2 className="h-4 w-4" /> Aprovar divergências
+            </button>
+            <button
+              onClick={() => runStatus(() => reopenCountAction(count.id), "Devolvida para recontagem.")}
+              disabled={busy}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-40 dark:border-ink-600 dark:text-slate-200 dark:hover:bg-ink-800"
+            >
+              <RotateCcw className="h-4 w-4" /> Devolver p/ recontagem
+            </button>
+          </>
+        )}
+        {awaiting && !canApprove && (
+          <p className="rounded-xl bg-amber-500/10 px-4 py-2 text-sm text-amber-600 dark:text-amber-300">
+            Aguardando aprovação de um gestor para efetivar o ajuste.
+          </p>
+        )}
+        {approved && canApprove && (
+          <button
+            onClick={() => runStatus(() => adjustCountAction(count.id), "Estoque ajustado com sucesso.")}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40"
+          >
+            <PackageSearch className="h-4 w-4" /> Efetivar ajuste no estoque
+          </button>
+        )}
+        {count.status !== "ajustada" && count.status !== "cancelada" && (
+          <button
+            onClick={() => {
+              if (confirm("Cancelar esta conferência? Nenhum ajuste será feito."))
+                runStatus(() => cancelCountAction(count.id), "Conferência cancelada.");
+            }}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-rose-500/50 hover:text-rose-500 disabled:opacity-40 dark:border-ink-600"
+          >
+            <XCircle className="h-4 w-4" /> Cancelar
+          </button>
+        )}
+        {busy && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
+      </div>
+
+      {/* Adicionar itens (só durante a contagem) */}
+      {editable && <AddItems countId={count.id} onChange={() => router.refresh()} setMsg={setMsg} />}
+
+      {/* Tabela de itens */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-ink-700 dark:bg-ink-900">
+        {count.items.length === 0 ? (
+          <div className="grid place-items-center px-6 py-16 text-center">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-500/10 text-brand-500">
+              <PackageSearch className="h-6 w-6" />
+            </div>
+            <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-200">
+              Nenhum produto na conferência
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Use a busca ou o scanner acima para adicionar itens à contagem.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400 dark:border-ink-800">
+                  <th className="px-4 py-2.5 font-medium">Produto</th>
+                  <th className="px-4 py-2.5 font-medium text-center">Sistema</th>
+                  <th className="px-4 py-2.5 font-medium text-center">Físico</th>
+                  <th className="px-4 py-2.5 font-medium text-center">Divergência</th>
+                  {editable && <th className="px-4 py-2.5" />}
+                </tr>
+              </thead>
+              <tbody>
+                {count.items.map((it) => {
+                  const div = divergenceOf(it);
+                  const hasDiv = div != null && div !== 0;
+                  return (
+                    <tr
+                      key={it.id}
+                      className={`border-b border-slate-100 last:border-0 dark:border-ink-800 ${
+                        hasDiv ? "bg-rose-500/[0.04]" : ""
+                      }`}
+                    >
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-slate-700 dark:text-slate-200">
+                          {it.productName}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {[it.barcode, it.category].filter(Boolean).join(" · ") || "—"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-center font-medium text-slate-500 dark:text-slate-400">
+                        {it.systemQty}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {editable ? (
+                          <input
+                            type="number"
+                            min={0}
+                            inputMode="numeric"
+                            defaultValue={it.countedQty ?? ""}
+                            onChange={(e) =>
+                              setCounted((p) => ({ ...p, [it.id]: e.target.value }))
+                            }
+                            onBlur={(e) => commitCount(it, e.target.value)}
+                            placeholder="—"
+                            className="w-20 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-center font-semibold text-slate-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+                          />
+                        ) : (
+                          <span className="font-semibold text-slate-700 dark:text-slate-200">
+                            {countedOf(it) ?? "—"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {div == null ? (
+                          <span className="text-slate-300">—</span>
+                        ) : div === 0 ? (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-500">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> OK
+                          </span>
+                        ) : (
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                              div > 0
+                                ? "bg-sky-500/10 text-sky-600 dark:text-sky-300"
+                                : "bg-rose-500/10 text-rose-600 dark:text-rose-300"
+                            }`}
+                          >
+                            {div > 0 ? "+" : ""}
+                            {div}
+                          </span>
+                        )}
+                      </td>
+                      {editable && (
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() =>
+                              startTransition(async () => {
+                                await removeItemAction(count.id, it.id);
+                                router.refresh();
+                              })
+                            }
+                            className="inline-grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-400 transition hover:border-rose-500/50 hover:text-rose-500 dark:border-ink-600"
+                            aria-label="Remover item"
+                            title="Remover da conferência"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  tone = "slate",
+  icon,
+}: {
+  label: string;
+  value: string;
+  tone?: "slate" | "rose" | "amber" | "emerald";
+  icon?: React.ReactNode;
+}) {
+  const toneCls: Record<string, string> = {
+    slate: "text-slate-800 dark:text-slate-100",
+    rose: "text-rose-600 dark:text-rose-300",
+    amber: "text-amber-600 dark:text-amber-300",
+    emerald: "text-emerald-600 dark:text-emerald-300",
+  };
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-ink-700 dark:bg-ink-900">
+      <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        {icon}
+        {label}
+      </p>
+      <p className={`mt-1 text-xl font-bold tracking-tight ${toneCls[tone]}`}>{value}</p>
+    </div>
+  );
+}
+
+function AddItems({
+  countId,
+  onChange,
+  setMsg,
+}: {
+  countId: string;
+  onChange: () => void;
+  setMsg: (m: { tone: "ok" | "err"; text: string } | null) => void;
+}) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<
+    { id: string; name: string; barcode: string; sku: string; stock: number }[]
+  >([]);
+  const [searching, setSearching] = useState(false);
+  const scanRef = useRef<HTMLInputElement | null>(null);
+  const [, startTransition] = useTransition();
+
+  async function search(term: string) {
+    setQ(term);
+    if (term.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+    setSearching(true);
+    const res = await searchProductsAction(term);
+    setSearching(false);
+    if (res.ok) setResults(res.products ?? []);
+  }
+
+  function add(productId: string) {
+    startTransition(async () => {
+      const res = await addItemAction(countId, productId);
+      if (res.ok) {
+        setQ("");
+        setResults([]);
+        onChange();
+      } else setMsg({ tone: "err", text: res.error ?? "Falha ao adicionar." });
+    });
+  }
+
+  function scan(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    const code = (e.target as HTMLInputElement).value.trim();
+    if (!code) return;
+    startTransition(async () => {
+      const res = await addByBarcodeAction(countId, code);
+      if (res.ok) {
+        if (scanRef.current) scanRef.current.value = "";
+        setMsg({ tone: "ok", text: "Item adicionado pela leitura." });
+        onChange();
+      } else setMsg({ tone: "err", text: res.error ?? "Código não encontrado." });
+    });
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-ink-700 dark:bg-ink-900">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {/* Busca por código/SKU/descrição */}
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={q}
+            onChange={(e) => search(e.target.value)}
+            placeholder="Buscar por código, SKU, descrição…"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+          />
+          {(results.length > 0 || searching) && (
+            <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl dark:border-ink-700 dark:bg-ink-900">
+              {searching && (
+                <p className="px-3 py-2 text-xs text-slate-400">Buscando…</p>
+              )}
+              {results.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => add(p.id)}
+                  className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition hover:bg-slate-50 dark:hover:bg-ink-800"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-slate-700 dark:text-slate-200">
+                      {p.name}
+                    </span>
+                    <span className="block truncate text-xs text-slate-400">
+                      {[p.barcode, p.sku].filter(Boolean).join(" · ") || "sem código"}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-400">
+                    saldo {p.stock}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Leitura por scanner */}
+        <div className="relative">
+          <ScanBarcode className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-400" />
+          <input
+            ref={scanRef}
+            onKeyDown={scan}
+            placeholder="Leitura por scanner (bipe e Enter)"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+          />
+        </div>
+      </div>
+      <p className="mt-2 flex items-center gap-1.5 pl-1 text-xs text-slate-400">
+        <Plus className="h-3 w-3" /> Adicione produtos para conferir. O saldo do
+        sistema é congelado no momento em que o item entra na contagem.
+      </p>
+    </div>
+  );
+}

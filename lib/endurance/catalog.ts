@@ -177,6 +177,12 @@ export const MODULES: ModuleDef[] = [
     scope: ["mercado_varejo"],
   },
   {
+    id: "conferencia",
+    label: "Conferência de Estoque",
+    description: "Contagem física com aprovação de divergências antes do ajuste.",
+    scope: ["mercado_varejo"],
+  },
+  {
     id: "caixa",
     label: "Fechamento de caixa",
     description: "Abertura, sangria/suprimento e conferência do caixa.",
@@ -427,6 +433,7 @@ const MODULE_CATEGORY: Record<string, ModuleCategory> = {
   produtos: "Catálogo & Estoque",
   estoque: "Catálogo & Estoque",
   movimentacoes: "Catálogo & Estoque",
+  conferencia: "Catálogo & Estoque",
   precificacao: "Catálogo & Estoque",
   estoque_produtos: "Catálogo & Estoque",
   equipamentos: "Catálogo & Estoque",

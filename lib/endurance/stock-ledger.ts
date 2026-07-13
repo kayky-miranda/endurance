@@ -45,6 +45,8 @@ export const STOCK_REASONS: StockReasonDef[] = [
   { id: "producao", label: "Produção (entrada)", dir: "in", manual: true },
   { id: "consumo_materia_prima", label: "Consumo de matéria-prima", dir: "out", manual: true },
   { id: "transferencia", label: "Transferência entre depósitos", dir: "both", manual: false },
+  // Gerado ao efetivar uma conferência de estoque aprovada (ajuste de inventário).
+  { id: "inventario", label: "Ajuste de inventário", dir: "both", manual: false },
 ];
 
 const REASON_BY_ID = new Map(STOCK_REASONS.map((r) => [r.id, r]));

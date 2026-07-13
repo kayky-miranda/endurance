@@ -40,6 +40,7 @@ model Organization {
   quotations       Quotation[]
   receipts         Receipt[]
   stockMovements   StockMovement[]
+  stockCounts      StockCount[]
   productSuppliers ProductSupplier[]
   costCenters      CostCenter[]
   categories       Category[]
@@ -1067,4 +1068,57 @@ model CreditLedger {
   marketingSub MarketingSubscription? @relation(fields: [marketingSubId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Conferência / inventário de estoque. Contagem física comparada ao sistema.
+// NENHUM ajuste de estoque acontece durante a contagem — só após aprovação,
+// via razão (StockMovement), preservando a auditoria.
+// ---------------------------------------------------------------------------
+model StockCount {
+  id              String    @id @default(cuid())
+  organizationId  String
+  number          String // CONF-AAAA-NNNN (sequencial por org/ano)
+  type            String    @default("geral") // geral | parcial | ciclica | localizacao
+  location        String    @default("") // depósito/armazém/localização (texto)
+  status          String    @default("rascunho") // rascunho | em_conferencia | aguardando_aprovacao | aprovada | ajustada | cancelada
+  responsibleId   String?
+  responsibleName String    @default("")
+  note            String    @default("")
+  createdById     String?
+  createdByName   String    @default("")
+  approvedById    String?
+  approvedByName  String    @default("")
+  approvedAt      DateTime?
+  adjustedAt      DateTime?
+  finalizedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items        StockCountItem[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId])
+  @@index([organizationId, status])
+}
+
+model StockCountItem {
+  id           String   @id @default(cuid())
+  stockCountId String
+  productId    String
+  productName  String // snapshot p/ o histórico
+  barcode      String   @default("")
+  sku          String   @default("")
+  category     String   @default("")
+  systemQty    Int // saldo do sistema no momento da adição do item
+  countedQty   Int? // null = ainda não contado
+  unitCost     Decimal  @default(0) @db.Decimal(12, 2) // custo p/ valorizar a divergência
+  note         String   @default("")
+  createdAt    DateTime @default(now())
+
+  count StockCount @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
+
+  @@unique([stockCountId, productId])
+  @@index([stockCountId])
 }

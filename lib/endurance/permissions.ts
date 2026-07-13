@@ -12,6 +12,8 @@ export type PermissionId =
   | "dashboard.view"
   | "products.manage"
   | "stock.manage"
+  | "count.manage"
+  | "count.approve"
   | "fiscal.manage"
   | "pdv.sell"
   | "customers.manage"
@@ -67,6 +69,18 @@ export const PERMISSIONS: PermissionDef[] = [
     id: "stock.manage",
     label: "Gerenciar Estoque",
     description: "Entradas, saídas e ajustes de estoque.",
+    group: "Catálogo & Estoque",
+  },
+  {
+    id: "count.manage",
+    label: "Conferência de Estoque",
+    description: "Criar conferências, contar itens e registrar divergências.",
+    group: "Catálogo & Estoque",
+  },
+  {
+    id: "count.approve",
+    label: "Aprovar Conferências",
+    description: "Aprovar divergências e efetivar o ajuste no estoque.",
     group: "Catálogo & Estoque",
   },
   {
@@ -203,6 +217,8 @@ export const PROFILES: ProfileDef[] = [
       "customers.manage",
       "products.manage",
       "stock.manage",
+      "count.manage",
+      "count.approve",
       "suppliers.manage",
       "purchasing.request",
       "purchasing.approve",
@@ -235,6 +251,8 @@ export const PROFILES: ProfileDef[] = [
       "dashboard.view",
       "products.manage",
       "stock.manage",
+      "count.manage",
+      "count.approve",
       "suppliers.manage",
       "purchasing.request",
       "purchasing.manage",
@@ -318,6 +336,7 @@ export const MODULE_PERMISSION: Record<string, PermissionId> = {
   codigo_barras: "products.manage",
   estoque: "stock.manage",
   movimentacoes: "stock.manage",
+  conferencia: "count.manage",
   caixa: "pdv.sell",
   pdv: "pdv.sell",
   crm: "customers.manage",
