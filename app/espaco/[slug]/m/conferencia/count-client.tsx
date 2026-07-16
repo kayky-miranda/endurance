@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,11 +17,13 @@ import {
   AlertCircle,
   PackageSearch,
   Target,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import {
   searchProductsAction,
   addItemAction,
-  addByBarcodeAction,
+  scanCountAction,
   removeItemAction,
   setCountedAction,
   finalizeCountAction,
@@ -32,11 +34,39 @@ import {
 } from "./count-actions";
 import { CountStatusBadge, CountTypeBadge } from "./badges";
 import type { CountDetail } from "@/lib/endurance/stock-count";
+import type { ScannedItem } from "@/lib/endurance/stock-count";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 type Item = CountDetail["items"][number];
+
+/** Beep curto por WebAudio (agudo = ok, grave = erro). Sem asset externo. */
+function useBeep() {
+  const ctxRef = useRef<AudioContext | null>(null);
+  return (ok: boolean) => {
+    try {
+      if (!ctxRef.current)
+        ctxRef.current = new (window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext })
+            .webkitAudioContext)();
+      const ctx = ctxRef.current;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = ok ? "sine" : "square";
+      osc.frequency.value = ok ? 880 : 200;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (ok ? 0.12 : 0.25));
+      osc.start();
+      osc.stop(ctx.currentTime + (ok ? 0.12 : 0.25));
+    } catch {
+      /* áudio bloqueado — o feedback visual cobre */
+    }
+  };
+}
 
 export default function CountClient({
   slug,
@@ -50,31 +80,32 @@ export default function CountClient({
   const router = useRouter();
   const [busy, startTransition] = useTransition();
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
-  // Overrides otimistas da contagem (por itemId) sobre os dados do servidor.
-  const [counted, setCounted] = useState<Record<string, string>>({});
+  // Itens em estado LOCAL (fonte da verdade da tela) — semeados do servidor e
+  // atualizados por scan/busca/edição sem recarregar a página.
+  const [items, setItems] = useState<Item[]>(count.items);
+  const [lastScanId, setLastScanId] = useState<string | null>(null);
 
   const editable = count.status === "rascunho" || count.status === "em_conferencia";
   const awaiting = count.status === "aguardando_aprovacao";
   const approved = count.status === "aprovada";
 
-  // Valor efetivo contado de um item (override otimista ou valor do servidor).
-  function countedOf(it: Item): number | null {
-    if (it.id in counted) {
-      const v = counted[it.id];
-      return v === "" ? null : Math.max(0, parseInt(v, 10) || 0);
-    }
-    return it.countedQty;
-  }
-  function divergenceOf(it: Item): number | null {
-    const c = countedOf(it);
-    return c == null ? null : c - it.systemQty;
+  function upsert(it: ScannedItem) {
+    setItems((prev) => {
+      const idx = prev.findIndex((x) => x.id === it.id);
+      if (idx === -1) return [...prev, it];
+      const next = [...prev];
+      next[idx] = it;
+      return next;
+    });
   }
 
-  // Totais ao vivo.
-  const countedItems = count.items.filter((it) => countedOf(it) != null);
-  const divergentItems = countedItems.filter((it) => divergenceOf(it) !== 0);
+  // Totais ao vivo (a partir do estado local).
+  const countedItems = items.filter((it) => it.countedQty != null);
+  const divergentItems = countedItems.filter(
+    (it) => (it.countedQty as number) !== it.systemQty,
+  );
   const divValue = divergentItems.reduce(
-    (s, it) => s + Math.abs(divergenceOf(it)!) * it.unitCost,
+    (s, it) => s + Math.abs((it.countedQty as number) - it.systemQty) * it.unitCost,
     0,
   );
   const accuracy =
@@ -84,17 +115,17 @@ export default function CountClient({
 
   function commitCount(it: Item, raw: string) {
     const parsed = raw.trim() === "" ? null : Math.max(0, parseInt(raw, 10) || 0);
+    // otimista
+    setItems((prev) =>
+      prev.map((x) =>
+        x.id === it.id
+          ? { ...x, countedQty: parsed, divergence: parsed == null ? null : parsed - x.systemQty }
+          : x,
+      ),
+    );
     startTransition(async () => {
       const res = await setCountedAction(count.id, it.id, parsed);
-      if (!res.ok) {
-        setMsg({ tone: "err", text: res.error ?? "Falha ao salvar." });
-        // reverte o override
-        setCounted((prev) => {
-          const n = { ...prev };
-          delete n[it.id];
-          return n;
-        });
-      }
+      if (!res.ok) setMsg({ tone: "err", text: res.error ?? "Falha ao salvar." });
     });
   }
 
@@ -105,9 +136,7 @@ export default function CountClient({
       if (res.ok) {
         setMsg({ tone: "ok", text: okText });
         router.refresh();
-      } else {
-        setMsg({ tone: "err", text: res.error ?? "Não foi possível concluir." });
-      }
+      } else setMsg({ tone: "err", text: res.error ?? "Não foi possível concluir." });
     });
   }
 
@@ -153,7 +182,7 @@ export default function CountClient({
 
       {/* Resumo ao vivo */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <MiniStat label="Itens" value={`${countedItems.length}/${count.items.length}`} />
+        <MiniStat label="Itens" value={`${countedItems.length}/${items.length}`} />
         <MiniStat
           label="Divergências"
           value={String(divergentItems.length)}
@@ -226,12 +255,22 @@ export default function CountClient({
         {busy && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
       </div>
 
-      {/* Adicionar itens (só durante a contagem) */}
-      {editable && <AddItems countId={count.id} onChange={() => router.refresh()} setMsg={setMsg} />}
+      {/* Leitura / adição (só durante a contagem) */}
+      {editable && (
+        <ScanBar
+          countId={count.id}
+          onScan={(it) => {
+            upsert(it);
+            setLastScanId(it.id);
+          }}
+          onAdd={(it) => upsert(it)}
+          setMsg={setMsg}
+        />
+      )}
 
       {/* Tabela de itens */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-ink-700 dark:bg-ink-900">
-        {count.items.length === 0 ? (
+        {items.length === 0 ? (
           <div className="grid place-items-center px-6 py-16 text-center">
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-500/10 text-brand-500">
               <PackageSearch className="h-6 w-6" />
@@ -240,7 +279,7 @@ export default function CountClient({
               Nenhum produto na conferência
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              Use a busca ou o scanner acima para adicionar itens à contagem.
+              Bipe um código no scanner ou use a busca acima para adicionar itens.
             </p>
           </div>
         ) : (
@@ -256,14 +295,21 @@ export default function CountClient({
                 </tr>
               </thead>
               <tbody>
-                {count.items.map((it) => {
-                  const div = divergenceOf(it);
+                {/* Itens recém-bipados sobem para o topo, na ordem inversa de leitura */}
+                {items.map((it) => {
+                  const c = it.countedQty;
+                  const div = c == null ? null : c - it.systemQty;
                   const hasDiv = div != null && div !== 0;
+                  const flash = it.id === lastScanId;
                   return (
                     <tr
                       key={it.id}
-                      className={`border-b border-slate-100 last:border-0 dark:border-ink-800 ${
-                        hasDiv ? "bg-rose-500/[0.04]" : ""
+                      className={`border-b border-slate-100 transition-colors last:border-0 dark:border-ink-800 ${
+                        flash
+                          ? "bg-emerald-500/10"
+                          : hasDiv
+                            ? "bg-rose-500/[0.04]"
+                            : ""
                       }`}
                     >
                       <td className="px-4 py-3">
@@ -283,9 +329,21 @@ export default function CountClient({
                             type="number"
                             min={0}
                             inputMode="numeric"
-                            defaultValue={it.countedQty ?? ""}
+                            value={c ?? ""}
                             onChange={(e) =>
-                              setCounted((p) => ({ ...p, [it.id]: e.target.value }))
+                              setItems((prev) =>
+                                prev.map((x) =>
+                                  x.id === it.id
+                                    ? {
+                                        ...x,
+                                        countedQty:
+                                          e.target.value === ""
+                                            ? null
+                                            : Math.max(0, parseInt(e.target.value, 10) || 0),
+                                      }
+                                    : x,
+                                ),
+                              )
                             }
                             onBlur={(e) => commitCount(it, e.target.value)}
                             placeholder="—"
@@ -293,7 +351,7 @@ export default function CountClient({
                           />
                         ) : (
                           <span className="font-semibold text-slate-700 dark:text-slate-200">
-                            {countedOf(it) ?? "—"}
+                            {c ?? "—"}
                           </span>
                         )}
                       </td>
@@ -322,8 +380,8 @@ export default function CountClient({
                           <button
                             onClick={() =>
                               startTransition(async () => {
-                                await removeItemAction(count.id, it.id);
-                                router.refresh();
+                                const res = await removeItemAction(count.id, it.id);
+                                if (res.ok) setItems((prev) => prev.filter((x) => x.id !== it.id));
                               })
                             }
                             className="inline-grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-400 transition hover:border-rose-500/50 hover:text-rose-500 dark:border-ink-600"
@@ -374,13 +432,15 @@ function MiniStat({
   );
 }
 
-function AddItems({
+function ScanBar({
   countId,
-  onChange,
+  onScan,
+  onAdd,
   setMsg,
 }: {
   countId: string;
-  onChange: () => void;
+  onScan: (it: ScannedItem) => void;
+  onAdd: (it: ScannedItem) => void;
   setMsg: (m: { tone: "ok" | "err"; text: string } | null) => void;
 }) {
   const [q, setQ] = useState("");
@@ -388,8 +448,51 @@ function AddItems({
     { id: string; name: string; barcode: string; sku: string; stock: number }[]
   >([]);
   const [searching, setSearching] = useState(false);
+  const [soundOn, setSoundOn] = useState(true);
+  const [flash, setFlash] = useState<"ok" | "err" | null>(null);
   const scanRef = useRef<HTMLInputElement | null>(null);
   const [, startTransition] = useTransition();
+  const beep = useBeep();
+
+  // Foco no campo de leitura ao abrir a tela (modo hands-free).
+  useEffect(() => {
+    scanRef.current?.focus();
+  }, []);
+
+  function feedback(ok: boolean) {
+    if (soundOn) beep(ok);
+    setFlash(ok ? "ok" : "err");
+    setTimeout(() => setFlash(null), ok ? 350 : 600);
+  }
+
+  function refocus() {
+    if (scanRef.current) {
+      scanRef.current.value = "";
+      scanRef.current.focus();
+    }
+  }
+
+  function scan(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const code = (e.target as HTMLInputElement).value.trim();
+    if (!code) return;
+    startTransition(async () => {
+      const res = await scanCountAction(countId, code);
+      if (res.ok) {
+        onScan(res.item);
+        feedback(true);
+        setMsg({
+          tone: "ok",
+          text: `${res.item.productName} — contado: ${res.item.countedQty}`,
+        });
+      } else {
+        feedback(false);
+        setMsg({ tone: "err", text: res.error });
+      }
+      refocus(); // mantém o foco para a próxima leitura, sempre
+    });
+  }
 
   async function search(term: string) {
     setQ(term);
@@ -406,45 +509,61 @@ function AddItems({
   function add(productId: string) {
     startTransition(async () => {
       const res = await addItemAction(countId, productId);
-      if (res.ok) {
+      if (res.ok && res.item) {
+        onAdd(res.item);
         setQ("");
         setResults([]);
-        onChange();
       } else setMsg({ tone: "err", text: res.error ?? "Falha ao adicionar." });
     });
   }
 
-  function scan(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key !== "Enter") return;
-    const code = (e.target as HTMLInputElement).value.trim();
-    if (!code) return;
-    startTransition(async () => {
-      const res = await addByBarcodeAction(countId, code);
-      if (res.ok) {
-        if (scanRef.current) scanRef.current.value = "";
-        setMsg({ tone: "ok", text: "Item adicionado pela leitura." });
-        onChange();
-      } else setMsg({ tone: "err", text: res.error ?? "Código não encontrado." });
-    });
-  }
-
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-ink-700 dark:bg-ink-900">
+    <div
+      className={`rounded-2xl border bg-white p-4 shadow-sm transition-colors dark:bg-ink-900 ${
+        flash === "ok"
+          ? "border-emerald-500/60 ring-2 ring-emerald-500/30"
+          : flash === "err"
+            ? "border-rose-500/60 ring-2 ring-rose-500/30"
+            : "border-slate-200 dark:border-ink-700"
+      }`}
+    >
       <div className="grid gap-3 sm:grid-cols-2">
-        {/* Busca por código/SKU/descrição */}
-        <div className="relative">
+        {/* Leitura por scanner — destaque, foco automático */}
+        <div className="relative sm:order-2">
+          <ScanBarcode
+            className={`pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 ${
+              flash === "err" ? "text-rose-500" : "text-brand-500"
+            }`}
+          />
+          <input
+            ref={scanRef}
+            onKeyDown={scan}
+            autoFocus
+            placeholder="Bipe o código de barras aqui…"
+            className="w-full rounded-xl border-2 border-brand-500/40 bg-brand-500/5 py-3 pl-10 pr-10 text-sm font-medium text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:bg-brand-500/10 dark:text-slate-100"
+          />
+          <button
+            type="button"
+            onClick={() => setSoundOn((v) => !v)}
+            title={soundOn ? "Som ligado" : "Som desligado"}
+            className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-lg text-slate-400 hover:text-brand-500"
+          >
+            {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+          </button>
+        </div>
+
+        {/* Busca manual por código/SKU/descrição */}
+        <div className="relative sm:order-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             value={q}
             onChange={(e) => search(e.target.value)}
             placeholder="Buscar por código, SKU, descrição…"
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
           />
           {(results.length > 0 || searching) && (
             <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl dark:border-ink-700 dark:bg-ink-900">
-              {searching && (
-                <p className="px-3 py-2 text-xs text-slate-400">Buscando…</p>
-              )}
+              {searching && <p className="px-3 py-2 text-xs text-slate-400">Buscando…</p>}
               {results.map((p) => (
                 <button
                   key={p.id}
@@ -459,29 +578,16 @@ function AddItems({
                       {[p.barcode, p.sku].filter(Boolean).join(" · ") || "sem código"}
                     </span>
                   </span>
-                  <span className="shrink-0 text-xs text-slate-400">
-                    saldo {p.stock}
-                  </span>
+                  <span className="shrink-0 text-xs text-slate-400">saldo {p.stock}</span>
                 </button>
               ))}
             </div>
           )}
         </div>
-
-        {/* Leitura por scanner */}
-        <div className="relative">
-          <ScanBarcode className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-400" />
-          <input
-            ref={scanRef}
-            onKeyDown={scan}
-            placeholder="Leitura por scanner (bipe e Enter)"
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-          />
-        </div>
       </div>
       <p className="mt-2 flex items-center gap-1.5 pl-1 text-xs text-slate-400">
-        <Plus className="h-3 w-3" /> Adicione produtos para conferir. O saldo do
-        sistema é congelado no momento em que o item entra na contagem.
+        <Plus className="h-3 w-3" /> Modo hands-free: bipe os produtos em sequência —
+        cada leitura soma +1 na contagem e mantém o foco para a próxima.
       </p>
     </div>
   );

@@ -7,11 +7,13 @@ import { logActivity } from "@/lib/endurance/activity-log";
 import {
   createCount,
   addItem,
+  scanItem,
   removeItem,
   setCounted,
   transition,
   adjustCount,
   type CountType,
+  type ScannedItem,
 } from "@/lib/endurance/stock-count";
 
 type R = { ok: boolean; error?: string; id?: string };
@@ -109,30 +111,36 @@ export async function searchProductsAction(
   return { ok: true, products: rows };
 }
 
-export async function addItemAction(countId: string, productId: string): Promise<R> {
+export async function addItemAction(
+  countId: string,
+  productId: string,
+): Promise<{ ok: boolean; error?: string; item?: ScannedItem }> {
   const gate = await requirePermission("count.manage");
-  if (!gate.ok) return gate;
+  if (!gate.ok) return { ok: false, error: gate.error };
   const s = gate.session;
   const res = await addItem(s.org, countId, productId);
-  if (res.ok) revalidate(s.slug, countId);
+  if (res.ok) revalidatePath(`/espaco/${s.slug}/m/conferencia`);
   return res;
 }
 
-/** Leitura por scanner: adiciona pelo código de barras exato. */
-export async function addByBarcodeAction(countId: string, barcode: string): Promise<R> {
+/**
+ * Leitura por scanner (hands-free): identifica o produto pelo código, INCREMENTA
+ * a quantidade conferida (+1) e devolve o item atualizado para a UI refletir sem
+ * recarregar. Revalida só o dashboard (leve) — a tela usa o item retornado.
+ */
+export async function scanCountAction(
+  countId: string,
+  barcode: string,
+): Promise<
+  | { ok: true; item: ScannedItem; created: boolean }
+  | { ok: false; error: string; notFound?: boolean }
+> {
   const gate = await requirePermission("count.manage");
-  if (!gate.ok) return gate;
+  if (!gate.ok) return { ok: false, error: gate.error };
   const s = gate.session;
-  const code = barcode.trim();
-  if (!code) return { ok: false, error: "Código vazio." };
-  const p = await prisma.product.findFirst({
-    where: { organizationId: s.org, barcode: code },
-    select: { id: true },
-  });
-  if (!p) return { ok: false, error: `Nenhum produto com o código ${code}.` };
-  const res = await addItem(s.org, countId, p.id);
-  if (res.ok) revalidate(s.slug, countId);
-  return { ok: res.ok, error: res.error, id: p.id };
+  const res = await scanItem(s.org, countId, barcode);
+  if (res.ok) revalidatePath(`/espaco/${s.slug}/m/conferencia`);
+  return res;
 }
 
 export async function removeItemAction(countId: string, itemId: string): Promise<R> {

@@ -9,7 +9,13 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const { prisma, applyStockMovement } = vi.hoisted(() => ({
   prisma: {
     stockCount: { findFirst: vi.fn(), update: vi.fn(), count: vi.fn() },
-    stockCountItem: { updateMany: vi.fn() },
+    stockCountItem: {
+      updateMany: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+    product: { findFirst: vi.fn() },
     $transaction: vi.fn(),
   },
   applyStockMovement: vi.fn(),
@@ -23,6 +29,7 @@ import {
   canTransition,
   transition,
   adjustCount,
+  scanItem,
 } from "@/lib/endurance/stock-count";
 
 const ORG = "org1";
@@ -69,6 +76,87 @@ describe("máquina de estados", () => {
     expect(data.status).toBe("aprovada");
     expect(data.approvedById).toBe("u1");
     expect(data.approvedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe("scanItem — leitura por scanner (hands-free)", () => {
+  beforeEach(() => {
+    prisma.stockCount.findFirst.mockResolvedValue({ status: "em_conferencia" });
+    prisma.product.findFirst.mockResolvedValue({
+      id: "p1",
+      name: "Arroz 5kg",
+      barcode: "789",
+      sku: "SKU1",
+      category: "Mercearia",
+      stock: 10,
+      cost: 5,
+    });
+  });
+
+  it("código não cadastrado → erro claro com notFound", async () => {
+    prisma.product.findFirst.mockResolvedValue(null);
+    const res = await scanItem(ORG, "c1", "000");
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.notFound).toBe(true);
+  });
+
+  it("primeiro bipe cria a linha com quantidade 1", async () => {
+    prisma.stockCountItem.findUnique.mockResolvedValue(null);
+    prisma.stockCountItem.create.mockResolvedValue({
+      id: "i1",
+      productId: "p1",
+      productName: "Arroz 5kg",
+      barcode: "789",
+      sku: "SKU1",
+      category: "Mercearia",
+      systemQty: 10,
+      countedQty: 1,
+      unitCost: 5,
+      note: "",
+    });
+    const res = await scanItem(ORG, "c1", "789");
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.created).toBe(true);
+      expect(res.item.countedQty).toBe(1);
+      expect(res.item.divergence).toBe(-9); // 1 contado − 10 sistema
+    }
+    expect(prisma.stockCountItem.create).toHaveBeenCalled();
+  });
+
+  it("bipe repetido INCREMENTA a mesma linha (não cria outra)", async () => {
+    prisma.stockCountItem.findUnique.mockResolvedValue({
+      id: "i1",
+      countedQty: 2,
+      systemQty: 10,
+    });
+    prisma.stockCountItem.update.mockResolvedValue({
+      id: "i1",
+      productId: "p1",
+      productName: "Arroz 5kg",
+      barcode: "789",
+      sku: "SKU1",
+      category: "Mercearia",
+      systemQty: 10,
+      countedQty: 3,
+      unitCost: 5,
+      note: "",
+    });
+    const res = await scanItem(ORG, "c1", "789");
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.created).toBe(false);
+      expect(res.item.countedQty).toBe(3);
+    }
+    // incrementou de 2 → 3, sem criar nova linha
+    expect(prisma.stockCountItem.update.mock.calls[0][0].data.countedQty).toBe(3);
+    expect(prisma.stockCountItem.create).not.toHaveBeenCalled();
+  });
+
+  it("recusa leitura fora dos status editáveis", async () => {
+    prisma.stockCount.findFirst.mockResolvedValue({ status: "aprovada" });
+    const res = await scanItem(ORG, "c1", "789");
+    expect(res.ok).toBe(false);
   });
 });
 

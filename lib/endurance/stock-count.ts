@@ -129,7 +129,7 @@ export async function addItem(
   org: string,
   countId: string,
   productId: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; item?: ScannedItem }> {
   const count = await prisma.stockCount.findFirst({
     where: { id: countId, organizationId: org },
   });
@@ -154,9 +154,9 @@ export async function addItem(
   const exists = await prisma.stockCountItem.findUnique({
     where: { stockCountId_productId: { stockCountId: countId, productId } },
   });
-  if (exists) return { ok: true }; // idempotente — já está na lista
+  if (exists) return { ok: true, item: toItemDTO(exists) }; // idempotente
 
-  await prisma.stockCountItem.create({
+  const created = await prisma.stockCountItem.create({
     data: {
       stockCountId: countId,
       productId: p.id,
@@ -168,7 +168,130 @@ export async function addItem(
       unitCost: p.cost,
     },
   });
-  return { ok: true };
+  return { ok: true, item: toItemDTO(created) };
+}
+
+/** Item devolvido ao cliente (scan/add) para atualização otimista da UI. */
+export interface ScannedItem {
+  id: string;
+  productId: string;
+  productName: string;
+  barcode: string;
+  sku: string;
+  category: string;
+  systemQty: number;
+  countedQty: number | null;
+  unitCost: number;
+  divergence: number | null;
+  note: string;
+}
+
+function toItemDTO(i: {
+  id: string;
+  productId: string;
+  productName: string;
+  barcode: string;
+  sku: string;
+  category: string;
+  systemQty: number;
+  countedQty: number | null;
+  unitCost: unknown;
+  note: string;
+}): ScannedItem {
+  const counted = i.countedQty;
+  return {
+    id: i.id,
+    productId: i.productId,
+    productName: i.productName,
+    barcode: i.barcode,
+    sku: i.sku,
+    category: i.category,
+    systemQty: i.systemQty,
+    countedQty: counted,
+    unitCost: money(i.unitCost as number),
+    divergence: counted == null ? null : counted - i.systemQty,
+    note: i.note,
+  };
+}
+
+/**
+ * Leitura por scanner: localiza o produto pelo código de barras e INCREMENTA a
+ * quantidade conferida em +1 (cria a linha se ainda não existe). Modo hands-free
+ * — devolve o item atualizado para a UI refletir sem recarregar a página.
+ */
+export async function scanItem(
+  org: string,
+  countId: string,
+  barcode: string,
+): Promise<
+  | { ok: true; item: ScannedItem; created: boolean }
+  | { ok: false; error: string; notFound?: boolean }
+> {
+  const code = barcode.trim();
+  if (!code) return { ok: false, error: "Código vazio." };
+
+  const count = await prisma.stockCount.findFirst({
+    where: { id: countId, organizationId: org },
+    select: { status: true },
+  });
+  if (!count) return { ok: false, error: "Conferência não encontrada." };
+  if (count.status !== "rascunho" && count.status !== "em_conferencia")
+    return { ok: false, error: "A conferência não aceita leitura neste status." };
+
+  const p = await prisma.product.findFirst({
+    where: { organizationId: org, barcode: code },
+    select: {
+      id: true,
+      name: true,
+      barcode: true,
+      sku: true,
+      category: true,
+      stock: true,
+      cost: true,
+    },
+  });
+  if (!p)
+    return {
+      ok: false,
+      notFound: true,
+      error: `Produto não cadastrado para o código ${code}.`,
+    };
+
+  const existing = await prisma.stockCountItem.findUnique({
+    where: { stockCountId_productId: { stockCountId: countId, productId: p.id } },
+  });
+
+  let item;
+  let created = false;
+  if (existing) {
+    item = await prisma.stockCountItem.update({
+      where: { id: existing.id },
+      data: { countedQty: (existing.countedQty ?? 0) + 1 },
+    });
+  } else {
+    created = true;
+    item = await prisma.stockCountItem.create({
+      data: {
+        stockCountId: countId,
+        productId: p.id,
+        productName: p.name,
+        barcode: p.barcode,
+        sku: p.sku,
+        category: p.category,
+        systemQty: p.stock,
+        unitCost: p.cost,
+        countedQty: 1,
+      },
+    });
+  }
+
+  if (count.status === "rascunho")
+    await prisma.stockCount.update({
+      where: { id: countId },
+      data: { status: "em_conferencia" },
+    });
+
+  return { ok: true, created, item: toItemDTO(item) };
 }
 
 export async function removeItem(
