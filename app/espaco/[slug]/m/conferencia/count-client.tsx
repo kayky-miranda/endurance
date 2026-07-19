@@ -19,7 +19,9 @@ import {
   Target,
   Volume2,
   VolumeX,
+  Camera,
 } from "lucide-react";
+import { CameraScanner } from "./camera-scanner";
 import {
   searchProductsAction,
   addItemAction,
@@ -450,6 +452,7 @@ function ScanBar({
   const [searching, setSearching] = useState(false);
   const [soundOn, setSoundOn] = useState(true);
   const [flash, setFlash] = useState<"ok" | "err" | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const scanRef = useRef<HTMLInputElement | null>(null);
   const [, startTransition] = useTransition();
   const beep = useBeep();
@@ -515,6 +518,20 @@ function ScanBar({
         setResults([]);
       } else setMsg({ tone: "err", text: res.error ?? "Falha ao adicionar." });
     });
+  }
+
+  // Leitura pela câmera: mesmo fluxo do scanner físico (incrementa +1), mas o
+  // beep/feedback é tratado dentro do overlay. Devolve o texto a exibir lá.
+  async function detectFromCamera(code: string): Promise<{ ok: boolean; text: string }> {
+    const res = await scanCountAction(countId, code);
+    if (res.ok) {
+      onScan(res.item);
+      const t = `${res.item.productName} — contado: ${res.item.countedQty}`;
+      setMsg({ tone: "ok", text: t });
+      return { ok: true, text: t };
+    }
+    setMsg({ tone: "err", text: res.error });
+    return { ok: false, text: res.error };
   }
 
   return (
@@ -585,10 +602,32 @@ function ScanBar({
           )}
         </div>
       </div>
-      <p className="mt-2 flex items-center gap-1.5 pl-1 text-xs text-slate-400">
-        <Plus className="h-3 w-3" /> Modo hands-free: bipe os produtos em sequência —
-        cada leitura soma +1 na contagem e mantém o foco para a próxima.
-      </p>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 pl-1 text-xs text-slate-400">
+          <Plus className="h-3 w-3" /> Modo hands-free: bipe os produtos em sequência —
+          cada leitura soma +1 na contagem e mantém o foco para a próxima.
+        </p>
+        <button
+          type="button"
+          onClick={() => setCameraOpen(true)}
+          className="inline-flex items-center gap-2 rounded-xl border border-brand-500/40 bg-brand-500/5 px-3.5 py-2 text-sm font-semibold text-brand-600 transition hover:bg-brand-500/10 dark:text-brand-300"
+        >
+          <Camera className="h-4 w-4" /> Ler pela câmera
+        </button>
+      </div>
+
+      {cameraOpen && (
+        <CameraScanner
+          onDetect={detectFromCamera}
+          onClose={() => {
+            setCameraOpen(false);
+            refocus();
+          }}
+          playBeep={(ok) => {
+            if (soundOn) beep(ok);
+          }}
+        />
+      )}
     </div>
   );
 }
