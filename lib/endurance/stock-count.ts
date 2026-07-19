@@ -257,33 +257,61 @@ export async function scanItem(
       error: `Produto não cadastrado para o código ${code}.`,
     };
 
-  const existing = await prisma.stockCountItem.findUnique({
-    where: { stockCountId_productId: { stockCountId: countId, productId: p.id } },
-  });
+  // Incremento ATÔMICO no banco: com vários operadores bipando a mesma
+  // conferência, "ler e somar" em JS perderia leituras concorrentes. Aqui a
+  // soma acontece no próprio UPDATE (increment) e a criação simultânea da
+  // mesma linha cai no unique (P2002) e vira soma.
+  const productId = p.id; // narrow estável para os closures abaixo
+  const uniqueWhere = {
+    stockCountId_productId: { stockCountId: countId, productId },
+  };
 
-  let item;
-  let created = false;
-  if (existing) {
-    item = await prisma.stockCountItem.update({
-      where: { id: existing.id },
-      data: { countedQty: (existing.countedQty ?? 0) + 1 },
+  async function bump(): Promise<void> {
+    // Linha ainda não contada (countedQty null) começa em 1 (NULL+1 seria NULL);
+    // se outro operador já contou, o claim falha e soma +1 direto no banco.
+    const claimed = await prisma.stockCountItem.updateMany({
+      where: { stockCountId: countId, productId, countedQty: null },
+      data: { countedQty: 1 },
     });
-  } else {
-    created = true;
-    item = await prisma.stockCountItem.create({
-      data: {
-        stockCountId: countId,
-        productId: p.id,
-        productName: p.name,
-        barcode: p.barcode,
-        sku: p.sku,
-        category: p.category,
-        systemQty: p.stock,
-        unitCost: p.cost,
-        countedQty: 1,
-      },
-    });
+    if (claimed.count === 0)
+      await prisma.stockCountItem.updateMany({
+        where: { stockCountId: countId, productId },
+        data: { countedQty: { increment: 1 } },
+      });
   }
+
+  let item = null;
+  let created = false;
+  const existing = await prisma.stockCountItem.findUnique({
+    where: uniqueWhere,
+    select: { id: true },
+  });
+  if (existing) {
+    await bump();
+  } else {
+    try {
+      item = await prisma.stockCountItem.create({
+        data: {
+          stockCountId: countId,
+          productId: p.id,
+          productName: p.name,
+          barcode: p.barcode,
+          sku: p.sku,
+          category: p.category,
+          systemQty: p.stock,
+          unitCost: p.cost,
+          countedQty: 1,
+        },
+      });
+      created = true;
+    } catch (e) {
+      // Corrida: outro operador criou a linha neste exato instante — soma.
+      if ((e as { code?: string })?.code !== "P2002") throw e;
+      await bump();
+    }
+  }
+  if (!item) item = await prisma.stockCountItem.findUnique({ where: uniqueWhere });
+  if (!item) return { ok: false, error: "Falha ao registrar a leitura." };
 
   if (count.status === "rascunho")
     await prisma.stockCount.update({

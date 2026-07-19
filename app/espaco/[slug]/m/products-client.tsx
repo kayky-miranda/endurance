@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import {
   Plus,
   Trash2,
@@ -11,6 +11,9 @@ import {
   PackageOpen,
   Pencil,
   X,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   createProductAction,
@@ -37,12 +40,22 @@ function brl(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+/** Paginação server-side: quando presente, a lista veio paginada do banco. */
+export type ProductsPager = {
+  total: number;
+  page: number;
+  pageSize: number;
+  q: string;
+};
+
 export default function ProductsClient({
   products,
   showAdd = true,
+  pager,
 }: {
   products: Product[];
   showAdd?: boolean;
+  pager?: ProductsPager;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -166,6 +179,8 @@ export default function ProductsClient({
         </div>
       )}
 
+      {pager && <ProductsSearch pager={pager} />}
+
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-ink-700 dark:bg-ink-900">
         {products.length === 0 ? (
           <div className="grid place-items-center px-6 py-16 text-center">
@@ -173,12 +188,14 @@ export default function ProductsClient({
               <PackageOpen className="h-6 w-6" />
             </div>
             <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-200">
-              Nenhum produto ainda
+              {pager?.q ? "Nenhum produto encontrado" : "Nenhum produto ainda"}
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              {showAdd
-                ? "Adicione o primeiro produto no formulário acima."
-                : "Cadastre produtos no módulo Cadastro de produtos."}
+              {pager?.q
+                ? "Ajuste a busca ou limpe o filtro para ver todos."
+                : showAdd
+                  ? "Adicione o primeiro produto no formulário acima."
+                  : "Cadastre produtos no módulo Cadastro de produtos."}
             </p>
           </div>
         ) : (
@@ -285,6 +302,7 @@ export default function ProductsClient({
             </table>
           </div>
         )}
+        {pager && pager.total > pager.pageSize && <ProductsPagination pager={pager} />}
       </div>
 
       {editing && (
@@ -303,6 +321,89 @@ export default function ProductsClient({
 
 const INPUT =
   "w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100";
+
+/** Busca server-side via URL (?q=) com debounce — a query roda no banco. */
+function ProductsSearch({ pager }: { pager: ProductsPager }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [term, setTerm] = useState(pager.q);
+  const timer = useRef<number | null>(null);
+
+  // Se a URL mudar por navegação (voltar/avançar), realinha o campo.
+  useEffect(() => setTerm(pager.q), [pager.q]);
+
+  function apply(value: string) {
+    setTerm(value);
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value.trim()) params.set("q", value.trim());
+      else params.delete("q");
+      params.delete("pagina"); // busca nova volta para a primeira página
+      router.replace(`${pathname}${params.size ? `?${params}` : ""}`, {
+        scroll: false,
+      });
+    }, 350);
+  }
+
+  return (
+    <div className="relative">
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <input
+        value={term}
+        onChange={(e) => apply(e.target.value)}
+        placeholder="Buscar por nome, código de barras ou categoria…"
+        className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-800 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-700 dark:bg-ink-900 dark:text-slate-100"
+      />
+    </div>
+  );
+}
+
+function ProductsPagination({ pager }: { pager: ProductsPager }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const pages = Math.max(1, Math.ceil(pager.total / pager.pageSize));
+  const from = (pager.page - 1) * pager.pageSize + 1;
+  const to = Math.min(pager.page * pager.pageSize, pager.total);
+
+  function go(page: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (page > 1) params.set("pagina", String(page));
+    else params.delete("pagina");
+    router.replace(`${pathname}${params.size ? `?${params}` : ""}`, {
+      scroll: false,
+    });
+  }
+
+  return (
+    <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 text-sm dark:border-ink-800">
+      <p className="text-slate-500 dark:text-slate-400">
+        {from}–{to} de {pager.total}
+      </p>
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => go(pager.page - 1)}
+          disabled={pager.page <= 1}
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 transition hover:border-brand-500 disabled:opacity-30 dark:border-ink-600 dark:text-slate-300"
+        >
+          <ChevronLeft className="h-4 w-4" /> Anterior
+        </button>
+        <span className="px-2 text-xs text-slate-400">
+          {pager.page}/{pages}
+        </span>
+        <button
+          onClick={() => go(pager.page + 1)}
+          disabled={pager.page >= pages}
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 transition hover:border-brand-500 disabled:opacity-30 dark:border-ink-600 dark:text-slate-300"
+        >
+          Próxima <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function EditProductModal({
   product,

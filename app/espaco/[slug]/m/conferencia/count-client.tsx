@@ -87,6 +87,29 @@ export default function CountClient({
   const [items, setItems] = useState<Item[]>(count.items);
   const [lastScanId, setLastScanId] = useState<string | null>(null);
 
+  // Sincronização multiusuário: o servidor é a fonte da verdade. Quando um
+  // refresh traz novos dados (outro operador bipou/finalizou), realinha o
+  // estado local — os bipes deste operador já foram gravados antes do upsert
+  // local, então nada se perde.
+  useEffect(() => {
+    setItems(count.items);
+  }, [count.items]);
+
+  // Enquanto a conferência está ativa, revalida a cada 15s e ao voltar o foco
+  // para a aba — assim status e contagens de outros operadores aparecem sem
+  // recarregar a página.
+  const active = count.status !== "ajustada" && count.status !== "cancelada";
+  useEffect(() => {
+    if (!active) return;
+    const id = window.setInterval(() => router.refresh(), 15000);
+    const onFocus = () => router.refresh();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [active, router]);
+
   const editable = count.status === "rascunho" || count.status === "em_conferencia";
   const awaiting = count.status === "aguardando_aprovacao";
   const approved = count.status === "aprovada";

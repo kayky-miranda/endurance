@@ -14,6 +14,7 @@ const { prisma, applyStockMovement } = vi.hoisted(() => ({
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      count: vi.fn(),
     },
     product: { findFirst: vi.fn() },
     $transaction: vi.fn(),
@@ -124,33 +125,93 @@ describe("scanItem — leitura por scanner (hands-free)", () => {
     expect(prisma.stockCountItem.create).toHaveBeenCalled();
   });
 
-  it("bipe repetido INCREMENTA a mesma linha (não cria outra)", async () => {
-    prisma.stockCountItem.findUnique.mockResolvedValue({
-      id: "i1",
-      countedQty: 2,
-      systemQty: 10,
-    });
-    prisma.stockCountItem.update.mockResolvedValue({
-      id: "i1",
-      productId: "p1",
-      productName: "Arroz 5kg",
-      barcode: "789",
-      sku: "SKU1",
-      category: "Mercearia",
-      systemQty: 10,
-      countedQty: 3,
-      unitCost: 5,
-      note: "",
-    });
+  it("bipe repetido INCREMENTA a mesma linha, de forma atômica no banco", async () => {
+    // 1ª chamada: linha existe; 2ª: releitura do estado final pós-incremento.
+    prisma.stockCountItem.findUnique
+      .mockResolvedValueOnce({ id: "i1" })
+      .mockResolvedValueOnce({
+        id: "i1",
+        productId: "p1",
+        productName: "Arroz 5kg",
+        barcode: "789",
+        sku: "SKU1",
+        category: "Mercearia",
+        systemQty: 10,
+        countedQty: 3,
+        unitCost: 5,
+        note: "",
+      });
+    // claim (countedQty null → 1) não pega ninguém; increment soma no banco.
+    prisma.stockCountItem.updateMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 });
     const res = await scanItem(ORG, "c1", "789");
     expect(res.ok).toBe(true);
     if (res.ok) {
       expect(res.created).toBe(false);
       expect(res.item.countedQty).toBe(3);
     }
-    // incrementou de 2 → 3, sem criar nova linha
-    expect(prisma.stockCountItem.update.mock.calls[0][0].data.countedQty).toBe(3);
+    // a soma acontece via increment no UPDATE (seguro com vários operadores)
+    expect(prisma.stockCountItem.updateMany.mock.calls[1][0].data.countedQty).toEqual({
+      increment: 1,
+    });
     expect(prisma.stockCountItem.create).not.toHaveBeenCalled();
+  });
+
+  it("linha adicionada mas ainda não contada (null) vira 1 no primeiro bipe", async () => {
+    prisma.stockCountItem.findUnique
+      .mockResolvedValueOnce({ id: "i1" })
+      .mockResolvedValueOnce({
+        id: "i1",
+        productId: "p1",
+        productName: "Arroz 5kg",
+        barcode: "789",
+        sku: "SKU1",
+        category: "Mercearia",
+        systemQty: 10,
+        countedQty: 1,
+        unitCost: 5,
+        note: "",
+      });
+    // claim acerta a linha com countedQty null → nenhum increment depois
+    prisma.stockCountItem.updateMany.mockResolvedValueOnce({ count: 1 });
+    const res = await scanItem(ORG, "c1", "789");
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.item.countedQty).toBe(1);
+    expect(prisma.stockCountItem.updateMany).toHaveBeenCalledTimes(1);
+    expect(
+      prisma.stockCountItem.updateMany.mock.calls[0][0].where.countedQty,
+    ).toBeNull();
+  });
+
+  it("criação concorrente (P2002) degrada para incremento, sem duplicar linha", async () => {
+    prisma.stockCountItem.findUnique
+      .mockResolvedValueOnce(null) // ainda não existia ao checar…
+      .mockResolvedValueOnce({
+        id: "i1",
+        productId: "p1",
+        productName: "Arroz 5kg",
+        barcode: "789",
+        sku: "SKU1",
+        category: "Mercearia",
+        systemQty: 10,
+        countedQty: 2,
+        unitCost: 5,
+        note: "",
+      });
+    // …mas outro operador criou no meio: o create bate no unique
+    prisma.stockCountItem.create.mockRejectedValueOnce(
+      Object.assign(new Error("unique"), { code: "P2002" }),
+    );
+    prisma.stockCountItem.updateMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 });
+    const res = await scanItem(ORG, "c1", "789");
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.created).toBe(false);
+      expect(res.item.countedQty).toBe(2);
+    }
   });
 
   it("recusa leitura fora dos status editáveis", async () => {

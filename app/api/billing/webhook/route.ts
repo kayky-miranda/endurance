@@ -49,7 +49,19 @@ export async function POST(request: Request) {
   if (status && orgId) {
     // Toda a decisão (promover pendingPlan, renovar ciclo, inadimplência)
     // vive no serviço — o webhook só valida, traduz o evento e delega.
-    const result = await applyGatewayEvent(orgId, status);
+    let result;
+    try {
+      result = await applyGatewayEvent(orgId, status);
+    } catch (e) {
+      // Falha aqui significa assinatura parada silenciosamente — precisa
+      // chegar ao Sentry com contexto, e o 500 faz o Asaas reentregar.
+      logger.exception("Webhook billing — falha ao aplicar evento", e, {
+        event,
+        orgId,
+        status,
+      });
+      return Response.json({ ok: false }, { status: 500 });
+    }
     logger.info("Webhook billing aplicado", {
       event,
       orgId,

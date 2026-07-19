@@ -16,21 +16,51 @@ import {
 } from "../module-kit";
 
 // Controle de estoque — entradas, saídas e reposição inteligente.
+const PAGE_SIZE = 100;
+
 export default async function EstoquePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ q?: string; pagina?: string }>;
 }) {
   const { slug } = await params;
+  const sp = await searchParams;
   const { mod, session, denied } = await loadModule(slug, "estoque");
   if (denied) return <DeniedModule slug={slug} mod={mod} />;
 
-  const rows = session
-    ? await prisma.product.findMany({
-        where: { organizationId: session.org },
-        orderBy: { stock: "asc" },
-      })
-    : [];
+  // Lista paginada no banco; KPIs por agregação (não carrega o catálogo todo).
+  const q = (sp.q ?? "").trim();
+  const page = Math.max(1, parseInt(sp.pagina ?? "1", 10) || 1);
+  const where = {
+    organizationId: session?.org ?? "",
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" as const } },
+            { barcode: { contains: q } },
+            { category: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
+  const [rows, total, agg] = session
+    ? await Promise.all([
+        prisma.product.findMany({
+          where,
+          orderBy: { stock: "asc" },
+          take: PAGE_SIZE,
+          skip: (page - 1) * PAGE_SIZE,
+        }),
+        prisma.product.count({ where }),
+        prisma.product.aggregate({
+          where: { organizationId: session.org },
+          _count: true,
+          _sum: { stock: true },
+        }),
+      ])
+    : [[], 0, { _count: 0, _sum: { stock: 0 } }];
   const products: Product[] = rows.map((p) => ({
     id: p.id,
     name: p.name,
@@ -41,7 +71,8 @@ export default async function EstoquePage({
     price: money(p.price),
     stock: p.stock,
   }));
-  const unidades = products.reduce((s, p) => s + p.stock, 0);
+  const unidades = agg._sum.stock ?? 0;
+  const totalProdutos = agg._count;
   const replen = session
     ? await getReplenishment(session.org)
     : { items: [], totalCost: 0, needing: 0 };
@@ -52,7 +83,7 @@ export default async function EstoquePage({
       <div className="grid gap-4 sm:grid-cols-3">
         <StockStat
           label="Produtos cadastrados"
-          value={products.length}
+          value={totalProdutos}
           icon={Package}
         />
         <StockStat label="Unidades em estoque" value={unidades} icon={Boxes} />
@@ -68,7 +99,11 @@ export default async function EstoquePage({
 
       <ReplenishmentTable items={replen.items} totalCost={replen.totalCost} />
 
-      <ProductsClient products={products} showAdd={false} />
+      <ProductsClient
+        products={products}
+        showAdd={false}
+        pager={{ total, page, pageSize: PAGE_SIZE, q }}
+      />
     </div>
   );
 }
