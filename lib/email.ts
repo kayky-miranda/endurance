@@ -290,3 +290,64 @@ export async function sendPasswordResetEmail(opts: {
   const text = `Olá ${opts.name},\n\nRedefina sua senha no ${BRAND} acessando:\n${url}\n\nO link expira em 1 hora. Se você não solicitou, ignore.`;
   return sendEmail({ to: opts.to, subject: `Redefinir senha no ${BRAND}`, html, text });
 }
+
+export interface FinanceDigestItem {
+  description: string;
+  kind: string; // receber | pagar
+  amount: number;
+  dueDate: string; // YYYY-MM-DD
+  overdue: boolean;
+}
+
+/** Digest diário financeiro: contas vencidas e vencendo em até 3 dias. */
+export async function sendFinanceDigestEmail(opts: {
+  to: string;
+  name: string;
+  orgName: string;
+  items: FinanceDigestItem[];
+  totalPagar: number;
+  totalReceber: number;
+}): Promise<SendResult> {
+  const brl = (n: number) =>
+    n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const rows = opts.items
+    .map(
+      (i) =>
+        `<tr>
+          <td style="padding:6px 12px 6px 0;">${i.description}</td>
+          <td style="padding:6px 12px;">${i.kind === "pagar" ? "A pagar" : "A receber"}</td>
+          <td style="padding:6px 12px;text-align:right;">${brl(i.amount)}</td>
+          <td style="padding:6px 0;color:${i.overdue ? "#dc2626" : "#d97706"};font-weight:600;">
+            ${i.overdue ? "VENCIDA" : `vence ${i.dueDate.split("-").reverse().join("/")}`}
+          </td>
+        </tr>`,
+    )
+    .join("");
+  const html = wrap(
+    "Contas a vencer",
+    `<p>Olá, ${opts.name}!</p>
+     <p>Resumo financeiro do <strong>${opts.orgName}</strong> — contas vencidas ou vencendo nos próximos 3 dias:</p>
+     <table style="width:100%;border-collapse:collapse;font-size:14px;margin:16px 0;">${rows}</table>
+     <p style="font-size:14px;">
+       ${opts.totalPagar > 0 ? `Total a pagar: <strong>${brl(opts.totalPagar)}</strong>` : ""}
+       ${opts.totalPagar > 0 && opts.totalReceber > 0 ? " · " : ""}
+       ${opts.totalReceber > 0 ? `Total a receber: <strong>${brl(opts.totalReceber)}</strong>` : ""}
+     </p>
+     <p style="margin:24px 0;">${button(`${APP_URL}`, "Abrir o financeiro")}</p>
+     <p style="font-size:13px;color:#94a3b8;">Você recebe este resumo no máximo uma vez por dia, apenas quando há contas nessa janela.</p>`,
+  );
+  const text =
+    `Olá ${opts.name},\n\nContas vencidas/vencendo no ${opts.orgName}:\n` +
+    opts.items
+      .map(
+        (i) =>
+          `- ${i.description} (${i.kind}): ${brl(i.amount)} — ${i.overdue ? "VENCIDA" : `vence ${i.dueDate}`}`,
+      )
+      .join("\n");
+  return sendEmail({
+    to: opts.to,
+    subject: `💰 ${opts.items.length} conta${opts.items.length > 1 ? "s" : ""} a vencer — ${opts.orgName}`,
+    html,
+    text,
+  });
+}

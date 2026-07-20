@@ -59,6 +59,26 @@ model Organization {
   marketingSub     MarketingSubscription?
   invites          Invite[]
   themeSettings    ThemeSettings?
+  apiKeys          ApiKey[]
+}
+
+// Chave da API pública (/api/v1). O token completo (edk_…) é exibido UMA vez
+// na criação; aqui fica só o hash SHA-256 + um prefixo para identificação.
+model ApiKey {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  prefix         String // primeiros caracteres do token (exibição na lista)
+  keyHash        String    @unique // sha256(token)
+  createdById    String?
+  createdByName  String    @default("")
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
 
 // White-label: cada empresa pode customizar a paleta do app. Todos os campos

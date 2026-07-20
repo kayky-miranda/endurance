@@ -1,7 +1,10 @@
 import { requireOrgAccess } from "@/lib/auth";
 import Link from "next/link";
 import { User } from "lucide-react";
+import { hasPermission } from "@/lib/endurance/permissions";
+import { listApiKeys } from "@/lib/endurance/api-keys";
 import ConfiguracoesClient from "./configuracoes-client";
+import ApiKeysSection, { type ApiKeyRow } from "./api-keys-section";
 
 export default async function ConfiguracoesPage({
   params,
@@ -9,7 +12,17 @@ export default async function ConfiguracoesPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  await requireOrgAccess(slug);
+  const session = await requireOrgAccess(slug);
+
+  const canApi = hasPermission(session.role, session.permissions, "integrations.config");
+  const apiKeys: ApiKeyRow[] = canApi
+    ? (await listApiKeys(session.org)).map((k) => ({
+        ...k,
+        lastUsedAt: k.lastUsedAt?.toISOString() ?? null,
+        revokedAt: k.revokedAt?.toISOString() ?? null,
+        createdAt: k.createdAt.toISOString(),
+      }))
+    : [];
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -21,6 +34,8 @@ export default async function ConfiguracoesPage({
       </header>
 
       <ConfiguracoesClient />
+
+      {canApi && <ApiKeysSection keys={apiKeys} />}
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-ink-700 dark:bg-ink-900">
         <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Conta</h2>
