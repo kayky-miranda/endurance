@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getSession, requirePermission } from "@/lib/auth";
+import { FinalizeSaleSchema, CustomerSchema, firstError } from "@/lib/validation";
 import { suggestCrossSell, type Suggestion } from "@/lib/endurance/crosssell";
 import { getOpenSession } from "@/lib/endurance/cash";
 import { createReceivablesForSale } from "@/lib/endurance/finance";
@@ -50,6 +51,12 @@ export async function finalizeSaleAction(
   const gate = await requirePermission("pdv.sell");
   if (!gate.ok) return gate;
   const s = gate.session;
+
+  // Higiene de dados na porta: NaN, quantidade fracionária/absurda, método de
+  // pagamento desconhecido etc. param aqui com mensagem clara (não com 500).
+  const v = FinalizeSaleSchema.safeParse(input);
+  if (!v.success) return { ok: false, error: firstError(v.error) };
+  input = { ...input, ...v.data };
 
   const { token } = input;
   if (!token) return { ok: false, error: "Token de venda ausente." };
@@ -304,17 +311,12 @@ export async function createCustomerAction(
   if (!gate.ok) return gate;
   const s = gate.session;
 
-  const name = (input.name ?? "").trim();
-  if (!name) return { ok: false, error: "Informe o nome do cliente." };
+  const v = CustomerSchema.safeParse(input);
+  if (!v.success) return { ok: false, error: firstError(v.error) };
+  const { name, phone, email, document } = v.data;
 
   const c = await prisma.customer.create({
-    data: {
-      organizationId: s.org,
-      name,
-      phone: (input.phone ?? "").trim(),
-      email: (input.email ?? "").trim(),
-      document: (input.document ?? "").trim(),
-    },
+    data: { organizationId: s.org, name, phone, email, document },
   });
   revalidatePath(`/espaco/${s.slug}/m/pdv`);
   return {

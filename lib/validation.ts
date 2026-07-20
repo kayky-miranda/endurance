@@ -131,6 +131,71 @@ export const StockAdjustSchema = z.object({
     .transform((n) => Math.trunc(Number.isFinite(n) ? n : 0)),
 });
 
+/** Venda do PDV (finalizeSaleAction) — caminho do dinheiro, tolerância zero
+ * a NaN/fracionário/valores absurdos. As regras de negócio (estoque, troco,
+ * PIX) continuam na action; aqui só entra higiene de dados. */
+export const FinalizeSaleSchema = z.object({
+  token: z.string().trim().min(8, "Token de venda ausente.").max(80),
+  customerId: z.string().trim().max(40).nullish(),
+  pixChargeId: z.string().trim().max(40).nullish(),
+  discount: z
+    .coerce.number()
+    .catch(0)
+    .transform((n) => (Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0))
+    .refine((n) => n <= 9_999_999, "Desconto acima do limite."),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().trim().min(1).max(40),
+        qty: z
+          .coerce.number()
+          .refine((n) => Number.isFinite(n) && n > 0, "Quantidade inválida.")
+          .refine((n) => Number.isInteger(n), "Quantidade deve ser inteira.")
+          .refine((n) => n <= 100_000, "Quantidade acima do limite."),
+      }),
+    )
+    .min(1, "Carrinho vazio.")
+    .max(500, "Carrinho grande demais."),
+  payments: z
+    .array(
+      z.object({
+        method: z.enum(["dinheiro", "credito", "debito", "pix"]),
+        amount: z
+          .coerce.number()
+          .refine((n) => Number.isFinite(n) && n > 0, "Valor de pagamento inválido.")
+          .refine((n) => n <= 9_999_999, "Pagamento acima do limite.")
+          .transform((n) => Math.round(n * 100) / 100),
+      }),
+    )
+    .max(10, "Formas de pagamento demais.")
+    .optional()
+    .default([]),
+});
+export type FinalizeSaleInput = z.infer<typeof FinalizeSaleSchema>;
+
+/** Cliente rápido do PDV (createCustomerAction). */
+export const CustomerSchema = z.object({
+  name: z
+    .string({ message: "Informe o nome do cliente." })
+    .trim()
+    .min(1, "Informe o nome do cliente.")
+    .max(80, "Nome muito longo."),
+  phone: z.string().trim().max(20, "Telefone muito longo.").optional().default(""),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .max(120, "E-mail muito longo.")
+    .refine(
+      (e) => e === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e),
+      "E-mail inválido.",
+    )
+    .optional()
+    .default(""),
+  document: z.string().trim().max(20, "Documento muito longo.").optional().default(""),
+});
+export type CustomerFormInput = z.infer<typeof CustomerSchema>;
+
 /** Lançamento financeiro (createEntryAction). */
 export const FinanceEntrySchema = z.object({
   kind: z.enum(["receber", "pagar"]).catch("receber"),

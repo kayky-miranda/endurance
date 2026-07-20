@@ -1,6 +1,6 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { prisma, type Tx } from "@/lib/db";
 import { PAGE_SIZE, clampPage, pageMeta, type PageMeta } from "./pagination";
 
 // ===========================================================================
@@ -85,7 +85,7 @@ export interface ApplyMovementInput {
  * InsufficientStockError e a transação inteira do chamador é revertida.
  */
 export async function applyStockMovement(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   input: ApplyMovementInput,
 ): Promise<{ before: number; after: number }> {
   const { organizationId, productId, delta } = input;

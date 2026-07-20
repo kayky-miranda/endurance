@@ -136,10 +136,12 @@ export async function deleteProductAction(id: string): Promise<Result> {
   const s = gate.session;
 
   const p = await prisma.product.findUnique({ where: { id } });
-  if (!p || p.organizationId !== s.org)
+  if (!p || p.organizationId !== s.org || p.deletedAt)
     return { ok: false, error: "Produto não encontrado." };
 
-  await prisma.product.delete({ where: { id } });
+  // Exclusão LÓGICA: o histórico (vendas, razão de estoque) continua íntegro;
+  // o produto some das listagens pela extensão global em lib/db.ts.
+  await prisma.product.update({ where: { id }, data: { deletedAt: new Date() } });
   revalidate(s.slug);
   await logActivity(s, "product.delete", `Removeu o produto ${p.name}`, id);
   return { ok: true };

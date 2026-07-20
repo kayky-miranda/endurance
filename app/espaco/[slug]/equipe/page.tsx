@@ -19,7 +19,7 @@ export default async function EquipePage({
 
   const [users, logs, invites] = await Promise.all([
     prisma.user.findMany({
-      where: { organizationId: session.org },
+      where: { organizationId: session.org, status: { not: "deleted" } },
       orderBy: { createdAt: "asc" },
       select: {
         id: true,

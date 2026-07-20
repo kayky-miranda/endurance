@@ -296,7 +296,8 @@ export async function deleteSupplier(
       error:
         "Fornecedor com pedidos no histórico. Inative-o em vez de excluir.",
     };
-  await prisma.supplier.delete({ where: { id } });
+  // Exclusão LÓGICA (some das listagens via extensão global em lib/db.ts).
+  await prisma.supplier.update({ where: { id }, data: { deletedAt: new Date() } });
   return { ok: true };
 }
 

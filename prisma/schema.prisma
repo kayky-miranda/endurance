@@ -233,6 +233,9 @@ model Supplier {
   note            String  @default("")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @default(now()) @updatedAt
+  // Exclusão LÓGICA: pedidos e cotações antigos preservam o fornecedor.
+  // Filtrado globalmente pela extensão do Prisma em lib/db.ts.
+  deletedAt       DateTime?
 
   organization  Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   orders        PurchaseOrder[]
@@ -240,7 +243,7 @@ model Supplier {
   productLinks  ProductSupplier[]
   quotationBids QuotationSupplier[]
 
-  @@index([organizationId])
+  @@index([organizationId, deletedAt])
   @@index([organizationId, status])
 }
 
@@ -476,12 +479,15 @@ model Customer {
   email          String   @default("")
   document       String   @default("")
   createdAt      DateTime @default(now())
+  // Exclusão LÓGICA: preserva o histórico (vendas, fiado). Filtrado
+  // globalmente pela extensão do Prisma em lib/db.ts.
+  deletedAt      DateTime?
 
   organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   sales            Sale[]
   whatsAppMessages WhatsAppMessage[]
 
-  @@index([organizationId])
+  @@index([organizationId, deletedAt])
 }
 
 // Produto do catálogo de um negócio (módulo Cadastro de produtos / Estoque).
@@ -500,12 +506,15 @@ model Product {
   ncm            String   @default("") // NCM fiscal do produto (8 díg.); vazio = usa o defaultNcm da empresa
   minStock       Int      @default(0) // estoque mínimo (ponto de alerta/reposição)
   createdAt      DateTime @default(now())
+  // Exclusão LÓGICA: vendas/movimentações antigas continuam apontando para o
+  // produto. Filtrado globalmente pela extensão do Prisma em lib/db.ts.
+  deletedAt      DateTime?
 
   organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   supplierLinks  ProductSupplier[]
   stockMovements StockMovement[]
 
-  @@index([organizationId])
+  @@index([organizationId, deletedAt])
   @@index([organizationId, barcode])
 }
 

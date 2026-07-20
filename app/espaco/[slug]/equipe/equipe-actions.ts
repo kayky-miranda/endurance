@@ -228,7 +228,22 @@ export async function removeUserAction(userId: string): Promise<R> {
   if (target.role === "OWNER")
     return { ok: false, error: "Não é possível remover o dono do espaço." };
 
-  await prisma.user.delete({ where: { id: target.id } });
+  // Exclusão LÓGICA: mantém o nome no histórico (vendas, caixa, auditoria),
+  // bloqueia o login e libera o e-mail para um novo convite.
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: target.id },
+      data: {
+        email: `deleted-${target.id.slice(-8)}@deleted.endurance.local`,
+        passwordHash: "DELETED",
+        status: "deleted",
+        permissions: [],
+        emailVerifiedAt: null,
+      },
+    }),
+    prisma.passwordResetToken.deleteMany({ where: { userId: target.id } }),
+    prisma.emailVerifyToken.deleteMany({ where: { userId: target.id } }),
+  ]);
   await logActivity(
     session,
     "user.delete",

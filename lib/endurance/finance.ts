@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/db";
+import { prisma, type Tx } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import { money } from "./money";
 import {
@@ -41,7 +41,7 @@ export interface SaleReceivableInput {
  */
 export async function createReceivablesForSale(
   i: SaleReceivableInput,
-  db: Prisma.TransactionClient = prisma,
+  db: Tx | typeof prisma = prisma,
 ): Promise<void> {
   const data = i.payments
     .filter((p) => p.amount > 0)

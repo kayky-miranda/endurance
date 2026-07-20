@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/db";
+import { prisma, type Tx } from "@/lib/db";
 import { money } from "@/lib/endurance/money";
 import { applyStockMovement } from "@/lib/endurance/stock-ledger";
 import type { Prisma } from "@prisma/client";
@@ -34,7 +34,7 @@ export {
 
 /** Número humano sequencial por org/ano: CONF-AAAA-NNNN. */
 async function nextCountNumber(
-  tx: Prisma.TransactionClient,
+  tx: Tx,
   org: string,
 ): Promise<string> {
   const year = new Date().getFullYear();

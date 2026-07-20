@@ -322,7 +322,22 @@ export async function removeMemberAction(userId: string): Promise<SimpleResult> 
   if (target.role === "OWNER")
     return { ok: false, error: "Não é possível remover o dono." };
 
-  await prisma.user.delete({ where: { id: userId } });
+  // Exclusão LÓGICA: mantém o nome no histórico, bloqueia o login e libera o
+  // e-mail para um novo convite (mesmo padrão de equipe-actions).
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        email: `deleted-${userId.slice(-8)}@deleted.endurance.local`,
+        passwordHash: "DELETED",
+        status: "deleted",
+        permissions: [],
+        emailVerifiedAt: null,
+      },
+    }),
+    prisma.passwordResetToken.deleteMany({ where: { userId } }),
+    prisma.emailVerifyToken.deleteMany({ where: { userId } }),
+  ]);
   revalidatePath(`/espaco/${session.slug}/equipe`);
   return { ok: true };
 }
