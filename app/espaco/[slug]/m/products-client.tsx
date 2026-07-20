@@ -14,6 +14,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  UploadCloud,
 } from "lucide-react";
 import {
   createProductAction,
@@ -21,6 +22,20 @@ import {
   adjustStockAction,
   updateProductAction,
 } from "./products-actions";
+import { importProductsCsvAction } from "./csv-import-actions";
+import CsvImportModal, { type CsvField } from "./csv-import-modal";
+
+const PRODUCT_CSV_FIELDS: CsvField[] = [
+  { key: "name", label: "Nome", required: true, hints: ["nome", "produto", "descri"] },
+  { key: "barcode", label: "Código de barras", hints: ["barra", "ean", "gtin"] },
+  { key: "sku", label: "SKU", hints: ["sku", "codigo interno", "referencia"] },
+  { key: "category", label: "Categoria", hints: ["categoria", "grupo", "setor"] },
+  { key: "unit", label: "Unidade", hints: ["unidade", "un."] },
+  { key: "ncm", label: "NCM", hints: ["ncm"] },
+  { key: "price", label: "Preço", hints: ["preco", "venda", "valor"] },
+  { key: "cost", label: "Custo", hints: ["custo", "compra"] },
+  { key: "stock", label: "Estoque inicial", hints: ["estoque", "saldo", "quantidade", "qtd"] },
+];
 
 export type Product = {
   id: string;
@@ -68,6 +83,7 @@ export default function ProductsClient({
   const [error, setError] = useState("");
   const [pendingId, setPendingId] = useState("");
   const [editing, setEditing] = useState<Product | null>(null);
+  const [importing, setImporting] = useState(false);
 
   async function add() {
     if (busy) return;
@@ -179,7 +195,21 @@ export default function ProductsClient({
         </div>
       )}
 
-      {pager && <ProductsSearch pager={pager} />}
+      {pager && (
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <ProductsSearch pager={pager} />
+          </div>
+          {showAdd && (
+            <button
+              onClick={() => setImporting(true)}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:text-slate-300"
+            >
+              <UploadCloud className="h-4 w-4" /> Importar CSV
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-ink-700 dark:bg-ink-900">
         {products.length === 0 ? (
@@ -304,6 +334,17 @@ export default function ProductsClient({
         )}
         {pager && pager.total > pager.pageSize && <ProductsPagination pager={pager} />}
       </div>
+
+      {importing && (
+        <CsvImportModal
+          title="Importar produtos por planilha"
+          fields={PRODUCT_CSV_FIELDS}
+          templateExample="Nome;Código de barras;SKU;Categoria;Unidade;NCM;Preço;Custo;Estoque"
+          onImport={importProductsCsvAction}
+          onClose={() => setImporting(false)}
+          onDone={() => router.refresh()}
+        />
+      )}
 
       {editing && (
         <EditProductModal

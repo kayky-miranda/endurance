@@ -20,6 +20,9 @@ import {
   Volume2,
   VolumeX,
   Camera,
+  EyeOff,
+  Download,
+  Printer,
 } from "lucide-react";
 import { CameraScanner } from "./camera-scanner";
 import {
@@ -113,6 +116,9 @@ export default function CountClient({
   const editable = count.status === "rascunho" || count.status === "em_conferencia";
   const awaiting = count.status === "aguardando_aprovacao";
   const approved = count.status === "aprovada";
+  // Conferência CEGA: enquanto está em contagem, ninguém vê saldo do sistema
+  // nem divergência na tela (anti-viés). Tudo aparece a partir da aprovação.
+  const hideSystem = count.blind && editable;
 
   function upsert(it: ScannedItem) {
     setItems((prev) => {
@@ -179,6 +185,28 @@ export default function CountClient({
           <h1 className="font-mono text-2xl font-bold tracking-tight">{count.number}</h1>
           <CountTypeBadge type={count.type} />
           <CountStatusBadge status={count.status} />
+          {count.blind && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2.5 py-1 text-xs font-medium text-violet-600 dark:text-violet-300">
+              <EyeOff className="h-3 w-3" /> Cega
+            </span>
+          )}
+          <span className="ml-auto flex items-center gap-1.5">
+            <a
+              href={`/espaco/${slug}/m/conferencia/${count.id}/export`}
+              download
+              title="Exportar CSV"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:text-slate-400"
+            >
+              <Download className="h-3.5 w-3.5" /> CSV
+            </a>
+            <Link
+              href={`/espaco/${slug}/m/conferencia/${count.id}/imprimir`}
+              title="Imprimir"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:text-slate-400"
+            >
+              <Printer className="h-3.5 w-3.5" /> Imprimir
+            </Link>
+          </span>
         </div>
         <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
           {count.location && <span>📍 {count.location}</span>}
@@ -205,21 +233,32 @@ export default function CountClient({
         </div>
       )}
 
-      {/* Resumo ao vivo */}
+      {/* Resumo ao vivo (na conferência cega, divergências só após a contagem) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <MiniStat label="Itens" value={`${countedItems.length}/${items.length}`} />
-        <MiniStat
-          label="Divergências"
-          value={String(divergentItems.length)}
-          tone={divergentItems.length ? "rose" : "slate"}
-        />
-        <MiniStat label="Valor divergência" value={brl(divValue)} tone="amber" />
-        <MiniStat
-          label="Acuracidade"
-          value={`${accuracy.toFixed(1)}%`}
-          tone="emerald"
-          icon={<Target className="h-3.5 w-3.5" />}
-        />
+        {!hideSystem && (
+          <>
+            <MiniStat
+              label="Divergências"
+              value={String(divergentItems.length)}
+              tone={divergentItems.length ? "rose" : "slate"}
+            />
+            <MiniStat label="Valor divergência" value={brl(divValue)} tone="amber" />
+            <MiniStat
+              label="Acuracidade"
+              value={`${accuracy.toFixed(1)}%`}
+              tone="emerald"
+              icon={<Target className="h-3.5 w-3.5" />}
+            />
+          </>
+        )}
+        {hideSystem && (
+          <div className="col-span-2 flex items-center gap-2 rounded-2xl border border-violet-500/30 bg-violet-500/5 p-4 text-sm text-violet-600 sm:col-span-3 dark:text-violet-300">
+            <EyeOff className="h-4 w-4 shrink-0" />
+            Conferência cega: o saldo do sistema e as divergências ficam ocultos
+            até a contagem ser finalizada.
+          </div>
+        )}
       </div>
 
       {/* Ações de estado */}
@@ -313,9 +352,13 @@ export default function CountClient({
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400 dark:border-ink-800">
                   <th className="px-4 py-2.5 font-medium">Produto</th>
-                  <th className="px-4 py-2.5 font-medium text-center">Sistema</th>
+                  {!hideSystem && (
+                    <th className="px-4 py-2.5 font-medium text-center">Sistema</th>
+                  )}
                   <th className="px-4 py-2.5 font-medium text-center">Físico</th>
-                  <th className="px-4 py-2.5 font-medium text-center">Divergência</th>
+                  {!hideSystem && (
+                    <th className="px-4 py-2.5 font-medium text-center">Divergência</th>
+                  )}
                   {editable && <th className="px-4 py-2.5" />}
                 </tr>
               </thead>
@@ -324,7 +367,7 @@ export default function CountClient({
                 {items.map((it) => {
                   const c = it.countedQty;
                   const div = c == null ? null : c - it.systemQty;
-                  const hasDiv = div != null && div !== 0;
+                  const hasDiv = !hideSystem && div != null && div !== 0;
                   const flash = it.id === lastScanId;
                   return (
                     <tr
@@ -345,9 +388,11 @@ export default function CountClient({
                           {[it.barcode, it.category].filter(Boolean).join(" · ") || "—"}
                         </p>
                       </td>
-                      <td className="px-4 py-3 text-center font-medium text-slate-500 dark:text-slate-400">
-                        {it.systemQty}
-                      </td>
+                      {!hideSystem && (
+                        <td className="px-4 py-3 text-center font-medium text-slate-500 dark:text-slate-400">
+                          {it.systemQty}
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-center">
                         {editable ? (
                           <input
@@ -380,6 +425,7 @@ export default function CountClient({
                           </span>
                         )}
                       </td>
+                      {!hideSystem && (
                       <td className="px-4 py-3 text-center">
                         {div == null ? (
                           <span className="text-slate-300">—</span>
@@ -400,6 +446,7 @@ export default function CountClient({
                           </span>
                         )}
                       </td>
+                      )}
                       {editable && (
                         <td className="px-4 py-3 text-right">
                           <button

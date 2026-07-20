@@ -54,6 +54,8 @@ export interface CreateCountInput {
   responsibleId?: string | null;
   responsibleName?: string;
   note?: string;
+  /** Conferência cega: operador conta sem ver o saldo do sistema. */
+  blind?: boolean;
   createdBy: { id: string; name: string };
   /** Carregar automaticamente os produtos (geral) ou por categoria. */
   autoLoad?: boolean;
@@ -77,6 +79,7 @@ export async function createCount(input: CreateCountInput): Promise<{
         responsibleId: input.responsibleId ?? null,
         responsibleName: input.responsibleName ?? "",
         note: input.note ?? "",
+        blind: input.blind ?? false,
         createdById: input.createdBy.id,
         createdByName: input.createdBy.name,
         status: "rascunho",
@@ -558,6 +561,7 @@ export async function getCount(org: string, countId: string) {
     type: c.type,
     location: c.location,
     status: c.status,
+    blind: c.blind,
     responsibleName: c.responsibleName,
     createdByName: c.createdByName,
     approvedByName: c.approvedByName,

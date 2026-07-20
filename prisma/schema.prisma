@@ -1094,6 +1094,9 @@ model StockCount {
   responsibleId   String?
   responsibleName String    @default("")
   note            String    @default("")
+  // Conferência CEGA: o operador não vê o saldo do sistema nem a divergência
+  // durante a contagem (padrão WMS anti-viés); tudo aparece na aprovação.
+  blind           Boolean   @default(false)
   createdById     String?
   createdByName   String    @default("")
   approvedById    String?

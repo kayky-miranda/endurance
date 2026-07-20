@@ -231,6 +231,7 @@ function NewCountModal({
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
+  const [blind, setBlind] = useState(false);
   const [error, setError] = useState("");
   const [busy, startTransition] = useTransition();
 
@@ -241,6 +242,7 @@ function NewCountModal({
         type,
         location,
         note,
+        blind,
         // Geral carrega tudo; cíclica pode filtrar por categoria; parcial e por
         // localização começam vazias (itens adicionados na contagem).
         autoLoad: type === "geral" || (type === "ciclica" && !!category),
@@ -331,6 +333,24 @@ function NewCountModal({
               rows={2}
               className={INPUT}
             />
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 p-3 dark:border-ink-600">
+            <input
+              type="checkbox"
+              checked={blind}
+              onChange={(e) => setBlind(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-brand-500"
+            />
+            <span>
+              <span className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                Conferência cega
+              </span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">
+                O operador conta sem ver o saldo do sistema (evita viés). As
+                divergências aparecem só na etapa de aprovação.
+              </span>
+            </span>
           </label>
 
           {error && (

@@ -31,6 +31,7 @@ export async function createCountAction(input: {
   location?: string;
   responsibleId?: string;
   note?: string;
+  blind?: boolean;
   autoLoad?: boolean;
   categoryFilter?: string;
 }): Promise<R> {
@@ -63,6 +64,7 @@ export async function createCountAction(input: {
     responsibleId,
     responsibleName,
     note: input.note,
+    blind: Boolean(input.blind),
     createdBy: { id: s.sub, name: s.name },
     // "geral" carrega tudo; "ciclica" pode filtrar por categoria.
     autoLoad: input.autoLoad ?? type === "geral",

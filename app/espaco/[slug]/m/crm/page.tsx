@@ -3,12 +3,14 @@ import { Clock, TrendingUp, UserCheck, Users } from "lucide-react";
 import { getCustomerInsights } from "@/lib/endurance/crm";
 import { parsePage } from "@/lib/endurance/pagination";
 import CrmCustomersTable from "../crm-client";
+import ImportCustomersButton from "../import-customers-button";
 import CampaignsPanel from "../campaigns-panel";
 import Pager from "../pager";
 import {
   loadModule,
   DeniedModule,
   ModuleHeader,
+  ExportCsvButton,
   EmptyCard,
   KpiCard,
   RankList,
@@ -34,7 +36,17 @@ export default async function CrmPage({
 
   return (
     <div className="space-y-6">
-      <ModuleHeader slug={slug} label={mod.label} description={mod.description} />
+      <ModuleHeader
+        slug={slug}
+        label={mod.label}
+        description={mod.description}
+        action={
+          <div className="flex items-center gap-2">
+            <ImportCustomersButton />
+            <ExportCsvButton href={`/espaco/${slug}/m/crm/export`} />
+          </div>
+        }
+      />
       {!ci || ci.total === 0 ? (
         <EmptyCard>
           Nenhum cliente cadastrado ainda. Identifique clientes no{" "}

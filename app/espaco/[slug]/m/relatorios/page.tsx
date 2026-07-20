@@ -38,13 +38,23 @@ export default async function RelatoriosPage({
             insights gerados por IA.
           </p>
         </div>
-        <Link
-          href={`/espaco/${slug}/relatorio`}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:bg-ink-900 dark:text-slate-300"
-        >
-          <FileText className="h-4 w-4" />
-          Exportar PDF
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <a
+            href={`/espaco/${slug}/m/relatorios/export?dias=90`}
+            download
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:bg-ink-900 dark:text-slate-300"
+          >
+            <FileText className="h-4 w-4" />
+            Vendas CSV (90d)
+          </a>
+          <Link
+            href={`/espaco/${slug}/relatorio`}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:bg-ink-900 dark:text-slate-300"
+          >
+            <FileText className="h-4 w-4" />
+            Exportar PDF
+          </Link>
+        </div>
       </div>
 
       {!summary || summary.vendas === 0 ? (

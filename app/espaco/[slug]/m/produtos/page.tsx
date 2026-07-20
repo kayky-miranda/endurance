@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/endurance/money";
 import ProductsClient, { type Product } from "../products-client";
-import { loadModule, DeniedModule, ModuleHeader } from "../module-kit";
+import {
+  loadModule,
+  DeniedModule,
+  ModuleHeader,
+  ExportCsvButton,
+} from "../module-kit";
 
 // Cadastro de produtos — catálogo com preço, custo e categorias.
 const PAGE_SIZE = 100;
@@ -57,7 +62,12 @@ export default async function ProdutosPage({
 
   return (
     <div className="space-y-6">
-      <ModuleHeader slug={slug} label={mod.label} description={mod.description} />
+      <ModuleHeader
+        slug={slug}
+        label={mod.label}
+        description={mod.description}
+        action={<ExportCsvButton href={`/espaco/${slug}/m/produtos/export`} />}
+      />
       <ProductsClient
         products={products}
         pager={{ total, page, pageSize: PAGE_SIZE, q }}

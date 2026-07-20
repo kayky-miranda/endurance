@@ -12,6 +12,7 @@ import {
   loadModule,
   DeniedModule,
   ModuleHeader,
+  ExportCsvButton,
   EmptyCard,
   KpiCard,
   brl,
@@ -42,7 +43,12 @@ export default async function FinanceiroPage({
 
   return (
     <div className="space-y-6">
-      <ModuleHeader slug={slug} label={mod.label} description={mod.description} />
+      <ModuleHeader
+        slug={slug}
+        label={mod.label}
+        description={mod.description}
+        action={<ExportCsvButton href={`/espaco/${slug}/m/financeiro/export`} />}
+      />
       {!fin ? (
         <EmptyCard>Sessão expirada.</EmptyCard>
       ) : (

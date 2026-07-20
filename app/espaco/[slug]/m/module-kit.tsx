@@ -9,7 +9,7 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowLeft, Lock, Download } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getSession, type SessionPayload } from "@/lib/auth";
 import { getWorkspace } from "@/lib/endurance/workspace";
@@ -48,25 +48,44 @@ export function ModuleHeader({
   slug,
   label,
   description,
+  action,
 }: {
   slug: string;
   label: string;
   description: string;
+  /** Ação à direita do título (ex.: botão Exportar CSV). */
+  action?: React.ReactNode;
 }) {
   return (
-    <div>
-      <Link
-        href={`/espaco/${slug}`}
-        className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition hover:text-brand-500 dark:text-slate-400"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Visão geral
-      </Link>
-      <h1 className="mt-2 text-2xl font-bold tracking-tight">{label}</h1>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        {description}
-      </p>
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <Link
+          href={`/espaco/${slug}`}
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition hover:text-brand-500 dark:text-slate-400"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Visão geral
+        </Link>
+        <h1 className="mt-2 text-2xl font-bold tracking-tight">{label}</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          {description}
+        </p>
+      </div>
+      {action}
     </div>
+  );
+}
+
+/** Botão padrão "Exportar CSV" para o cabeçalho dos módulos. */
+export function ExportCsvButton({ href }: { href: string }) {
+  return (
+    <a
+      href={href}
+      download
+      className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:text-slate-300"
+    >
+      <Download className="h-4 w-4" /> Exportar CSV
+    </a>
   );
 }
 
