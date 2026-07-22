@@ -5,19 +5,25 @@ import { getCashflow, type DRE } from "@/lib/endurance/cashflow";
 import InsightsPanel from "../insights-panel";
 import { SalesByDayChart, PaymentMixChart, CashflowChart } from "../charts-lazy";
 import { loadModule, DeniedModule, KpiCard, RankList, brl } from "../module-kit";
+import { PeriodFilter } from "../period-filter";
+import { parsePeriod, periodLabel } from "@/lib/endurance/period";
 
 // Painel executivo de vendas (alimentado pelas vendas reais do PDV).
 export default async function RelatoriosPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ dias?: string }>;
 }) {
   const { slug } = await params;
+  const days = parsePeriod(await searchParams);
   const { mod, session, denied } = await loadModule(slug, "relatorios");
   if (denied) return <DeniedModule slug={slug} mod={mod} />;
 
-  const summary = session ? await getSalesSummary(session.org, 30) : null;
-  const cashflow = session ? await getCashflow(session.org, 30) : null;
+  const periodo = periodLabel(days);
+  const summary = session ? await getSalesSummary(session.org, days) : null;
+  const cashflow = session ? await getCashflow(session.org, days) : null;
 
   return (
     <div className="space-y-6">
@@ -34,18 +40,19 @@ export default async function RelatoriosPage({
             Painel executivo
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Vendas dos últimos {summary?.days ?? 30} dias — em tempo real, com
-            insights gerados por IA.
+            Vendas dos últimos {periodo} — em tempo real, com insights
+            gerados por IA.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <PeriodFilter days={days} />
           <a
-            href={`/espaco/${slug}/m/relatorios/export?dias=90`}
+            href={`/espaco/${slug}/m/relatorios/export?dias=${days}`}
             download
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:bg-ink-900 dark:text-slate-300"
           >
             <FileText className="h-4 w-4" />
-            Vendas CSV (90d)
+            Vendas CSV
           </a>
           <Link
             href={`/espaco/${slug}/relatorio`}
@@ -75,7 +82,7 @@ export default async function RelatoriosPage({
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <KpiCard
               icon={Wallet}
-              label="Faturamento (30d)"
+              label={`Faturamento (${periodo})`}
               value={brl(summary.faturamento)}
               sub={`Hoje: ${brl(summary.hojeFaturamento)}`}
               from="from-cyan-500"
