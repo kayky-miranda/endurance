@@ -107,7 +107,7 @@ export default async function CrmPage({
             />
           )}
 
-          <CrmCustomersTable rows={ci.customers} total={ci.total} />
+          <CrmCustomersTable rows={ci.customers} total={ci.total} slug={slug} />
           <Pager param="pagina" meta={ci.pageMeta} />
         </>
       )}

@@ -1,22 +1,7 @@
 import "server-only";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { money } from "./money";
-
-/**
- * Identificador de tabela QUALIFICADO PELO SCHEMA para uso em $queryRaw.
- *
- * O `?schema=` da connection string vale para o Prisma Client, mas NÃO define
- * o search_path da sessão no pooler do Neon (ele fica em `"$user", public`).
- * Sem qualificar, `FROM "Sale"` resolveria em `public` — outra tabela, ou
- * erro. O nome vem da nossa própria env, entre aspas duplas.
- */
-const SCHEMA = (() => {
-  const url = process.env.DATABASE_URL ?? "";
-  const m = /[?&]schema=([^&]+)/.exec(url);
-  return m ? decodeURIComponent(m[1]) : "public";
-})();
-const T = (table: string) => Prisma.raw(`"${SCHEMA}"."${table}"`);
+import { T } from "./sql";
 
 export interface SalesSummary {
   days: number;

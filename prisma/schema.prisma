@@ -471,6 +471,7 @@ model FinancialEntry {
 
   @@index([organizationId, status])
   @@index([organizationId, kind])
+  @@index([saleId])
 }
 
 // Configuração fiscal da empresa (emitente da NFC-e, modelo 65). Uma por org.

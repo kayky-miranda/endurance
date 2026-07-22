@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Loader2, Pencil, X } from "lucide-react";
 import { updateCustomerAction } from "./crm-actions";
 import type { CustomerRow } from "@/lib/endurance/crm";
@@ -38,9 +39,11 @@ const labelCls =
 export default function CrmCustomersTable({
   rows,
   total,
+  slug,
 }: {
   rows: CustomerRow[];
   total: number;
+  slug: string;
 }) {
   const [editing, setEditing] = useState<CustomerRow | null>(null);
 
@@ -71,7 +74,12 @@ export default function CrmCustomersTable({
                 >
                   <td className="px-5 py-3">
                     <p className="font-medium text-slate-700 dark:text-slate-200">
-                      {c.name}
+                      <Link
+                        href={`/espaco/${slug}/m/crm/${c.id}`}
+                        className="hover:text-brand-500 hover:underline"
+                      >
+                        {c.name}
+                      </Link>
                       {c.dueRepurchase && (
                         <span className="ml-2 rounded-full bg-brand-500/15 px-2 py-0.5 text-[10px] font-medium text-brand-600 dark:text-brand-300">
                           recompra
