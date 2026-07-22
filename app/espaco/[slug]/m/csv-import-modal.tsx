@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { useModalA11y } from "../use-modal-a11y";
 import {
   X,
   UploadCloud,
@@ -96,6 +97,7 @@ export default function CsvImportModal({
   /** Linha de exemplo mostrada como dica de formato. */
   templateExample: string;
 }) {
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [rows, setRows] = useState<string[][] | null>(null);
   const [mapping, setMapping] = useState<Record<string, number>>({});
@@ -165,11 +167,18 @@ export default function CsvImportModal({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="csv-import-title"
         className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-ink-700 dark:bg-ink-900"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white">
+          <h3
+            id="csv-import-title"
+            className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white"
+          >
             <FileSpreadsheet className="h-5 w-5 text-brand-500" /> {title}
           </h3>
           <button

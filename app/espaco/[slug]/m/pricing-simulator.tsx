@@ -63,7 +63,7 @@ export default function PricingSimulator({
             value={id}
             onChange={(e) => selectProduct(e.target.value)}
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-          >
+           aria-label="Produto" >
             {products.map((x) => (
               <option key={x.id} value={x.id}>
                 {x.name}
@@ -81,7 +81,7 @@ export default function PricingSimulator({
             onChange={(e) => setPriceStr(e.target.value)}
             inputMode="decimal"
             className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-          />
+           aria-label="Novo preço" />
           <div className="mt-1.5 flex gap-1.5">
             {[
               { l: "-20%", f: 0.8 },

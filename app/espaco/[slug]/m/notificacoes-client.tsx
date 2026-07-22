@@ -356,20 +356,20 @@ function IntegrationsPanel({
               onChange={(e) => setPixKey(e.target.value)}
               placeholder="Chave PIX do recebedor"
               className={inputCls}
-            />
+             aria-label="Chave PIX do recebedor" />
             <div className="grid grid-cols-2 gap-2">
               <input
                 value={pixNome}
                 onChange={(e) => setPixNome(e.target.value)}
                 placeholder="Beneficiário"
                 className={inputCls}
-              />
+               aria-label="Beneficiário" />
               <input
                 value={pixCidade}
                 onChange={(e) => setPixCidade(e.target.value)}
                 placeholder="Cidade"
                 className={inputCls}
-              />
+               aria-label="Cidade" />
             </div>
             {/* Maquininha (Mercado Pago Point) */}
             <div className="flex gap-2">
@@ -378,7 +378,7 @@ function IntegrationsPanel({
                 onChange={(e) => setPixDevice(e.target.value)}
                 placeholder="ID da maquininha (opcional)"
                 className={inputCls}
-              />
+               aria-label="ID da maquininha (opcional)" />
               <button
                 type="button"
                 onClick={buscarMaquininhas}
@@ -439,13 +439,13 @@ function IntegrationsPanel({
               onChange={(e) => setWaPhoneId(e.target.value)}
               placeholder="Phone Number ID"
               className={inputCls}
-            />
+             aria-label="Phone Number ID" />
             <input
               value={waRemetente}
               onChange={(e) => setWaRemetente(e.target.value)}
               placeholder="Remetente (exibição)"
               className={inputCls}
-            />
+             aria-label="Remetente (exibição)" />
             <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
               <input
                 type="checkbox"

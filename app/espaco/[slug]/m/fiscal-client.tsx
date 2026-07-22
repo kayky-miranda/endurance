@@ -327,7 +327,7 @@ function ConfigForm({
               onChange={(e) => set("cnpj", e.target.value)}
               placeholder="00.000.000/0000-00"
               className={inputCls}
-            />
+             aria-label="00.000.000/0000-00" />
             <button
               type="button"
               onClick={fillFromCnpj}
@@ -426,7 +426,7 @@ function ConfigForm({
             onChange={(e) => set("csc", e.target.value)}
             placeholder="Código de Segurança do Contribuinte"
             className={inputCls}
-          />
+           aria-label="Código de Segurança do Contribuinte" />
         </Field>
         <Field label="Emissão">
           <select
@@ -445,7 +445,7 @@ function ConfigForm({
             maxLength={8}
             placeholder="8 dígitos (ex.: 22021000)"
             className={inputCls}
-          />
+           aria-label="8 dígitos (ex.: 22021000)" />
         </Field>
       </div>
 

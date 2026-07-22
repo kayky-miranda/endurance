@@ -593,7 +593,7 @@ export default function PdvClient({
             autoFocus
             placeholder="Buscar por nome, categoria ou bipar código de barras…"
             className="w-full rounded-2xl border border-slate-200 bg-white py-3.5 pl-11 pr-4 text-sm text-slate-800 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-700 dark:bg-ink-900 dark:text-slate-100"
-          />
+           aria-label="Buscar por nome, categoria ou bipar código de barras" />
         </div>
 
         {categories.length > 0 && (
@@ -738,14 +738,14 @@ export default function PdvClient({
                     inputMode="tel"
                     placeholder="Telefone"
                     className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-                  />
+                   aria-label="Telefone" />
                   <input
                     value={cEmail}
                     onChange={(e) => setCEmail(e.target.value)}
                     inputMode="email"
                     placeholder="E-mail"
                     className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-                  />
+                   aria-label="E-mail" />
                 </div>
               </div>
               <button
@@ -919,6 +919,7 @@ export default function PdvClient({
                     </span>
                     <input
                       value={p.amount}
+                      aria-label={`Valor pago em `}
                       onChange={(e) =>
                         updatePayment(
                           i,
@@ -1154,7 +1155,7 @@ function ReceiptSender({
           inputMode="tel"
           placeholder="WhatsApp do cliente"
           className="w-44 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-        />
+         aria-label="WhatsApp do cliente" />
         <button
           onClick={send}
           disabled={pending || !phone.trim()}

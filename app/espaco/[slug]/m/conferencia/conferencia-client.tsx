@@ -11,6 +11,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { createCountAction } from "./count-actions";
+import { useModalA11y } from "../../use-modal-a11y";
 import { CountStatusBadge, CountTypeBadge } from "./badges";
 import {
   COUNT_STATUS_LABEL,
@@ -66,6 +67,7 @@ export default function ConferenciaClient({
           value={filters.status}
           onChange={(e) => applyFilter("status", e.target.value)}
           className={SELECT}
+          aria-label="Filtrar por status"
         >
           <option value="">Todos os status</option>
           {Object.entries(COUNT_STATUS_LABEL).map(([k, v]) => (
@@ -78,6 +80,7 @@ export default function ConferenciaClient({
           value={filters.type}
           onChange={(e) => applyFilter("type", e.target.value)}
           className={SELECT}
+          aria-label="Filtrar por tipo de conferência"
         >
           <option value="">Todos os tipos</option>
           {Object.entries(COUNT_TYPE_LABEL).map(([k, v]) => (
@@ -90,6 +93,7 @@ export default function ConferenciaClient({
           value={filters.resp}
           onChange={(e) => applyFilter("resp", e.target.value)}
           className={SELECT}
+          aria-label="Filtrar por responsável"
         >
           <option value="">Todos os responsáveis</option>
           {users.map((u) => (
@@ -104,14 +108,14 @@ export default function ConferenciaClient({
           onChange={(e) => applyFilter("from", e.target.value)}
           className={SELECT}
           title="De"
-        />
+         aria-label="De" />
         <input
           type="date"
           value={filters.to}
           onChange={(e) => applyFilter("to", e.target.value)}
           className={SELECT}
           title="Até"
-        />
+         aria-label="Até" />
         {hasFilters && (
           <button
             onClick={() => router.push(`/espaco/${slug}/m/conferencia`)}
@@ -232,6 +236,7 @@ function NewCountModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose);
   const [type, setType] = useState("geral");
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("");
@@ -268,11 +273,15 @@ function NewCountModal({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-count-title"
         className="chippy-pop w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-ink-700 dark:bg-ink-900"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">
+          <h3 id="new-count-title" className="text-base font-bold text-slate-900 dark:text-white">
             Nova conferência de estoque
           </h3>
           <button
@@ -353,7 +362,7 @@ function NewCountModal({
               onChange={(e) => setLocation(e.target.value)}
               placeholder="Ex.: Depósito central, Prateleira A3…"
               className={INPUT}
-            />
+             aria-label="Ex.: Depósito central, Prateleira A3" />
           </label>
 
           <label className="block">

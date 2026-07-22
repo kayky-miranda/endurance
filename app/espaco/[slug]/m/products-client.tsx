@@ -50,19 +50,6 @@ export type Product = {
   stock: number;
 };
 
-/**
- * Colunas ordenáveis da tabela de produtos. É uma WHITELIST: o valor vai
- * direto para o `orderBy` do Prisma, então nada que venha da URL pode
- * escapar desta lista.
- */
-export const PRODUCT_SORT_FIELDS = [
-  "name",
-  "category",
-  "price",
-  "stock",
-  "createdAt",
-] as const;
-
 const LOW_STOCK = 5;
 
 function brl(n: number) {
@@ -150,20 +137,20 @@ export default function ProductsClient({
               onChange={(e) => setName(e.target.value)}
               placeholder="Nome do produto"
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-            />
+             aria-label="Nome do produto" />
             <input
               value={barcode}
               onChange={(e) => setBarcode(e.target.value)}
               inputMode="numeric"
               placeholder="Código de barras"
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-            />
+             aria-label="Código de barras" />
             <input
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="Categoria"
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-            />
+             aria-label="Categoria" />
             <input
               value={ncm}
               onChange={(e) => setNcm(e.target.value.replace(/\D/g, "").slice(0, 8))}
@@ -171,14 +158,14 @@ export default function ProductsClient({
               placeholder="NCM (8 díg., fiscal)"
               title="Código NCM do produto para emissão de nota fiscal. Deixe vazio para usar o NCM padrão da empresa."
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-            />
+             aria-label="NCM (8 díg., fiscal)" />
             <input
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               inputMode="decimal"
               placeholder="Preço (R$)"
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-            />
+             aria-label="Preço (R$)" />
             <input
               value={stock}
               onChange={(e) => setStock(e.target.value)}
@@ -186,7 +173,7 @@ export default function ProductsClient({
               placeholder="Estoque inicial"
               onKeyDown={(e) => e.key === "Enter" && add()}
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-            />
+             aria-label="Estoque inicial" />
           </div>
           {error && (
             <div className="mt-3 flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">
@@ -422,7 +409,7 @@ function ProductsSearch({ pager }: { pager: ProductsPager }) {
         onChange={(e) => apply(e.target.value)}
         placeholder="Buscar por nome, código de barras ou categoria…"
         className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-800 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-700 dark:bg-ink-900 dark:text-slate-100"
-      />
+       aria-label="Buscar por nome, código de barras ou categoria" />
     </div>
   );
 }
@@ -562,7 +549,7 @@ function EditProductModal({
               onChange={(e) => setCategory(e.target.value)}
               placeholder="—"
               className={INPUT}
-            />
+             aria-label="—" />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-500">
@@ -574,7 +561,7 @@ function EditProductModal({
               inputMode="numeric"
               placeholder="—"
               className={INPUT}
-            />
+             aria-label="—" />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-500">
@@ -586,7 +573,7 @@ function EditProductModal({
               inputMode="decimal"
               placeholder="0,00"
               className={INPUT}
-            />
+             aria-label="0,00" />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-500">
@@ -597,7 +584,7 @@ function EditProductModal({
               onChange={(e) => setUnit(e.target.value.slice(0, 10))}
               placeholder="un"
               className={INPUT}
-            />
+             aria-label="un" />
           </label>
           <label className="block sm:col-span-2">
             <span className="mb-1 block text-xs font-medium text-slate-500">
@@ -609,7 +596,7 @@ function EditProductModal({
               inputMode="numeric"
               placeholder="Herda o NCM padrão da empresa se vazio"
               className={INPUT}
-            />
+             aria-label="Herda o NCM padrão da empresa se vazio" />
           </label>
         </div>
 

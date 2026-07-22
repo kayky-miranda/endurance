@@ -1,10 +1,7 @@
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/endurance/money";
-import ProductsClient, {
-  type Product,
-  PRODUCT_SORT_FIELDS,
-} from "../products-client";
-import { parseSort } from "@/lib/endurance/sorting";
+import ProductsClient, { type Product } from "../products-client";
+import { parseSort, PRODUCT_SORT_FIELDS } from "@/lib/endurance/sorting";
 import {
   loadModule,
   DeniedModule,

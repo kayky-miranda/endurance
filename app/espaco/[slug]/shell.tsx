@@ -407,7 +407,7 @@ export default function Shell({
               <input
                 placeholder="Buscar…"
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-brand-500 dark:border-ink-700 dark:bg-ink-950 dark:text-slate-200"
-              />
+               aria-label="Buscar" />
             </div>
 
             <div className="ml-auto flex items-center gap-2">

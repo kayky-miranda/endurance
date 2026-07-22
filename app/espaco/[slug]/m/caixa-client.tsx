@@ -87,7 +87,7 @@ function OpenForm({ pending, run }: { pending: boolean; run: RunFn }) {
             inputMode="decimal"
             placeholder="0,00"
             className={inputCls}
-          />
+           aria-label="0,00" />
         </label>
         <button
           onClick={() =>
@@ -235,13 +235,13 @@ function MovementForm({ pending, run }: { pending: boolean; run: RunFn }) {
           inputMode="decimal"
           placeholder="Valor (R$)"
           className={inputCls}
-        />
+         aria-label="Valor (R$)" />
         <input
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="Motivo (ex.: troco, pagamento fornecedor)"
           className={inputCls}
-        />
+         aria-label="Motivo (ex.: troco, pagamento fornecedor)" />
         <button
           onClick={() => {
             run(() =>
@@ -295,7 +295,7 @@ function CloseForm({
             inputMode="decimal"
             placeholder="0,00"
             className={inputCls}
-          />
+           aria-label="0,00" />
         </label>
         {diff !== null && (
           <div
@@ -325,7 +325,7 @@ function CloseForm({
           onChange={(e) => setNote(e.target.value)}
           placeholder="Observação (opcional)"
           className={inputCls}
-        />
+         aria-label="Observação (opcional)" />
         <button
           onClick={() => run(() => closeCashAction(c, note))}
           disabled={pending || counted === ""}

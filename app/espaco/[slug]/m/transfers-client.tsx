@@ -167,7 +167,7 @@ export default function TransfersClient({
             onChange={(e) => search(e.target.value)}
             placeholder="Buscar produto por nome, código de barras ou SKU…"
             className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-          />
+           aria-label="Buscar produto por nome, código de barras ou SKU" />
           {results.length > 0 && !picked && (
             <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl dark:border-ink-700 dark:bg-ink-900">
               {results.map((p) => (
@@ -223,7 +223,7 @@ export default function TransfersClient({
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Ex.: reposição da vitrine"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-              />
+               aria-label="Ex.: reposição da vitrine" />
             </label>
             <button
               onClick={submit}

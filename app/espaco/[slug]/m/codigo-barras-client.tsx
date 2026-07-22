@@ -115,7 +115,7 @@ export default function CodigoBarrasClient({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar produto ou código…"
             className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-          />
+           aria-label="Buscar produto ou código" />
         </div>
         <button
           type="button"
@@ -171,7 +171,7 @@ export default function CodigoBarrasClient({
                     onChange={(e) => setEditVal(e.target.value)}
                     placeholder="Código"
                     className="w-32 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm outline-none focus:border-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-                  />
+                   aria-label="Código" />
                   <button
                     onClick={() => saveManual(p.id)}
                     disabled={busyId === p.id}
@@ -249,7 +249,7 @@ export default function CodigoBarrasClient({
                     }
                     title="Quantidade de etiquetas para imprimir"
                     className="w-16 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-center text-sm outline-none focus:border-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-                  />
+                   aria-label="Quantidade de etiquetas para imprimir" />
                 </div>
               )}
             </div>

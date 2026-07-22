@@ -144,6 +144,7 @@ export default function BrandKitModal({
               <input
                 type="color"
                 value={kit[f.key] as string}
+                aria-label={`Cor: ${f.label}`}
                 onChange={(e) => update(f.key, e.target.value)}
                 className="h-10 w-10 shrink-0 cursor-pointer rounded-lg border-0 bg-transparent"
               />
@@ -156,6 +157,7 @@ export default function BrandKitModal({
               <input
                 type="text"
                 value={kit[f.key] as string}
+                aria-label={`Código da cor: ${f.label}`}
                 onChange={(e) => update(f.key, e.target.value)}
                 className="w-20 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 font-mono text-xs uppercase focus:border-brand-500 focus:outline-none dark:border-ink-700 dark:bg-ink-900 dark:text-white"
               />
@@ -176,7 +178,7 @@ export default function BrandKitModal({
               value={kit.fontHeading}
               onChange={(e) => update("fontHeading", e.target.value)}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-white"
-            >
+             aria-label="Fonte de títulos" >
               {fonts.map((f) => (
                 <option key={f} value={f}>
                   {f}
@@ -192,7 +194,7 @@ export default function BrandKitModal({
               value={kit.fontBody}
               onChange={(e) => update("fontBody", e.target.value)}
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-white"
-            >
+             aria-label="Fonte de corpo" >
               {fonts.map((f) => (
                 <option key={f} value={f}>
                   {f}
@@ -217,7 +219,7 @@ export default function BrandKitModal({
               onChange={(e) => update("logoText", e.target.value)}
               placeholder="Ex.: ENDURANCE"
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-white"
-            />
+             aria-label="Ex.: ENDURANCE" />
           </div>
           <div>
             <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -231,7 +233,7 @@ export default function BrandKitModal({
                 onChange={(e) => update("instagramHandle", e.target.value.replace(/^@/, ""))}
                 placeholder="suaempresa"
                 className="w-full rounded-r-xl bg-transparent px-1 py-2 text-sm focus:outline-none dark:text-white"
-              />
+               aria-label="suaempresa" />
             </div>
           </div>
           <div className="sm:col-span-2">
@@ -244,7 +246,7 @@ export default function BrandKitModal({
               onChange={(e) => update("tagline", e.target.value)}
               placeholder="Ex.: O melhor mercado do bairro"
               className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-white"
-            />
+             aria-label="Ex.: O melhor mercado do bairro" />
           </div>
         </div>
 

@@ -87,27 +87,27 @@ export default function LocationsSection({ locations }: { locations: LocationRow
               onChange={(e) => setName(e.target.value)}
               placeholder="Nome (ex.: Loja Centro)"
               className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-            />
+             aria-label="Nome (ex.: Loja Centro)" />
             <input
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="Sigla"
               className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-            />
+             aria-label="Sigla" />
             <div className="flex gap-2">
               <input
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
                 placeholder="Cidade"
                 className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-              />
+               aria-label="Cidade" />
               <input
                 value={uf}
                 onChange={(e) => setUf(e.target.value)}
                 placeholder="UF"
                 maxLength={2}
                 className="w-14 rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-center text-sm uppercase dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-              />
+               aria-label="UF" />
             </div>
           </div>
           <div className="flex justify-end gap-2">
@@ -143,6 +143,7 @@ export default function LocationsSection({ locations }: { locations: LocationRow
                   <input
                     autoFocus
                     value={editName}
+                    aria-label="Novo nome do local"
                     onChange={(e) => setEditName(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter")

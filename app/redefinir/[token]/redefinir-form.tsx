@@ -60,7 +60,7 @@ export default function RedefinirForm({ token }: { token: string }) {
             autoFocus
             placeholder="Mínimo 8 caracteres com letra e número"
             className="ml-2 w-full bg-transparent py-2.5 text-sm focus:outline-none dark:text-white"
-          />
+           aria-label="Mínimo 8 caracteres com letra e número" />
         </div>
       </label>
       <label className="block">
@@ -77,7 +77,7 @@ export default function RedefinirForm({ token }: { token: string }) {
             minLength={8}
             placeholder="Digite a senha novamente"
             className="ml-2 w-full bg-transparent py-2.5 text-sm focus:outline-none dark:text-white"
-          />
+           aria-label="Digite a senha novamente" />
         </div>
       </label>
       {error && (

@@ -178,6 +178,7 @@ function NewOrder({
           <div className="flex gap-2">
             <select
               value={supplierId}
+              aria-label="Fornecedor do pedido"
               onChange={(e) => setSupplierId(e.target.value)}
               className={inputCls}
             >
@@ -193,6 +194,7 @@ function NewOrder({
             <select
               value={pick}
               onChange={(e) => addProduct(e.target.value)}
+              aria-label="Adicionar produto ao pedido"
               className={`${inputCls} flex-1`}
             >
               <option value="">+ Adicionar produto…</option>
@@ -225,6 +227,7 @@ function NewOrder({
                   <input
                     type="number"
                     value={it.quantity}
+                    aria-label="Quantidade do item"
                     onChange={(e) =>
                       update(idx, { quantity: Math.max(0, Number(e.target.value)) })
                     }
@@ -234,6 +237,7 @@ function NewOrder({
                     type="number"
                     step="0.01"
                     value={it.unitCost}
+                    aria-label="Custo unitário do item"
                     onChange={(e) =>
                       update(idx, { unitCost: Math.max(0, Number(e.target.value)) })
                     }
@@ -262,7 +266,7 @@ function NewOrder({
             onChange={(e) => setNote(e.target.value)}
             placeholder="Observação (opcional)"
             className={inputCls}
-          />
+           aria-label="Observação (opcional)" />
           {err && <p className="text-sm text-red-500">{err}</p>}
           <button
             onClick={save}
@@ -326,12 +330,12 @@ function Suppliers({
 
       {show && (
         <div className="mb-3 space-y-2 rounded-xl border border-slate-100 p-3 dark:border-ink-800">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome / razão social" className={inputCls} />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome / razão social" className={inputCls}  aria-label="Nome / razão social" />
           <div className="grid grid-cols-2 gap-2">
-            <input value={cnpj} onChange={(e) => setCnpj(e.target.value)} placeholder="CNPJ" className={inputCls} />
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Telefone" className={inputCls} />
+            <input value={cnpj} onChange={(e) => setCnpj(e.target.value)} placeholder="CNPJ" className={inputCls}  aria-label="CNPJ" />
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Telefone" className={inputCls}  aria-label="Telefone" />
           </div>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" className={inputCls} />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" className={inputCls}  aria-label="E-mail" />
           {err && <p className="text-sm text-red-500">{err}</p>}
           <button
             onClick={save}

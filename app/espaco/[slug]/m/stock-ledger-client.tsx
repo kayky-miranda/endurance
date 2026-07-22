@@ -89,6 +89,7 @@ export default function StockLedgerClient({
           <select
             value={filterProduct}
             onChange={(e) => setFilter("produto", e.target.value)}
+            aria-label="Filtrar por produto"
             className={`${inputCls} sm:w-52`}
           >
             <option value="">Todos os produtos</option>
@@ -243,7 +244,7 @@ export default function StockLedgerClient({
                   value={productId}
                   onChange={(e) => setProductId(e.target.value)}
                   className={inputCls}
-                >
+                 aria-label="Produto" >
                   <option value="">— Escolha o produto —</option>
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -260,7 +261,7 @@ export default function StockLedgerClient({
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   className={inputCls}
-                >
+                 aria-label="Motivo" >
                   {reasons.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.label} ({r.dir === "in" ? "entrada" : "saída"})
@@ -278,7 +279,7 @@ export default function StockLedgerClient({
                   inputMode="numeric"
                   placeholder="0"
                   className={inputCls}
-                />
+                 aria-label="0" />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
@@ -288,7 +289,7 @@ export default function StockLedgerClient({
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   className={`${inputCls} min-h-16`}
-                />
+                 aria-label="Observação" />
               </div>
               {error && (
                 <div className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">

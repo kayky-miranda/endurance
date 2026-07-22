@@ -345,7 +345,7 @@ export default function RequisitionsClient({
                 className={inputCls}
                 value={costCenterId}
                 onChange={(e) => setCostCenterId(e.target.value)}
-              >
+               aria-label="Centro de custo" >
                 <option value="">— Sem centro de custo —</option>
                 {costCenters
                   .filter((c) => c.active || c.id === costCenterId)
@@ -366,7 +366,7 @@ export default function RequisitionsClient({
                 className={inputCls}
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-              >
+               aria-label="Prioridade" >
                 {PRIORITY_OPTS.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.label}
@@ -380,7 +380,7 @@ export default function RequisitionsClient({
                 className={`${inputCls} min-h-14`}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-              />
+               aria-label="Observações" />
             </div>
           </div>
 
@@ -403,6 +403,7 @@ export default function RequisitionsClient({
                     <select
                       className={inputCls}
                       value={it.productId}
+                      aria-label="Produto do item"
                       onChange={(e) => onPickProduct(i, e.target.value)}
                     >
                       <option value="">— Produto avulso —</option>
@@ -417,14 +418,14 @@ export default function RequisitionsClient({
                       value={it.name}
                       onChange={(e) => updateItem(i, { name: e.target.value })}
                       placeholder="Descrição do item"
-                    />
+                     aria-label="Descrição do item" />
                     <input
                       className={inputCls}
                       value={it.quantity}
                       onChange={(e) => updateItem(i, { quantity: e.target.value })}
                       inputMode="numeric"
                       placeholder="Quantidade"
-                    />
+                     aria-label="Quantidade" />
                     <input
                       className={inputCls}
                       value={it.estimatedUnitCost}
@@ -433,10 +434,11 @@ export default function RequisitionsClient({
                       }
                       inputMode="decimal"
                       placeholder="Custo unit. estimado"
-                    />
+                     aria-label="Custo unit. estimado" />
                     <select
                       className={inputCls}
                       value={it.priority}
+                      aria-label="Prioridade do item"
                       onChange={(e) => updateItem(i, { priority: e.target.value })}
                     >
                       {PRIORITY_OPTS.map((p) => (
@@ -452,7 +454,7 @@ export default function RequisitionsClient({
                         updateItem(i, { justification: e.target.value })
                       }
                       placeholder="Justificativa"
-                    />
+                     aria-label="Justificativa" />
                   </div>
                   {items.length > 1 && (
                     <button
@@ -649,7 +651,7 @@ function CostCenterAdd({ onAdded }: { onAdded: () => void }) {
         value={name}
         onChange={(e) => setName(e.target.value)}
         placeholder="Nome do centro de custo"
-      />
+       aria-label="Nome do centro de custo" />
       <button onClick={add} disabled={busy} className="rounded-lg bg-brand-500 px-2.5 text-xs font-semibold text-ink-950">
         OK
       </button>

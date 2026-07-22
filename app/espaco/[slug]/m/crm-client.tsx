@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useModalA11y } from "../use-modal-a11y";
 import { Loader2, Pencil, X } from "lucide-react";
 import { updateCustomerAction } from "./crm-actions";
 import type { CustomerRow } from "@/lib/endurance/crm";
@@ -140,6 +141,7 @@ function EditCustomerModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose);
   const [name, setName] = useState(customer.name);
   const [phone, setPhone] = useState(customer.phone);
   const [email, setEmail] = useState(customer.email);
@@ -169,9 +171,18 @@ function EditCustomerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
-      <div className="w-full max-w-md overflow-hidden rounded-t-2xl bg-white shadow-xl dark:bg-ink-900 sm:rounded-2xl">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-customer-title"
+        className="w-full max-w-md overflow-hidden rounded-t-2xl bg-white shadow-xl dark:bg-ink-900 sm:rounded-2xl"
+      >
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-ink-700">
-          <h2 className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-100">
+          <h2
+            id="edit-customer-title"
+            className="flex items-center gap-2 text-base font-semibold text-slate-800 dark:text-slate-100"
+          >
             <Pencil className="h-4 w-4 text-brand-500" />
             Editar cliente
           </h2>
@@ -191,7 +202,7 @@ function EditCustomerModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="Nome do cliente"
               className={inputCls}
-            />
+             aria-label="Nome do cliente" />
           </div>
           <div>
             <label className={labelCls}>Telefone</label>
@@ -200,7 +211,7 @@ function EditCustomerModal({
               onChange={(e) => setPhone(e.target.value)}
               placeholder="(00) 00000-0000"
               className={inputCls}
-            />
+             aria-label="(00) 00000-0000" />
           </div>
           <div>
             <label className={labelCls}>E-mail</label>
@@ -210,7 +221,7 @@ function EditCustomerModal({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="cliente@email.com"
               className={inputCls}
-            />
+             aria-label="cliente@email.com" />
           </div>
           <div>
             <label className={labelCls}>CPF / CNPJ</label>
@@ -219,7 +230,7 @@ function EditCustomerModal({
               onChange={(e) => setDocument(e.target.value)}
               placeholder="Documento (opcional)"
               className={inputCls}
-            />
+             aria-label="Documento (opcional)" />
           </div>
           {error && (
             <p className="text-xs font-medium text-red-500">{error}</p>

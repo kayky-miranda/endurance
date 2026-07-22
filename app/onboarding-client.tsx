@@ -190,7 +190,7 @@ export default function OnboardingClient({
             rows={3}
             placeholder="Ex.: Tenho um mercadinho de bairro em Campinas, SP."
             className="w-full resize-none rounded-xl border border-ink-600 bg-ink-950 px-4 py-3 text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
-          />
+           aria-label="Ex.: Tenho um mercadinho de bairro em Campinas, SP." />
 
           <div className="mt-3 flex flex-wrap gap-2">
             {niches.map((n) => (
@@ -582,6 +582,7 @@ function Field({
       <input
         type={type}
         value={value}
+        aria-label={placeholder}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && onEnter) onEnter();

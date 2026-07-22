@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2, Mail, X, Check, Send } from "lucide-react";
 import { createInviteAction } from "./invite-actions";
+import { useModalA11y } from "../use-modal-a11y";
 
 interface ProfileOption {
   id: string;
@@ -17,6 +18,7 @@ export default function InviteModal({
   profiles: ProfileOption[];
   onClose: () => void;
 }) {
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose);
   const [email, setEmail] = useState("");
   const [profile, setProfile] = useState(profiles[0]?.id ?? "");
   const [loading, setLoading] = useState(false);
@@ -39,13 +41,19 @@ export default function InviteModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-ink-900">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="invite-title"
+        className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-ink-900"
+      >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-500/15 text-brand-500">
               <Mail className="h-4 w-4" />
             </div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+            <h3 id="invite-title" className="text-base font-bold text-slate-900 dark:text-white">
               Convidar membro
             </h3>
           </div>
@@ -99,7 +107,7 @@ export default function InviteModal({
                 autoFocus
                 placeholder="convidado@empresa.com"
                 className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-white"
-              />
+               aria-label="convidado@empresa.com" />
             </label>
 
             <label className="block">

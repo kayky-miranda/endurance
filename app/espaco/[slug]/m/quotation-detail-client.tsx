@@ -150,7 +150,7 @@ export default function QuotationDetailClient({
                     inputMode="decimal"
                     placeholder="0,00"
                     className="w-24 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 disabled:opacity-60 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-                  />
+                   aria-label="0,00" />
                 </td>
               ))}
             </tr>
@@ -170,7 +170,7 @@ export default function QuotationDetailClient({
                   inputMode="numeric"
                   placeholder="—"
                   className="w-20 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm outline-none focus:border-brand-500 disabled:opacity-60 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-                />
+                 aria-label="—" />
               </td>
             ))}
           </tr>
@@ -188,7 +188,7 @@ export default function QuotationDetailClient({
                   disabled={closed}
                   placeholder="ex.: 30 dias"
                   className="w-32 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-sm outline-none focus:border-brand-500 disabled:opacity-60 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-                />
+                 aria-label="ex.: 30 dias" />
               </td>
             ))}
           </tr>

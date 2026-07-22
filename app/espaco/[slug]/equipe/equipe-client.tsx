@@ -383,7 +383,7 @@ export default function EquipeClient({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar por nome, e-mail ou cargo…"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-              />
+               aria-label="Buscar por nome, e-mail ou cargo" />
             </div>
             <div className="w-full sm:w-52">
               <Combobox
@@ -585,7 +585,7 @@ function UserRow({
               onChange={(e) => onSetLocation(e.target.value || null)}
               className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600 outline-none focus:border-brand-500 disabled:opacity-40 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-300"
               title="Local em que este usuário opera"
-            >
+             aria-label="Local em que este usuário opera" >
               <option value="">
                 Local padrão
                 {locations.find((l) => l.isDefault)
@@ -1107,7 +1107,7 @@ function ResetPasswordModal({
               }}
               placeholder="Nova senha (mín. 6)"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-20 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-            />
+             aria-label="Nova senha (mín. 6)" />
             <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
               <button
                 type="button"
@@ -1439,6 +1439,7 @@ function Combobox({
                   ref={inputRef}
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
+                  aria-label={searchPlaceholder}
                   placeholder={searchPlaceholder}
                   autoComplete="off"
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
@@ -1600,6 +1601,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        aria-label={placeholder}
         disabled={disabled}
         className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 disabled:opacity-60 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100 dark:placeholder:text-slate-500"
       />

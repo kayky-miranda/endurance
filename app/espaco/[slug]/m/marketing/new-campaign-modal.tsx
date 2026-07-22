@@ -65,7 +65,7 @@ export function NewCampaignModal({
           placeholder="Ex.: Promoção de final de semana com 30% off em todos os produtos do açougue..."
           rows={4}
           className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm focus:border-brand-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-white"
-        />
+         aria-label="Ex.: Promoção de final de semana com 30% off em todos os produtos do açougue..." />
 
         <div className="mt-2 flex flex-wrap gap-2">
           {EXAMPLES.map((ex) => (

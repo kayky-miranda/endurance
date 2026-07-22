@@ -186,6 +186,7 @@ export default function AparenciaClient({ initial }: { initial: State }) {
                 <input
                   type="color"
                   value={(state[f.key as keyof State] as string) || "#000000"}
+                  aria-label={`Cor: ${f.label}`}
                   onChange={(e) =>
                     update(f.key as keyof State, e.target.value as State[keyof State])
                   }
@@ -200,6 +201,7 @@ export default function AparenciaClient({ initial }: { initial: State }) {
                 <input
                   type="text"
                   value={state[f.key as keyof State] as string}
+                  aria-label={`Código da cor: ${f.label}`}
                   onChange={(e) =>
                     update(f.key as keyof State, e.target.value as State[keyof State])
                   }

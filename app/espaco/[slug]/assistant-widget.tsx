@@ -379,7 +379,7 @@ export default function AssistantWidget({ userName }: { userName?: string }) {
                 rows={1}
                 placeholder="Pergunte sobre vendas, lucro, estoque, clientes…"
                 className="max-h-28 flex-1 resize-none bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100"
-              />
+               aria-label="Pergunte sobre vendas, lucro, estoque, clientes" />
               <button
                 onClick={() => send()}
                 disabled={busy || !input.trim()}

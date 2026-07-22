@@ -459,7 +459,7 @@ function EntryForm({
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Ex.: Aluguel da loja"
             className={inputCls}
-          />
+           aria-label="Ex.: Aluguel da loja" />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs text-slate-500">Categoria</span>
@@ -468,7 +468,7 @@ function EntryForm({
             onChange={(e) => setCategory(e.target.value)}
             placeholder="Ex.: Despesa fixa"
             className={inputCls}
-          />
+           aria-label="Ex.: Despesa fixa" />
         </label>
         <label className="block">
           <span className="mb-1 block text-xs text-slate-500">Valor (R$)</span>
@@ -478,7 +478,7 @@ function EntryForm({
             inputMode="decimal"
             placeholder="0,00"
             className={inputCls}
-          />
+           aria-label="0,00" />
         </label>
       </div>
       {err && <p className="mt-3 text-sm text-red-500">{err}</p>}

@@ -50,7 +50,7 @@ export default function RecuperarForm() {
             autoFocus
             placeholder="seu@email.com"
             className="ml-2 w-full bg-transparent py-2.5 text-sm focus:outline-none dark:text-white"
-          />
+           aria-label="seu@email.com" />
         </div>
       </label>
       {error && (

@@ -2,15 +2,12 @@ import { AlertTriangle, Boxes, Package, Store } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/endurance/money";
 import { listLocations } from "@/lib/endurance/locations";
-import { parseSort } from "@/lib/endurance/sorting";
+import { parseSort, PRODUCT_SORT_FIELDS } from "@/lib/endurance/sorting";
 import {
   getReplenishment,
   type ReplenItem,
 } from "@/lib/endurance/replenishment";
-import ProductsClient, {
-  type Product,
-  PRODUCT_SORT_FIELDS,
-} from "../products-client";
+import ProductsClient, { type Product } from "../products-client";
 import StockAdvicePanel from "../stock-advice-panel";
 import {
   loadModule,

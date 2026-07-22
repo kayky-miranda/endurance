@@ -85,7 +85,7 @@ export default function LoginForm({ next }: { next?: string }) {
             placeholder="XXXX-XXXX"
             maxLength={9}
             className="w-full rounded-xl border border-ink-600 bg-ink-950 px-4 py-3 text-center font-mono text-lg tracking-[0.2em] text-slate-100 placeholder:text-slate-600 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
-          />
+           aria-label="XXXX-XXXX" />
         ) : (
           <input
             type="text"
@@ -100,7 +100,7 @@ export default function LoginForm({ next }: { next?: string }) {
             autoFocus
             placeholder="000000"
             className="w-full rounded-xl border border-ink-600 bg-ink-950 px-4 py-3 text-center font-mono text-lg tracking-[0.5em] text-slate-100 placeholder:text-slate-600 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
-          />
+           aria-label="000000" />
         )}
         {error && (
           <div className="flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">
@@ -156,7 +156,7 @@ export default function LoginForm({ next }: { next?: string }) {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Seu e-mail"
           className="w-full rounded-xl border border-ink-600 bg-ink-950 py-2.5 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
-        />
+         aria-label="Seu e-mail" />
       </div>
       <div className="relative">
         <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -169,7 +169,7 @@ export default function LoginForm({ next }: { next?: string }) {
           }}
           placeholder="Senha"
           className="w-full rounded-xl border border-ink-600 bg-ink-950 py-2.5 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-500 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30"
-        />
+         aria-label="Senha" />
       </div>
 
       {error && (

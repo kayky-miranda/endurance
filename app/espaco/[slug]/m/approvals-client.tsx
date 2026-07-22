@@ -147,7 +147,7 @@ export default function ApprovalsClient({
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Motivo / observação (obrigatório)"
                 className="mt-3 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-              />
+               aria-label="Motivo / observação (obrigatório)" />
             )}
 
             <div className="mt-3 flex flex-wrap items-center justify-end gap-2">

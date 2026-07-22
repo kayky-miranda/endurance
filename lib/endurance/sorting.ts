@@ -22,3 +22,18 @@ export function parseSort(
   const dir: SortDir = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : fallback.dir;
   return { field, dir };
 }
+
+/**
+ * Colunas ordenáveis da tabela de produtos (usada em Produtos e Estoque).
+ *
+ * Mora AQUI, e não no componente de tabela: aquele arquivo é "use client" e,
+ * ao ser importado por um Server Component, o Next entrega uma referência de
+ * cliente no lugar do array — o `includes` da whitelist quebraria em runtime.
+ */
+export const PRODUCT_SORT_FIELDS = [
+  "name",
+  "category",
+  "price",
+  "stock",
+  "createdAt",
+] as const;

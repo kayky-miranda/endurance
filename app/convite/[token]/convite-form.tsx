@@ -56,7 +56,7 @@ export default function ConviteForm({ token }: { token: string }) {
             autoFocus
             placeholder="Como você quer ser chamado(a)"
             className="ml-2 w-full bg-transparent py-2.5 text-sm focus:outline-none dark:text-white"
-          />
+           aria-label="Como você quer ser chamado(a)" />
         </div>
       </label>
       <label className="block">
@@ -73,7 +73,7 @@ export default function ConviteForm({ token }: { token: string }) {
             minLength={8}
             placeholder="Mínimo 8 chars com letra e número"
             className="ml-2 w-full bg-transparent py-2.5 text-sm focus:outline-none dark:text-white"
-          />
+           aria-label="Mínimo 8 chars com letra e número" />
         </div>
       </label>
       {error && (

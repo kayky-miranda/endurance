@@ -285,7 +285,7 @@ export default function ReceivingClient({
                       value={note}
                       onChange={(e) => setNote(e.target.value)}
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-                    />
+                     aria-label="Observação do recebimento" />
                   </div>
 
                   {receipts.length > 0 && (

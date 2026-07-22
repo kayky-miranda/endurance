@@ -182,7 +182,7 @@ export default function SuppliersClient({
             onChange={(e) => onSearch(e.target.value)}
             placeholder="Buscar por nome ou CNPJ…"
             className={`${inputCls} pl-9`}
-          />
+           aria-label="Buscar por nome ou CNPJ" />
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-xl border border-slate-200 p-0.5 dark:border-ink-600">
@@ -464,7 +464,7 @@ function SupplierDrawer({
                 value={form.name ?? ""}
                 onChange={(e) => set("name", e.target.value)}
                 placeholder="Como o fornecedor aparece nas listas"
-              />
+               aria-label="Como o fornecedor aparece nas listas" />
             </Field>
             <Field label="Razão social">
               <input
@@ -488,7 +488,7 @@ function SupplierDrawer({
                   onChange={(e) => set("cnpj", e.target.value)}
                   inputMode="numeric"
                   placeholder="00.000.000/0000-00"
-                />
+                 aria-label="00.000.000/0000-00" />
                 <button
                   type="button"
                   onClick={fillFromCnpj}
@@ -777,25 +777,25 @@ function ContactsManager({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Nome do contato"
-          />
+           aria-label="Nome do contato" />
           <input
             className={inputCls}
             value={role}
             onChange={(e) => setRole(e.target.value)}
             placeholder="Cargo (ex.: comprador)"
-          />
+           aria-label="Cargo (ex.: comprador)" />
           <input
             className={inputCls}
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="Telefone / celular"
-          />
+           aria-label="Telefone / celular" />
           <input
             className={inputCls}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="E-mail"
-          />
+           aria-label="E-mail" />
         </div>
         <button
           onClick={add}

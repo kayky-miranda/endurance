@@ -405,7 +405,7 @@ function SetupModal({ onClose }: { onClose: () => void }) {
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                 placeholder="000000"
                 className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-center font-mono text-lg tracking-[0.4em] focus:border-brand-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-white"
-              />
+               aria-label="000000" />
             </label>
             {error && (
               <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
@@ -552,7 +552,7 @@ function DisableModal({ onClose }: { onClose: () => void }) {
               autoComplete="current-password"
               placeholder="Sua senha"
               className="ml-2 w-full bg-transparent py-2.5 text-sm focus:outline-none dark:text-white"
-            />
+             aria-label="Sua senha" />
           </div>
           {error && (
             <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">

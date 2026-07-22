@@ -423,7 +423,7 @@ export default function CountClient({
                             onBlur={(e) => commitCount(it, e.target.value)}
                             placeholder="—"
                             className="w-20 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-center font-semibold text-slate-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-                          />
+                           aria-label="—" />
                         ) : (
                           <span className="font-semibold text-slate-700 dark:text-slate-200">
                             {c ?? "—"}
@@ -633,7 +633,7 @@ function ScanBar({
             autoFocus
             placeholder="Bipe o código de barras aqui…"
             className="w-full rounded-xl border-2 border-brand-500/40 bg-brand-500/5 py-3 pl-10 pr-10 text-sm font-medium text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:bg-brand-500/10 dark:text-slate-100"
-          />
+           aria-label="Bipe o código de barras aqui" />
           <button
             type="button"
             onClick={() => setSoundOn((v) => !v)}
@@ -652,7 +652,7 @@ function ScanBar({
             onChange={(e) => search(e.target.value)}
             placeholder="Buscar por código, SKU, descrição…"
             className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
-          />
+           aria-label="Buscar por código, SKU, descrição" />
           {(results.length > 0 || searching) && (
             <div className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl dark:border-ink-700 dark:bg-ink-900">
               {searching && <p className="px-3 py-2 text-xs text-slate-400">Buscando…</p>}
