@@ -336,6 +336,7 @@ export const MODULE_PERMISSION: Record<string, PermissionId> = {
   codigo_barras: "products.manage",
   estoque: "stock.manage",
   movimentacoes: "stock.manage",
+  transferencias: "stock.manage",
   conferencia: "count.manage",
   caixa: "pdv.sell",
   pdv: "pdv.sell",

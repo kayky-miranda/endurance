@@ -10,6 +10,7 @@ import {
 import { loadModule, DeniedModule, ModuleHeader, KpiCard } from "../module-kit";
 import { hasPermission } from "@/lib/endurance/permissions";
 import { countDashboard } from "@/lib/endurance/stock-count";
+import { activeLocations } from "@/lib/endurance/locations";
 import ConferenciaClient from "./conferencia-client";
 
 const brl = (n: number) =>
@@ -37,7 +38,7 @@ export default async function ConferenciaPage({
     to: sp.to ? new Date(`${sp.to}T23:59:59`) : undefined,
   };
 
-  const [dash, users, cats] = org
+  const [dash, users, cats, locations] = org
     ? await Promise.all([
         countDashboard(org, filters),
         prisma.user.findMany({
@@ -51,6 +52,7 @@ export default async function ConferenciaPage({
           distinct: ["category"],
           orderBy: { category: "asc" },
         }),
+        activeLocations(org),
       ])
     : [
         {
@@ -62,6 +64,7 @@ export default async function ConferenciaPage({
           accuracy: 100,
           list: [],
         },
+        [],
         [],
         [],
       ];
@@ -127,6 +130,7 @@ export default async function ConferenciaPage({
         list={dash.list}
         users={users}
         categories={cats.map((c) => c.category)}
+        locations={locations}
         canApprove={canApprove}
         filters={{
           status: sp.status ?? "",

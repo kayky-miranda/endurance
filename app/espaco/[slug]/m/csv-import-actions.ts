@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
 import { logActivity } from "@/lib/endurance/activity-log";
 import { applyStockMovement } from "@/lib/endurance/stock-ledger";
+import { resolveUserLocation } from "@/lib/endurance/locations";
 
 /**
  * Importação por planilha (CSV): produtos e clientes. As linhas chegam já
@@ -65,6 +66,7 @@ export async function importProductsCsvAction(
   if (rows.length > MAX_ROWS)
     return { ok: false, error: "Limite de 5.000 linhas por importação." };
 
+  const locationId = await resolveUserLocation(s.org, s.sub);
   let created = 0;
   let updated = 0;
   const errors: string[] = [];
@@ -135,6 +137,7 @@ export async function importProductsCsvAction(
               reason: "saldo_inicial",
               refType: "import_csv",
               actor: { id: s.sub, name: s.name },
+              locationId,
             });
         });
         created++;

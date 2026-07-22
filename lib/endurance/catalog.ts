@@ -177,6 +177,12 @@ export const MODULES: ModuleDef[] = [
     scope: ["mercado_varejo"],
   },
   {
+    id: "transferencias",
+    label: "Transferências entre locais",
+    description: "Mova estoque entre matriz, filiais e depósitos, com rastro no razão.",
+    scope: ["mercado_varejo"],
+  },
+  {
     id: "conferencia",
     label: "Conferência de Estoque",
     description: "Contagem física com aprovação de divergências antes do ajuste.",
@@ -434,6 +440,7 @@ const MODULE_CATEGORY: Record<string, ModuleCategory> = {
   estoque: "Catálogo & Estoque",
   movimentacoes: "Catálogo & Estoque",
   conferencia: "Catálogo & Estoque",
+  transferencias: "Catálogo & Estoque",
   precificacao: "Catálogo & Estoque",
   estoque_produtos: "Catálogo & Estoque",
   equipamentos: "Catálogo & Estoque",

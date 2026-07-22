@@ -209,6 +209,11 @@ export default function CountClient({
           </span>
         </div>
         <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+          {count.locationName && (
+            <span className="font-medium text-slate-600 dark:text-slate-300">
+              🏬 {count.locationName}
+            </span>
+          )}
           {count.location && <span>📍 {count.location}</span>}
           <span>Responsável: {count.responsibleName || "—"}</span>
           <span>Criada por {count.createdByName}</span>

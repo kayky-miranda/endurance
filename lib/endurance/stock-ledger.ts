@@ -74,15 +74,48 @@ export interface ApplyMovementInput {
   actor?: MovementActor;
   /** Permite saldo negativo (ex.: importação que define saldo absoluto). */
   allowNegative?: boolean;
+  /** Local do movimento. Omitido = local padrão da organização. */
+  locationId?: string;
+}
+
+/** Local padrão da org dentro de uma transação (cria a Matriz se faltar). */
+async function defaultLocationTx(tx: Tx, org: string): Promise<string> {
+  const found = await tx.location.findFirst({
+    where: { organizationId: org, isDefault: true },
+    select: { id: true },
+  });
+  if (found) return found.id;
+  const any = await tx.location.findFirst({
+    where: { organizationId: org },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (any) {
+    await tx.location.update({ where: { id: any.id }, data: { isDefault: true } });
+    return any.id;
+  }
+  const created = await tx.location.create({
+    data: { organizationId: org, name: "Matriz", code: "MTZ", isDefault: true },
+    select: { id: true },
+  });
+  return created.id;
 }
 
 /**
  * Aplica UM movimento de estoque dentro de uma transação do chamador (`tx`).
- * Atualiza o saldo de forma atômica (incremento/decremento condicional, à prova
- * de corrida) e grava o registro no razão com saldo anterior e posterior.
  *
- * Saídas (delta < 0) usam baixa CONDICIONAL: se não houver saldo, lança
- * InsufficientStockError e a transação inteira do chamador é revertida.
+ * Escritura DUPLA e atômica:
+ *  - ProductStock.qty  → saldo daquele PRODUTO naquele LOCAL (fonte da verdade
+ *    operacional: é contra ele que a saída é validada);
+ *  - Product.stock     → TOTAL consolidado da organização (soma dos locais),
+ *    mantido para todo o restante do sistema continuar somando certo.
+ *
+ * Saídas (delta < 0) usam baixa CONDICIONAL no LOCAL: sem saldo lá, lança
+ * InsufficientStockError e a transação inteira do chamador é revertida — não
+ * se vende de uma loja usando o estoque de outra.
+ *
+ * `balanceBefore/After` no razão são os saldos DO LOCAL (é o que um livro de
+ * depósito significa). Em organizações de local único, coincidem com o total.
  */
 export async function applyStockMovement(
   tx: Tx,
@@ -91,34 +124,43 @@ export async function applyStockMovement(
   const { organizationId, productId, delta } = input;
   const reasonDef = REASON_BY_ID.get(input.reason);
   const allowNegative = input.allowNegative ?? false;
+  const locationId =
+    input.locationId ?? (await defaultLocationTx(tx, organizationId));
+
+  const product = await tx.product.findFirst({
+    where: { id: productId, organizationId },
+    select: { name: true },
+  });
+  if (!product) throw new Error("Produto não encontrado no espaço.");
 
   if (delta < 0 && !allowNegative) {
     const need = -delta;
-    const res = await tx.product.updateMany({
-      where: { id: productId, organizationId, stock: { gte: need } },
-      data: { stock: { decrement: need } },
+    // Baixa condicional NO LOCAL (linha inexistente = saldo 0 = insuficiente).
+    const res = await tx.productStock.updateMany({
+      where: { productId, locationId, qty: { gte: need } },
+      data: { qty: { decrement: need } },
     });
-    if (res.count === 0) {
-      const p = await tx.product.findUnique({
-        where: { id: productId },
-        select: { name: true },
-      });
-      throw new InsufficientStockError(p?.name ?? "produto");
-    }
+    if (res.count === 0) throw new InsufficientStockError(product.name);
   } else {
-    const res = await tx.product.updateMany({
-      where: { id: productId, organizationId },
-      data: { stock: { increment: delta } },
+    await tx.productStock.upsert({
+      where: { productId_locationId: { productId, locationId } },
+      create: { organizationId, productId, locationId, qty: delta },
+      update: { qty: { increment: delta } },
     });
-    if (res.count === 0) throw new Error("Produto não encontrado no espaço.");
   }
 
-  // Saldo após o movimento (a alteração foi atômica) → saldo antes = after − delta.
-  const fresh = await tx.product.findUnique({
-    where: { id: productId },
-    select: { stock: true },
+  // Total consolidado: o guard já foi feito no local, então segue direto.
+  await tx.product.updateMany({
+    where: { id: productId, organizationId },
+    data: { stock: { increment: delta } },
   });
-  const after = fresh?.stock ?? 0;
+
+  // Saldo do LOCAL após o movimento (atômico) → antes = depois − delta.
+  const fresh = await tx.productStock.findUnique({
+    where: { productId_locationId: { productId, locationId } },
+    select: { qty: true },
+  });
+  const after = fresh?.qty ?? 0;
   const before = after - delta;
 
   const type =
@@ -132,6 +174,7 @@ export async function applyStockMovement(
     data: {
       organizationId,
       productId,
+      locationId,
       type: delta === 0 ? "ajuste" : type,
       reason: input.reason,
       quantity: delta,
@@ -149,6 +192,73 @@ export async function applyStockMovement(
 }
 
 /**
+ * Transferência entre locais: saída de um, entrada no outro, na MESMA
+ * transação e pelo razão (motivo "transferencia"). Se faltar saldo na origem,
+ * nada acontece. O total consolidado da organização não muda.
+ */
+export async function transferStock(
+  org: string,
+  input: {
+    productId: string;
+    fromLocationId: string;
+    toLocationId: string;
+    quantity: number;
+    note?: string;
+    actor: MovementActor;
+  },
+): Promise<{ ok: boolean; error?: string }> {
+  const qty = Math.trunc(Number(input.quantity) || 0);
+  if (qty <= 0) return { ok: false, error: "Informe uma quantidade maior que zero." };
+  if (input.fromLocationId === input.toLocationId)
+    return { ok: false, error: "Origem e destino devem ser locais diferentes." };
+
+  const locs = await prisma.location.findMany({
+    where: {
+      id: { in: [input.fromLocationId, input.toLocationId] },
+      organizationId: org,
+      active: true,
+    },
+    select: { id: true, name: true },
+  });
+  if (locs.length !== 2)
+    return { ok: false, error: "Local de origem ou destino inválido." };
+  const nameOf = (id: string) => locs.find((l) => l.id === id)?.name ?? "";
+  const label = `${nameOf(input.fromLocationId)} → ${nameOf(input.toLocationId)}`;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await applyStockMovement(tx, {
+        organizationId: org,
+        productId: input.productId,
+        delta: -qty,
+        reason: "transferencia",
+        refType: "transfer",
+        refId: input.toLocationId,
+        note: input.note ? `${label} — ${input.note}` : label,
+        actor: input.actor,
+        locationId: input.fromLocationId,
+      });
+      await applyStockMovement(tx, {
+        organizationId: org,
+        productId: input.productId,
+        delta: qty,
+        reason: "transferencia",
+        refType: "transfer",
+        refId: input.fromLocationId,
+        note: input.note ? `${label} — ${input.note}` : label,
+        actor: input.actor,
+        locationId: input.toLocationId,
+      });
+    });
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof InsufficientStockError)
+      return { ok: false, error: `${e.message} no local de origem.` };
+    throw e;
+  }
+}
+
+/**
  * Lançamento manual de movimentação (devolução, perda, avaria, consumo,
  * ajuste, produção…). Resolve a direção pelo motivo e roda em transação própria.
  */
@@ -160,6 +270,7 @@ export async function recordManualMovement(
     quantity: number;
     note?: string;
     actor: MovementActor;
+    locationId?: string;
   },
 ): Promise<{ ok: boolean; error?: string; before?: number; after?: number }> {
   const def = REASON_BY_ID.get(input.reason);
@@ -183,6 +294,7 @@ export async function recordManualMovement(
         refType: "manual",
         note: input.note,
         actor: input.actor,
+        locationId: input.locationId,
       }),
     );
     return { ok: true, ...r };

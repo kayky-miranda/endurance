@@ -2,6 +2,7 @@ import "server-only";
 import { prisma, type Tx } from "@/lib/db";
 import { money } from "@/lib/endurance/money";
 import { applyStockMovement } from "@/lib/endurance/stock-ledger";
+import { resolveUserLocation } from "@/lib/endurance/locations";
 import type { Prisma } from "@prisma/client";
 import {
   COUNT_STATUS_LABEL,
@@ -56,6 +57,8 @@ export interface CreateCountInput {
   note?: string;
   /** Conferência cega: operador conta sem ver o saldo do sistema. */
   blind?: boolean;
+  /** Local conferido (omitido = local do operador / padrão da organização). */
+  locationId?: string;
   createdBy: { id: string; name: string };
   /** Carregar automaticamente os produtos (geral) ou por categoria. */
   autoLoad?: boolean;
@@ -68,6 +71,12 @@ export async function createCount(input: CreateCountInput): Promise<{
   number?: string;
   error?: string;
 }> {
+  // A conferência é SEMPRE de um local: sem ele, o saldo do sistema não tem
+  // significado numa rede com várias lojas.
+  const locationId =
+    input.locationId ??
+    (await resolveUserLocation(input.org, input.createdBy.id));
+
   return prisma.$transaction(async (tx) => {
     const number = await nextCountNumber(tx, input.org);
     const count = await tx.stockCount.create({
@@ -80,6 +89,7 @@ export async function createCount(input: CreateCountInput): Promise<{
         responsibleName: input.responsibleName ?? "",
         note: input.note ?? "",
         blind: input.blind ?? false,
+        locationId,
         createdById: input.createdBy.id,
         createdByName: input.createdBy.name,
         status: "rascunho",
@@ -102,8 +112,12 @@ export async function createCount(input: CreateCountInput): Promise<{
           barcode: true,
           sku: true,
           category: true,
-          stock: true,
           cost: true,
+          // Saldo NO LOCAL conferido (não o total consolidado da rede).
+          locationStocks: {
+            where: { locationId },
+            select: { qty: true },
+          },
         },
       });
       if (products.length) {
@@ -115,7 +129,7 @@ export async function createCount(input: CreateCountInput): Promise<{
             barcode: p.barcode,
             sku: p.sku,
             category: p.category,
-            systemQty: p.stock,
+            systemQty: p.locationStocks[0]?.qty ?? 0,
             unitCost: p.cost,
           })),
           skipDuplicates: true,
@@ -125,6 +139,29 @@ export async function createCount(input: CreateCountInput): Promise<{
 
     return { ok: true, id: count.id, number };
   });
+}
+
+/**
+ * Saldo do produto NO LOCAL da conferência — é contra ele que a contagem
+ * física é comparada. Sem local definido (contagens antigas), usa o total.
+ */
+async function locationQty(
+  org: string,
+  productId: string,
+  locationId: string | null,
+): Promise<number> {
+  if (!locationId) {
+    const p = await prisma.product.findFirst({
+      where: { id: productId, organizationId: org },
+      select: { stock: true },
+    });
+    return p?.stock ?? 0;
+  }
+  const row = await prisma.productStock.findUnique({
+    where: { productId_locationId: { productId, locationId } },
+    select: { qty: true },
+  });
+  return row?.qty ?? 0;
 }
 
 /** Adiciona (ou reusa) um item na conferência, congelando o saldo do sistema. */
@@ -148,11 +185,11 @@ export async function addItem(
       barcode: true,
       sku: true,
       category: true,
-      stock: true,
       cost: true,
     },
   });
   if (!p) return { ok: false, error: "Produto não encontrado." };
+  const systemQty = await locationQty(org, p.id, count.locationId);
 
   const exists = await prisma.stockCountItem.findUnique({
     where: { stockCountId_productId: { stockCountId: countId, productId } },
@@ -167,7 +204,7 @@ export async function addItem(
       barcode: p.barcode,
       sku: p.sku,
       category: p.category,
-      systemQty: p.stock,
+      systemQty,
       unitCost: p.cost,
     },
   });
@@ -235,7 +272,7 @@ export async function scanItem(
 
   const count = await prisma.stockCount.findFirst({
     where: { id: countId, organizationId: org },
-    select: { status: true },
+    select: { status: true, locationId: true },
   });
   if (!count) return { ok: false, error: "Conferência não encontrada." };
   if (count.status !== "rascunho" && count.status !== "em_conferencia")
@@ -249,7 +286,6 @@ export async function scanItem(
       barcode: true,
       sku: true,
       category: true,
-      stock: true,
       cost: true,
     },
   });
@@ -259,6 +295,9 @@ export async function scanItem(
       notFound: true,
       error: `Produto não cadastrado para o código ${code}.`,
     };
+
+  // Saldo do sistema = o do LOCAL conferido (fotografado na 1ª leitura).
+  const systemQty = await locationQty(org, p.id, count.locationId);
 
   // Incremento ATÔMICO no banco: com vários operadores bipando a mesma
   // conferência, "ler e somar" em JS perderia leituras concorrentes. Aqui a
@@ -301,7 +340,7 @@ export async function scanItem(
           barcode: p.barcode,
           sku: p.sku,
           category: p.category,
-          systemQty: p.stock,
+          systemQty,
           unitCost: p.cost,
           countedQty: 1,
         },
@@ -444,6 +483,8 @@ export async function adjustCount(
         note: `Conferência ${count.number}${it.note ? ` — ${it.note}` : ""}`,
         actor,
         allowNegative: true,
+        // O ajuste incide no local conferido (não no total da rede).
+        locationId: count.locationId ?? undefined,
       });
     }
     await tx.stockCount.update({
@@ -552,7 +593,10 @@ export async function countDashboard(org: string, filters: CountListFilters = {}
 export async function getCount(org: string, countId: string) {
   const c = await prisma.stockCount.findFirst({
     where: { id: countId, organizationId: org },
-    include: { items: { orderBy: { createdAt: "asc" } } },
+    include: {
+      items: { orderBy: { createdAt: "asc" } },
+      locationRef: { select: { name: true } },
+    },
   });
   if (!c) return null;
   return {
@@ -560,6 +604,7 @@ export async function getCount(org: string, countId: string) {
     number: c.number,
     type: c.type,
     location: c.location,
+    locationName: c.locationRef?.name ?? "",
     status: c.status,
     blind: c.blind,
     responsibleName: c.responsibleName,

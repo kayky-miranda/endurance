@@ -3,8 +3,10 @@ import Link from "next/link";
 import { User } from "lucide-react";
 import { hasPermission } from "@/lib/endurance/permissions";
 import { listApiKeys } from "@/lib/endurance/api-keys";
+import { listLocations } from "@/lib/endurance/locations";
 import ConfiguracoesClient from "./configuracoes-client";
 import ApiKeysSection, { type ApiKeyRow } from "./api-keys-section";
+import LocationsSection from "./locations-section";
 
 export default async function ConfiguracoesPage({
   params,
@@ -14,6 +16,8 @@ export default async function ConfiguracoesPage({
   const { slug } = await params;
   const session = await requireOrgAccess(slug);
 
+  const canSettings = hasPermission(session.role, session.permissions, "settings.general");
+  const locations = canSettings ? await listLocations(session.org) : [];
   const canApi = hasPermission(session.role, session.permissions, "integrations.config");
   const apiKeys: ApiKeyRow[] = canApi
     ? (await listApiKeys(session.org)).map((k) => ({
@@ -34,6 +38,8 @@ export default async function ConfiguracoesPage({
       </header>
 
       <ConfiguracoesClient />
+
+      {canSettings && <LocationsSection locations={locations} />}
 
       {canApi && <ApiKeysSection keys={apiKeys} />}
 

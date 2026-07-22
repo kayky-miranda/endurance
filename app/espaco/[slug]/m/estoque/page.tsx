@@ -1,6 +1,7 @@
-import { AlertTriangle, Boxes, Package } from "lucide-react";
+import { AlertTriangle, Boxes, Package, Store } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/endurance/money";
+import { listLocations } from "@/lib/endurance/locations";
 import {
   getReplenishment,
   type ReplenItem,
@@ -73,6 +74,10 @@ export default async function EstoquePage({
   }));
   const unidades = agg._sum.stock ?? 0;
   const totalProdutos = agg._count;
+
+  // Distribuição do estoque por local (só faz sentido com mais de um).
+  const locations = session ? await listLocations(session.org) : [];
+  const multiLocal = locations.filter((l) => l.active).length > 1;
   const replen = session
     ? await getReplenishment(session.org)
     : { items: [], totalCost: 0, needing: 0 };
@@ -94,6 +99,39 @@ export default async function EstoquePage({
           warn
         />
       </div>
+
+      {multiLocal && (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-ink-700 dark:bg-ink-900">
+          <p className="flex items-center gap-2 px-5 py-3 text-sm font-semibold text-slate-800 dark:text-slate-100">
+            <Store className="h-4 w-4 text-brand-500" /> Estoque por local
+            <span className="font-normal text-slate-400">
+              · o total acima é a soma de todos
+            </span>
+          </p>
+          <div className="grid gap-px bg-slate-100 sm:grid-cols-2 lg:grid-cols-3 dark:bg-ink-800">
+            {locations
+              .filter((l) => l.active)
+              .map((l) => (
+                <div key={l.id} className="bg-white p-4 dark:bg-ink-900">
+                  <p className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {l.name}
+                    {l.isDefault && (
+                      <span className="rounded-full bg-brand-500/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-600 dark:text-brand-300">
+                        padrão
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-1 text-lg font-bold tracking-tight text-slate-800 dark:text-slate-100">
+                    {l.units}{" "}
+                    <span className="text-xs font-normal text-slate-400">
+                      un. · {l.skus} produto(s)
+                    </span>
+                  </p>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       <StockAdvicePanel />
 

@@ -6,6 +6,7 @@ import {
   PERMISSION_GROUPS,
   PROFILES,
 } from "@/lib/endurance/permissions";
+import { activeLocations } from "@/lib/endurance/locations";
 import EquipeClient, { type MemberView, type ActivityView } from "./equipe-client";
 
 export default async function EquipePage({
@@ -33,6 +34,7 @@ export default async function EquipePage({
         status: true,
         lastLoginAt: true,
         createdAt: true,
+        locationId: true,
       },
     }),
     prisma.activityLog.findMany({
@@ -77,7 +79,10 @@ export default async function EquipePage({
     status: u.status,
     lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
     createdAt: u.createdAt.toISOString(),
+    locationId: u.locationId,
   }));
+
+  const locations = await activeLocations(session.org);
 
   const activity: ActivityView[] = logs.map((l) => ({
     id: l.id,
@@ -104,6 +109,7 @@ export default async function EquipePage({
       permissions={PERMISSIONS}
       permissionGroups={PERMISSION_GROUPS}
       profiles={PROFILES}
+      locations={locations}
     />
   );
 }

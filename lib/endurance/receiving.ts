@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { resolveUserLocation } from "./locations";
 import { money } from "./money";
 import { applyStockMovement } from "./stock-ledger";
 import { PAGE_SIZE, clampPage, pageMeta, type PageMeta } from "./pagination";
@@ -206,6 +207,8 @@ export async function receiveOrder(
     return { ok: false, error: "Informe ao menos uma quantidade recebida." };
 
   const dueDays = order.supplier.paymentTermDays > 0 ? order.supplier.paymentTermDays : 28;
+  // A mercadoria entra no local em que quem recebeu trabalha.
+  const locationId = await resolveUserLocation(org, receiver.id);
 
   const result = await prisma.$transaction(async (tx) => {
     const seq = await tx.receipt.count({ where: { organizationId: org } });
@@ -259,6 +262,7 @@ export async function receiveOrder(
             refType: "receipt",
             refId: receipt.id,
             actor: { id: receiver.id, name: receiver.name },
+            locationId,
             note: `${number} · ${code(orderId)}`,
           });
         }

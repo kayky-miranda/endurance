@@ -49,6 +49,7 @@ import {
   ListFilter,
   IdCard,
   Plus,
+  Store,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -58,6 +59,7 @@ import {
   removeUserAction,
   resetPasswordAction,
 } from "./equipe-actions";
+import { setUserLocationAction } from "../configuracoes/locations-actions";
 import InviteModal from "./invite-modal";
 import InviteList from "./invite-list";
 
@@ -73,6 +75,7 @@ export type MemberView = {
   status: string;
   lastLoginAt: string | null;
   createdAt: string;
+  locationId: string | null;
 };
 
 export type ActivityView = {
@@ -211,6 +214,7 @@ export default function EquipeClient({
   permissions,
   permissionGroups,
   profiles,
+  locations,
 }: {
   slug: string;
   currentUserId: string;
@@ -220,6 +224,7 @@ export default function EquipeClient({
   permissions: PermissionDef[];
   permissionGroups: string[];
   profiles: ProfileDef[];
+  locations: { id: string; name: string; isDefault: boolean }[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<"users" | "invites" | "audit">("users");
@@ -257,6 +262,19 @@ export default function EquipeClient({
     const active = members.filter((m) => m.status === "active").length;
     return { total: members.length, active, blocked: members.length - active };
   }, [members]);
+
+  /** Define o local (loja/depósito) em que o membro opera. */
+  async function changeLocation(userId: string, locationId: string | null) {
+    setBusyId(userId);
+    setError("");
+    try {
+      const res = await setUserLocationAction(userId, locationId);
+      if (res.ok) router.refresh();
+      else setError(res.error ?? "Não foi possível definir o local.");
+    } finally {
+      setBusyId("");
+    }
+  }
 
   async function toggleStatus(m: MemberView) {
     setBusyId(m.id);
@@ -410,6 +428,8 @@ export default function EquipeClient({
                 isCurrent={m.id === currentUserId}
                 busy={busyId === m.id}
                 profiles={profiles}
+                locations={locations}
+                onSetLocation={(locationId) => changeLocation(m.id, locationId)}
                 onEdit={() => {
                   setError("");
                   setEditing(m);
@@ -494,6 +514,8 @@ function UserRow({
   isCurrent,
   busy,
   profiles,
+  locations,
+  onSetLocation,
   onEdit,
   onResetPassword,
   onToggleStatus,
@@ -503,6 +525,8 @@ function UserRow({
   isCurrent: boolean;
   busy: boolean;
   profiles: ProfileDef[];
+  locations: { id: string; name: string; isDefault: boolean }[];
+  onSetLocation: (locationId: string | null) => void;
   onEdit: () => void;
   onResetPassword: () => void;
   onToggleStatus: () => void;
@@ -549,6 +573,32 @@ function UserRow({
           <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
             {m.jobTitle}
           </span>
+        )}
+        {/* Loja/depósito em que a pessoa opera: define de qual saldo o PDV
+            baixa e qual local a conferência dela conta. */}
+        {locations.length > 1 && (
+          <label className="flex items-center gap-1.5 text-[11px] text-slate-400">
+            <Store className="h-3 w-3" />
+            <select
+              value={m.locationId ?? ""}
+              disabled={busy}
+              onChange={(e) => onSetLocation(e.target.value || null)}
+              className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600 outline-none focus:border-brand-500 disabled:opacity-40 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-300"
+              title="Local em que este usuário opera"
+            >
+              <option value="">
+                Local padrão
+                {locations.find((l) => l.isDefault)
+                  ? ` (${locations.find((l) => l.isDefault)!.name})`
+                  : ""}
+              </option>
+              {locations.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
         <div className="flex items-center gap-1.5">
           <span className="rounded-full bg-brand-500/15 px-2.5 py-0.5 text-[11px] font-medium text-brand-600 dark:text-brand-200">

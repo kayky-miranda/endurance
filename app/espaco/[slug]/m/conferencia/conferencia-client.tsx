@@ -31,12 +31,14 @@ export default function ConferenciaClient({
   list,
   users,
   categories,
+  locations,
   filters,
 }: {
   slug: string;
   list: CountListRow[];
   users: { id: string; name: string }[];
   categories: string[];
+  locations: { id: string; name: string; isDefault: boolean }[];
   canApprove: boolean;
   filters: { status: string; type: string; resp: string; from: string; to: string };
 }) {
@@ -210,6 +212,7 @@ export default function ConferenciaClient({
         <NewCountModal
           slug={slug}
           categories={categories}
+          locations={locations}
           onClose={() => setShowNew(false)}
         />
       )}
@@ -220,10 +223,12 @@ export default function ConferenciaClient({
 function NewCountModal({
   slug,
   categories,
+  locations,
   onClose,
 }: {
   slug: string;
   categories: string[];
+  locations: { id: string; name: string; isDefault: boolean }[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -231,6 +236,9 @@ function NewCountModal({
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
+  const [locationId, setLocationId] = useState(
+    locations.find((l) => l.isDefault)?.id ?? locations[0]?.id ?? "",
+  );
   const [blind, setBlind] = useState(false);
   const [error, setError] = useState("");
   const [busy, startTransition] = useTransition();
@@ -243,6 +251,7 @@ function NewCountModal({
         location,
         note,
         blind,
+        locationId,
         // Geral carrega tudo; cíclica pode filtrar por categoria; parcial e por
         // localização começam vazias (itens adicionados na contagem).
         autoLoad: type === "geral" || (type === "ciclica" && !!category),
@@ -311,9 +320,33 @@ function NewCountModal({
             </label>
           )}
 
+          {locations.length > 1 && (
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">
+                Local conferido
+              </span>
+              <select
+                value={locationId}
+                onChange={(e) => setLocationId(e.target.value)}
+                className={INPUT}
+              >
+                {locations.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                    {l.isDefault ? " (padrão)" : ""}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-[11px] text-slate-400">
+                A contagem compara com o saldo deste local, e o ajuste incide
+                apenas nele.
+              </span>
+            </label>
+          )}
+
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-500">
-              Depósito / armazém / localização
+              Ponto / corredor / prateleira (opcional)
             </span>
             <input
               value={location}

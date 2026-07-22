@@ -60,6 +60,50 @@ model Organization {
   invites          Invite[]
   themeSettings    ThemeSettings?
   apiKeys          ApiKey[]
+  locations        Location[]
+  productStocks    ProductStock[]
+}
+
+// Local de estoque: matriz, filial, depósito ou loja. Toda organização tem ao
+// menos um (isDefault) — criado no onboarding e no backfill das contas antigas.
+model Location {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  code           String   @default("") // apelido curto (ex.: "MTZ", "FIL01")
+  isDefault      Boolean  @default(false)
+  active         Boolean  @default(true)
+  address        String   @default("")
+  city           String   @default("")
+  state          String   @default("")
+  createdAt      DateTime @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stocks       ProductStock[]
+  movements    StockMovement[]
+  users        User[]
+  sales        Sale[]
+  counts       StockCount[]
+
+  @@index([organizationId, active])
+}
+
+// Saldo de um produto EM UM LOCAL. A soma dos locais é mantida em
+// Product.stock (total consolidado) pelo razão — ver applyStockMovement.
+model ProductStock {
+  id             String   @id @default(cuid())
+  organizationId String
+  productId      String
+  locationId     String
+  qty            Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  location     Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, locationId])
+  @@index([organizationId, locationId])
 }
 
 // Chave da API pública (/api/v1). O token completo (edk_…) é exibido UMA vez
@@ -533,6 +577,8 @@ model Product {
   organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   supplierLinks  ProductSupplier[]
   stockMovements StockMovement[]
+  // Saldo por local; `stock` acima é o TOTAL consolidado (soma destes).
+  locationStocks ProductStock[]
 
   @@index([organizationId, deletedAt])
   @@index([organizationId, barcode])
@@ -553,10 +599,13 @@ model Sale {
   itemsCount     Int
   createdAt      DateTime @default(now())
 
+  locationId   String? // local (loja) onde a venda foi feita
+
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   customer     Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
   seller       User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   cashSession  CashSession?    @relation(fields: [cashSessionId], references: [id], onDelete: SetNull)
+  location     Location?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
   items        SaleItem[]
   payments     SalePayment[]
   fiscalDoc    FiscalDocument?
@@ -564,6 +613,7 @@ model Sale {
 
   @@index([organizationId])
   @@index([customerId])
+  @@index([organizationId, locationId])
 }
 
 model SaleItem {
@@ -620,9 +670,13 @@ model User {
   // valor plain. Quando usuário usa um, removemos do array.
   totpBackupCodes String[]  @default([])
   organizationId  String
+  // Local (loja/depósito) onde a pessoa opera: PDV e conferência usam este
+  // saldo. Null = usa o local padrão da organização.
+  locationId      String?
   createdAt       DateTime  @default(now())
 
   organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location            Location?            @relation(fields: [locationId], references: [id], onDelete: SetNull)
   sales               Sale[]
   whatsappMessages    WhatsAppMessage[]
   passwordResetTokens PasswordResetToken[]
@@ -999,13 +1053,18 @@ model StockMovement {
   userId         String? // usuário responsável
   userName       String   @default("") // nome do responsável (snapshot p/ auditoria)
   note           String   @default("")
+  // Local onde o movimento ocorreu (null só em registros anteriores ao
+  // multi-local; o backfill aponta todos para a matriz).
+  locationId     String?
   createdAt      DateTime @default(now())
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   product      Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  location     Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, createdAt])
   @@index([productId])
+  @@index([locationId])
 }
 
 // ===========================================================================
@@ -1127,7 +1186,10 @@ model StockCount {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  locationId   String? // local conferido (null = local padrão)
+
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  locationRef  Location?        @relation(fields: [locationId], references: [id], onDelete: SetNull)
   items        StockCountItem[]
 
   @@unique([organizationId, number])

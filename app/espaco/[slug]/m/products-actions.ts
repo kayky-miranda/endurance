@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
 import { logActivity } from "@/lib/endurance/activity-log";
 import { ProductSchema, StockAdjustSchema, firstError } from "@/lib/validation";
+import { resolveUserLocation } from "@/lib/endurance/locations";
 import {
   applyStockMovement,
   InsufficientStockError,
@@ -48,7 +49,9 @@ export async function createProductAction(input: NewProduct): Promise<Result> {
   }
 
   // Cria com saldo 0 e registra o estoque inicial pelo RAZÃO (entrada
-  // "saldo_inicial"), para que toda existência de saldo tenha origem auditável.
+  // "saldo_inicial"), no local em que o operador trabalha, para que toda
+  // existência de saldo tenha origem auditável.
+  const locationId = await resolveUserLocation(s.org, s.sub);
   const created = await prisma.$transaction(async (tx) => {
     const p = await tx.product.create({
       data: {
@@ -69,6 +72,7 @@ export async function createProductAction(input: NewProduct): Promise<Result> {
         reason: "saldo_inicial",
         refType: "initial",
         actor: { id: s.sub, name: s.name },
+        locationId,
       });
     }
     return p;
@@ -166,6 +170,7 @@ export async function adjustStockAction(
   if (move === 0) return { ok: true };
 
   // Ajuste manual pelo RAZÃO (entrada/saída de ajuste), com saldo e responsável.
+  const locationId = await resolveUserLocation(s.org, s.sub);
   try {
     const r = await prisma.$transaction((tx) =>
       applyStockMovement(tx, {
@@ -175,6 +180,7 @@ export async function adjustStockAction(
         reason: move > 0 ? "ajuste_entrada" : "ajuste_saida",
         refType: "adjust",
         actor: { id: s.sub, name: s.name },
+        locationId,
       }),
     );
     revalidate(s.slug);

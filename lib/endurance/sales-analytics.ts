@@ -1,6 +1,22 @@
 import "server-only";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { money } from "./money";
+
+/**
+ * Identificador de tabela QUALIFICADO PELO SCHEMA para uso em $queryRaw.
+ *
+ * O `?schema=` da connection string vale para o Prisma Client, mas NÃO define
+ * o search_path da sessão no pooler do Neon (ele fica em `"$user", public`).
+ * Sem qualificar, `FROM "Sale"` resolveria em `public` — outra tabela, ou
+ * erro. O nome vem da nossa própria env, entre aspas duplas.
+ */
+const SCHEMA = (() => {
+  const url = process.env.DATABASE_URL ?? "";
+  const m = /[?&]schema=([^&]+)/.exec(url);
+  return m ? decodeURIComponent(m[1]) : "public";
+})();
+const T = (table: string) => Prisma.raw(`"${SCHEMA}"."${table}"`);
 
 export interface SalesSummary {
   days: number;
@@ -55,8 +71,8 @@ export async function getSalesSummary(
         SELECT i."name",
                SUM(i."quantity")::int                         AS qty,
                SUM(i."quantity" * i."unitPrice")::float8      AS revenue
-        FROM "SaleItem" i
-        JOIN "Sale" s ON s."id" = i."saleId"
+        FROM ${T("SaleItem")} i
+        JOIN ${T("Sale")} s ON s."id" = i."saleId"
         WHERE s."organizationId" = ${orgId} AND s."createdAt" >= ${since}
         GROUP BY i."name"
         ORDER BY qty DESC
@@ -64,15 +80,15 @@ export async function getSalesSummary(
       prisma.$queryRaw<{ date: string; total: number }[]>`
         SELECT to_char(date_trunc('day', s."createdAt"), 'YYYY-MM-DD') AS date,
                SUM(s."total")::float8                                  AS total
-        FROM "Sale" s
+        FROM ${T("Sale")} s
         WHERE s."organizationId" = ${orgId} AND s."createdAt" >= ${since}
         GROUP BY 1`,
       prisma.$queryRaw<{ name: string; total: number; vendas: number }[]>`
         SELECT COALESCE(u."name", '—') AS name,
                SUM(s."total")::float8  AS total,
                COUNT(*)::int           AS vendas
-        FROM "Sale" s
-        LEFT JOIN "User" u ON u."id" = s."userId"
+        FROM ${T("Sale")} s
+        LEFT JOIN ${T("User")} u ON u."id" = s."userId"
         WHERE s."organizationId" = ${orgId} AND s."createdAt" >= ${since}
         GROUP BY 1
         ORDER BY total DESC

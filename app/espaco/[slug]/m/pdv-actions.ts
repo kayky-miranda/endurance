@@ -6,6 +6,7 @@ import { getSession, requirePermission } from "@/lib/auth";
 import { FinalizeSaleSchema, CustomerSchema, firstError } from "@/lib/validation";
 import { suggestCrossSell, type Suggestion } from "@/lib/endurance/crosssell";
 import { getOpenSession } from "@/lib/endurance/cash";
+import { resolveUserLocation } from "@/lib/endurance/locations";
 import { createReceivablesForSale } from "@/lib/endurance/finance";
 import { money } from "@/lib/endurance/money";
 import {
@@ -84,18 +85,27 @@ export async function finalizeSaleAction(
   if (clean.length === 0) return { ok: false, error: "Carrinho vazio." };
 
   const ids = clean.map((i) => i.productId);
-  const products = await prisma.product.findMany({
-    where: { id: { in: ids }, organizationId: s.org },
-  });
+  // A venda baixa o estoque DO LOCAL em que o operador trabalha — a checagem
+  // prévia (mensagem amigável) usa o saldo de lá, não o total da rede.
+  const locationId = await resolveUserLocation(s.org, s.sub);
+  const [products, localStocks] = await Promise.all([
+    prisma.product.findMany({ where: { id: { in: ids }, organizationId: s.org } }),
+    prisma.productStock.findMany({
+      where: { productId: { in: ids }, locationId },
+      select: { productId: true, qty: true },
+    }),
+  ]);
   const byId = new Map(products.map((p) => [p.id, p]));
+  const qtyHere = new Map(localStocks.map((r) => [r.productId, r.qty]));
 
   for (const it of clean) {
     const p = byId.get(it.productId);
     if (!p) return { ok: false, error: "Produto não encontrado no seu espaço." };
-    if (p.stock < it.qty)
+    const available = qtyHere.get(it.productId) ?? 0;
+    if (available < it.qty)
       return {
         ok: false,
-        error: `Estoque insuficiente de "${p.name}" (${p.stock} disponível).`,
+        error: `Estoque insuficiente de "${p.name}" (${available} disponível neste local).`,
       };
   }
 
@@ -195,6 +205,7 @@ export async function finalizeSaleAction(
           customerId: saleCustomerId,
           userId: s.sub,
           cashSessionId: openSession?.id ?? null,
+          locationId,
           token,
           subtotal,
           discount,
@@ -228,6 +239,7 @@ export async function finalizeSaleAction(
           refType: "sale",
           refId: sale.id,
           actor: { id: s.sub, name: s.name },
+          locationId,
         });
       }
 

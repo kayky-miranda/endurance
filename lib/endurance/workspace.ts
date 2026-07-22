@@ -101,6 +101,11 @@ export async function createWorkspace(
       modules: {
         create: moduleIds.map((moduleId) => ({ moduleId, enabled: true })),
       },
+      // Toda organização nasce com um local padrão — é nele que o estoque
+      // reside até que filiais/depósitos sejam criados.
+      locations: {
+        create: { name: "Matriz", code: "MTZ", isDefault: true },
+      },
       users: {
         create: {
           email,
