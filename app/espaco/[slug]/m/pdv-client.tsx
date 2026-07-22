@@ -88,6 +88,8 @@ export default function PdvClient({
   const submitting = useRef(false);
   const tokenRef = useRef(newToken());
   const searchRef = useRef<HTMLInputElement>(null);
+  const discRef = useRef<HTMLInputElement>(null);
+  const customerRef = useRef<HTMLInputElement>(null);
 
   // cliente
   const [customer, setCustomer] = useState<CustomerData | null>(null);
@@ -175,22 +177,80 @@ export default function PdvClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cartKey, active]);
 
-  // Atalhos de teclado.
+  /**
+   * Atalhos de teclado (operação sem mouse — padrão de PDV profissional).
+   *
+   *   F2  nova venda / voltar o foco para a busca
+   *   F4  desconto            F8  cliente
+   *   F9  finalizar a venda   ESC fecha modal ou cancela a venda
+   *
+   * As teclas de função funcionam mesmo com o cursor dentro de um campo (é o
+   * que o operador espera); ESC é contextual e nunca descarta o carrinho sem
+   * confirmação.
+   */
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "F2") {
-        e.preventDefault();
-        if (!active) startSale();
-        else searchRef.current?.focus();
-      } else if (e.key === "F4" && active) {
-        e.preventDefault();
-        finalize();
+      switch (e.key) {
+        case "F2":
+          e.preventDefault();
+          if (!active) startSale();
+          else searchRef.current?.focus();
+          break;
+        case "F4":
+          if (!active) return;
+          e.preventDefault();
+          discRef.current?.focus();
+          discRef.current?.select();
+          break;
+        case "F8":
+          if (!active) return;
+          e.preventDefault();
+          if (customer) return; // já identificado
+          setShowCustomerForm(true);
+          setTimeout(() => customerRef.current?.focus(), 50);
+          break;
+        case "F9":
+          if (!active) return;
+          e.preventDefault();
+          void finalize();
+          break;
+        case "Escape": {
+          // Contextual: fecha o que estiver aberto antes de mexer na venda.
+          if (pixModal) {
+            e.preventDefault();
+            // Só fecha o QR se a cobrança ainda não foi paga — cobrança paga
+            // precisa concluir a venda, não pode ser descartada por engano.
+            if (!pixCharge || pixCharge.status !== "pago") resetPix();
+            return;
+          }
+          if (showCustomerForm) {
+            e.preventDefault();
+            setShowCustomerForm(false);
+            return;
+          }
+          if (active && lines.length > 0) {
+            e.preventDefault();
+            if (confirm("Cancelar esta venda? Os itens do carrinho serão perdidos."))
+              cancelSale();
+          }
+          break;
+        }
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, cart, payments, discInput, customer, busy]);
+  }, [
+    active,
+    cart,
+    payments,
+    discInput,
+    customer,
+    busy,
+    pixModal,
+    pixCharge,
+    showCustomerForm,
+  ]);
 
   function startSale() {
     setActive(true);
@@ -664,9 +724,11 @@ export default function PdvClient({
               </div>
               <div className="grid gap-2">
                 <input
+                  ref={customerRef}
                   value={cName}
                   onChange={(e) => setCName(e.target.value)}
                   placeholder="Nome*"
+                  aria-label="Nome do cliente"
                   className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
                 />
                 <div className="grid grid-cols-2 gap-2">
@@ -776,10 +838,12 @@ export default function PdvClient({
             </span>
             <div className="ml-auto flex items-center gap-1">
               <input
+                ref={discRef}
                 value={discInput}
                 onChange={(e) => setDiscInput(e.target.value)}
                 inputMode="decimal"
                 placeholder="0"
+                aria-label="Valor do desconto"
                 className="w-20 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-right text-sm text-slate-800 outline-none focus:border-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
               />
               <div className="flex overflow-hidden rounded-lg border border-slate-200 text-xs dark:border-ink-600">
@@ -903,7 +967,7 @@ export default function PdvClient({
               <CheckCircle2 className="h-4 w-4" />
             )}
             Finalizar venda · {brl(total)}
-            <kbd className="ml-1 rounded bg-ink-950/15 px-1 text-[10px]">F4</kbd>
+            <kbd className="ml-1 rounded bg-ink-950/15 px-1 text-[10px]">F9</kbd>
           </button>
           <button
             type="button"
@@ -912,6 +976,8 @@ export default function PdvClient({
           >
             Cancelar venda
           </button>
+
+          <ShortcutLegend />
         </div>
       </div>
     </div>
@@ -1133,5 +1199,31 @@ function Chip({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * Legenda dos atalhos — discreta, mas sempre visível: operador de caixa
+ * aprende o teclado olhando, não lendo manual.
+ */
+function ShortcutLegend() {
+  const items: [string, string][] = [
+    ["F2", "buscar"],
+    ["F4", "desconto"],
+    ["F8", "cliente"],
+    ["F9", "finalizar"],
+    ["ESC", "cancelar"],
+  ];
+  return (
+    <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-slate-100 pt-3 text-[11px] text-slate-400 dark:border-ink-800">
+      {items.map(([key, label]) => (
+        <span key={key} className="inline-flex items-center gap-1">
+          <kbd className="rounded border border-slate-200 bg-slate-50 px-1 font-mono text-[10px] text-slate-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-400">
+            {key}
+          </kbd>
+          {label}
+        </span>
+      ))}
+    </div>
   );
 }

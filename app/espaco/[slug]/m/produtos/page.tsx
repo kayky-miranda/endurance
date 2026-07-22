@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/endurance/money";
-import ProductsClient, { type Product } from "../products-client";
+import ProductsClient, {
+  type Product,
+  PRODUCT_SORT_FIELDS,
+} from "../products-client";
+import { parseSort } from "@/lib/endurance/sorting";
 import {
   loadModule,
   DeniedModule,
@@ -16,16 +20,17 @@ export default async function ProdutosPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ q?: string; pagina?: string }>;
+  searchParams: Promise<{ q?: string; pagina?: string; ord?: string; dir?: string }>;
 }) {
   const { slug } = await params;
   const sp = await searchParams;
   const { mod, session, denied } = await loadModule(slug, "produtos");
   if (denied) return <DeniedModule slug={slug} mod={mod} />;
 
-  // Busca e paginação no banco — catálogos grandes não podem vir inteiros.
+  // Busca, ordenação e paginação no banco — catálogos grandes não vêm inteiros.
   const q = (sp.q ?? "").trim();
   const page = Math.max(1, parseInt(sp.pagina ?? "1", 10) || 1);
+  const sort = parseSort(sp, PRODUCT_SORT_FIELDS, { field: "createdAt", dir: "desc" });
   const where = {
     organizationId: session?.org ?? "",
     ...(q
@@ -42,7 +47,7 @@ export default async function ProdutosPage({
     ? await Promise.all([
         prisma.product.findMany({
           where,
-          orderBy: { createdAt: "desc" },
+          orderBy: { [sort.field]: sort.dir },
           take: PAGE_SIZE,
           skip: (page - 1) * PAGE_SIZE,
         }),
@@ -70,7 +75,7 @@ export default async function ProdutosPage({
       />
       <ProductsClient
         products={products}
-        pager={{ total, page, pageSize: PAGE_SIZE, q }}
+        pager={{ total, page, pageSize: PAGE_SIZE, q, sort }}
       />
     </div>
   );

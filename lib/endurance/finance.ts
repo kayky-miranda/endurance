@@ -119,9 +119,25 @@ function toRow(e: {
   };
 }
 
+/**
+ * Colunas ordenáveis das listas do financeiro. WHITELIST — o valor vai direto
+ * para o `orderBy` do Prisma, então nada vindo da URL escapa desta lista.
+ */
+export const FINANCE_SORT_FIELDS = [
+  "dueDate",
+  "description",
+  "category",
+  "amount",
+  "status",
+] as const;
+
 export async function getFinanceOverview(
   org: string,
-  pages: { receber?: number; pagar?: number } = {},
+  pages: {
+    receber?: number;
+    pagar?: number;
+    sort?: { field: string; dir: "asc" | "desc" };
+  } = {},
 ): Promise<FinanceOverview> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -159,10 +175,21 @@ export async function getFinanceOverview(
 
   const receberPage = clampPage(pages.receber, receberTotal);
   const pagarPage = clampPage(pages.pagar, pagarTotal);
+  // Ordenação escolhida pelo usuário; sem ela, pendentes primeiro por
+  // vencimento (o que precisa de ação aparece no topo).
+  const sortField = FINANCE_SORT_FIELDS.includes(
+    (pages.sort?.field ?? "") as (typeof FINANCE_SORT_FIELDS)[number],
+  )
+    ? (pages.sort!.field as string)
+    : null;
+  const orderBy = sortField
+    ? [{ [sortField]: pages.sort!.dir }]
+    : [{ status: "asc" as const }, { dueDate: "asc" as const }];
+
   const list = (kind: string, page: number) =>
     prisma.financialEntry.findMany({
       where: { organizationId: org, kind },
-      orderBy: [{ status: "asc" }, { dueDate: "asc" }],
+      orderBy,
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     });

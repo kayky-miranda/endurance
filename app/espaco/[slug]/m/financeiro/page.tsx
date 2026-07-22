@@ -4,7 +4,8 @@ import {
   ArrowUpRight,
   Banknote,
 } from "lucide-react";
-import { getFinanceOverview } from "@/lib/endurance/finance";
+import { getFinanceOverview, FINANCE_SORT_FIELDS } from "@/lib/endurance/finance";
+import { parseSort } from "@/lib/endurance/sorting";
 import { getReconciliationOverview } from "@/lib/endurance/reconciliation";
 import { parsePage } from "@/lib/endurance/pagination";
 import FinanceClient from "../finance-client";
@@ -24,7 +25,13 @@ export default async function FinanceiroPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ rec?: string; pag?: string; con?: string }>;
+  searchParams: Promise<{
+    rec?: string;
+    pag?: string;
+    con?: string;
+    ord?: string;
+    dir?: string;
+  }>;
 }) {
   const { slug } = await params;
   const sp = await searchParams;
@@ -36,6 +43,7 @@ export default async function FinanceiroPage({
         getFinanceOverview(session.org, {
           receber: parsePage(sp.rec),
           pagar: parsePage(sp.pag),
+          sort: parseSort(sp, FINANCE_SORT_FIELDS, { field: "", dir: "asc" }),
         }),
         getReconciliationOverview(session.org, parsePage(sp.con)),
       ])
@@ -93,6 +101,7 @@ export default async function FinanceiroPage({
             receberMeta={fin.receberMeta}
             pagarMeta={fin.pagarMeta}
             conciliacao={conciliacao}
+            sort={parseSort(sp, FINANCE_SORT_FIELDS, { field: "", dir: "asc" })}
           />
         </>
       )}

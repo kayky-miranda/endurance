@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { SortableTh, type SortState } from "./sortable-header";
 import {
   Loader2,
   Plus,
@@ -37,12 +38,14 @@ export default function FinanceClient({
   receberMeta,
   pagarMeta,
   conciliacao,
+  sort,
 }: {
   slug: string;
   receber: FinanceRow[];
   pagar: FinanceRow[];
   receberMeta: PageMeta;
   pagarMeta: PageMeta;
+  sort: SortState;
   conciliacao: ReconOverview | null;
 }) {
   const router = useRouter();
@@ -137,11 +140,11 @@ export default function FinanceClient({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400 dark:border-ink-800">
-                <th className="px-5 py-2.5 font-medium">Descrição</th>
-                <th className="px-5 py-2.5 font-medium">Categoria</th>
-                <th className="px-5 py-2.5 font-medium">Vencimento</th>
-                <th className="px-5 py-2.5 font-medium">Valor</th>
-                <th className="px-5 py-2.5 font-medium">Status</th>
+                <SortableTh field="description" label="Descrição" sort={sort} />
+                <SortableTh field="category" label="Categoria" sort={sort} />
+                <SortableTh field="dueDate" label="Vencimento" sort={sort} />
+                <SortableTh field="amount" label="Valor" sort={sort} />
+                <SortableTh field="status" label="Status" sort={sort} />
                 <th className="px-5 py-2.5 text-right font-medium">Ação</th>
               </tr>
             </thead>

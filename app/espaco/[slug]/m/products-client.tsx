@@ -24,6 +24,7 @@ import {
 } from "./products-actions";
 import { importProductsCsvAction } from "./csv-import-actions";
 import CsvImportModal, { type CsvField } from "./csv-import-modal";
+import { SortableTh, type SortState } from "./sortable-header";
 
 const PRODUCT_CSV_FIELDS: CsvField[] = [
   { key: "name", label: "Nome", required: true, hints: ["nome", "produto", "descri"] },
@@ -49,6 +50,19 @@ export type Product = {
   stock: number;
 };
 
+/**
+ * Colunas ordenáveis da tabela de produtos. É uma WHITELIST: o valor vai
+ * direto para o `orderBy` do Prisma, então nada que venha da URL pode
+ * escapar desta lista.
+ */
+export const PRODUCT_SORT_FIELDS = [
+  "name",
+  "category",
+  "price",
+  "stock",
+  "createdAt",
+] as const;
+
 const LOW_STOCK = 5;
 
 function brl(n: number) {
@@ -61,6 +75,7 @@ export type ProductsPager = {
   page: number;
   pageSize: number;
   q: string;
+  sort: SortState;
 };
 
 export default function ProductsClient({
@@ -233,10 +248,21 @@ export default function ProductsClient({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400 dark:border-ink-800">
-                  <th className="px-5 py-2.5 font-medium">Produto</th>
-                  <th className="px-5 py-2.5 font-medium">Categoria</th>
-                  <th className="px-5 py-2.5 font-medium">Preço</th>
-                  <th className="px-5 py-2.5 font-medium">Estoque</th>
+                  {pager ? (
+                    <>
+                      <SortableTh field="name" label="Produto" sort={pager.sort} />
+                      <SortableTh field="category" label="Categoria" sort={pager.sort} />
+                      <SortableTh field="price" label="Preço" sort={pager.sort} />
+                      <SortableTh field="stock" label="Estoque" sort={pager.sort} />
+                    </>
+                  ) : (
+                    <>
+                      <th className="px-5 py-2.5 font-medium">Produto</th>
+                      <th className="px-5 py-2.5 font-medium">Categoria</th>
+                      <th className="px-5 py-2.5 font-medium">Preço</th>
+                      <th className="px-5 py-2.5 font-medium">Estoque</th>
+                    </>
+                  )}
                   <th className="px-5 py-2.5 font-medium text-right">Ações</th>
                 </tr>
               </thead>

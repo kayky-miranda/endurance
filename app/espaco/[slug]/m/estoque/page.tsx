@@ -2,11 +2,15 @@ import { AlertTriangle, Boxes, Package, Store } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/endurance/money";
 import { listLocations } from "@/lib/endurance/locations";
+import { parseSort } from "@/lib/endurance/sorting";
 import {
   getReplenishment,
   type ReplenItem,
 } from "@/lib/endurance/replenishment";
-import ProductsClient, { type Product } from "../products-client";
+import ProductsClient, {
+  type Product,
+  PRODUCT_SORT_FIELDS,
+} from "../products-client";
 import StockAdvicePanel from "../stock-advice-panel";
 import {
   loadModule,
@@ -24,7 +28,7 @@ export default async function EstoquePage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ q?: string; pagina?: string }>;
+  searchParams: Promise<{ q?: string; pagina?: string; ord?: string; dir?: string }>;
 }) {
   const { slug } = await params;
   const sp = await searchParams;
@@ -34,6 +38,8 @@ export default async function EstoquePage({
   // Lista paginada no banco; KPIs por agregação (não carrega o catálogo todo).
   const q = (sp.q ?? "").trim();
   const page = Math.max(1, parseInt(sp.pagina ?? "1", 10) || 1);
+  // Padrão do Estoque: menor saldo primeiro (o que precisa de atenção no topo).
+  const sort = parseSort(sp, PRODUCT_SORT_FIELDS, { field: "stock", dir: "asc" });
   const where = {
     organizationId: session?.org ?? "",
     ...(q
@@ -50,7 +56,7 @@ export default async function EstoquePage({
     ? await Promise.all([
         prisma.product.findMany({
           where,
-          orderBy: { stock: "asc" },
+          orderBy: { [sort.field]: sort.dir },
           take: PAGE_SIZE,
           skip: (page - 1) * PAGE_SIZE,
         }),
@@ -140,7 +146,7 @@ export default async function EstoquePage({
       <ProductsClient
         products={products}
         showAdd={false}
-        pager={{ total, page, pageSize: PAGE_SIZE, q }}
+        pager={{ total, page, pageSize: PAGE_SIZE, q, sort }}
       />
     </div>
   );
