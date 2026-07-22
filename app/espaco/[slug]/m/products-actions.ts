@@ -20,6 +20,7 @@ export interface NewProduct {
   ncm?: string;
   price?: number;
   stock?: number;
+  minStock?: number;
 }
 
 function revalidate(slug: string) {
@@ -35,7 +36,7 @@ export async function createProductAction(input: NewProduct): Promise<Result> {
 
   const parsed = ProductSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
-  const { name, barcode, category, ncm, price, stock: initial } = parsed.data;
+  const { name, barcode, category, ncm, price, stock: initial, minStock } = parsed.data;
 
   if (barcode) {
     const dup = await prisma.product.findFirst({
@@ -61,6 +62,7 @@ export async function createProductAction(input: NewProduct): Promise<Result> {
         category,
         ncm,
         price,
+        minStock,
         stock: 0,
       },
     });
@@ -90,6 +92,7 @@ export interface EditProduct {
   ncm?: string;
   unit?: string;
   price?: number;
+  minStock?: number;
 }
 
 /**
@@ -107,7 +110,7 @@ export async function updateProductAction(input: EditProduct): Promise<Result> {
 
   const parsed = ProductSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
-  const { name, barcode, category, ncm, unit, price } = parsed.data;
+  const { name, barcode, category, ncm, unit, price, minStock } = parsed.data;
 
   const existing = await prisma.product.findUnique({ where: { id } });
   if (!existing || existing.organizationId !== s.org)
@@ -127,7 +130,7 @@ export async function updateProductAction(input: EditProduct): Promise<Result> {
 
   await prisma.product.update({
     where: { id },
-    data: { name, barcode, category, ncm, unit, price },
+    data: { name, barcode, category, ncm, unit, price, minStock },
   });
   revalidate(s.slug);
   await logActivity(s, "product.update", `Editou o produto ${name}`, id);

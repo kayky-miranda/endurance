@@ -86,8 +86,7 @@ function OpenForm({ pending, run }: { pending: boolean; run: RunFn }) {
             onChange={(e) => setAmount(e.target.value)}
             inputMode="decimal"
             placeholder="0,00"
-            className={inputCls}
-           aria-label="0,00" />
+            className={inputCls} />
         </label>
         <button
           onClick={() =>
@@ -294,8 +293,7 @@ function CloseForm({
             onChange={(e) => setCounted(e.target.value)}
             inputMode="decimal"
             placeholder="0,00"
-            className={inputCls}
-           aria-label="0,00" />
+            className={inputCls} />
         </label>
         {diff !== null && (
           <div

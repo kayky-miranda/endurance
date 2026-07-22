@@ -53,15 +53,26 @@ export async function getStockAlerts(
     const perDay = (sold.get(p.id) ?? 0) / days;
     const daysLeft = perDay > 0 ? p.stock / perDay : null;
 
+    // Ponto de reposição do PRODUTO quando configurado; senão, a régua padrão.
+    const minStock = p.minStock > 0 ? p.minStock : 0;
+
     let level: AlertLevel | null = null;
     if (p.stock <= 0) level = "rompido";
+    // Estoque mínimo definido pelo lojista tem precedência sobre a previsão:
+    // ele conhece o giro do produto (sazonal, prazo do fornecedor, etc.).
+    else if (minStock > 0 && p.stock <= minStock)
+      level = daysLeft !== null && daysLeft <= 3 ? "critico" : "atencao";
     else if (daysLeft !== null && daysLeft <= 3) level = "critico";
-    else if ((daysLeft !== null && daysLeft <= 7) || p.stock <= 5)
+    else if ((daysLeft !== null && daysLeft <= 7) || (minStock === 0 && p.stock <= 5))
       level = "atencao";
     if (!level) continue;
 
-    // Sugere repor para cobrir ~14 dias de venda (mínimo 10 se não há histórico).
-    const target = perDay > 0 ? Math.ceil(perDay * 14) : 10;
+    // Sugere repor para cobrir ~14 dias de venda (mínimo 10 se não há
+    // histórico) e nunca abaixo do ponto de reposição configurado.
+    const target = Math.max(
+      perDay > 0 ? Math.ceil(perDay * 14) : 10,
+      minStock > 0 ? minStock : 0,
+    );
     alerts.push({
       id: p.id,
       name: p.name,

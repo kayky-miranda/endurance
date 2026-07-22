@@ -584,8 +584,7 @@ function UserRow({
               disabled={busy}
               onChange={(e) => onSetLocation(e.target.value || null)}
               className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-600 outline-none focus:border-brand-500 disabled:opacity-40 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-300"
-              title="Local em que este usuário opera"
-             aria-label="Local em que este usuário opera" >
+              title="Local em que este usuário opera" >
               <option value="">
                 Local padrão
                 {locations.find((l) => l.isDefault)

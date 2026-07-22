@@ -119,6 +119,13 @@ export const ProductSchema = z.object({
     .coerce.number()
     .catch(0)
     .transform((n) => Math.max(0, Math.trunc(Number.isFinite(n) ? n : 0))),
+  // Estoque mínimo: dispara o alerta de reposição deste produto. 0 = usa a
+  // régua automática (velocidade de venda) em vez de um ponto fixo.
+  minStock: z
+    .coerce.number()
+    .catch(0)
+    .transform((n) => Math.max(0, Math.trunc(Number.isFinite(n) ? n : 0)))
+    .refine((n) => n <= 1_000_000, "Estoque mínimo acima do limite."),
 });
 export type ProductInput = z.infer<typeof ProductSchema>;
 

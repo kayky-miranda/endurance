@@ -106,8 +106,7 @@ export default function InviteModal({
                 required
                 autoFocus
                 placeholder="convidado@empresa.com"
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-white"
-               aria-label="convidado@empresa.com" />
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-white" />
             </label>
 
             <label className="block">

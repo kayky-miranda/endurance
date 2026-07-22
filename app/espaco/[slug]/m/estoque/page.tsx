@@ -74,6 +74,7 @@ export default async function EstoquePage({
     unit: p.unit,
     price: money(p.price),
     stock: p.stock,
+    minStock: p.minStock,
   }));
   const unidades = agg._sum.stock ?? 0;
   const totalProdutos = agg._count;

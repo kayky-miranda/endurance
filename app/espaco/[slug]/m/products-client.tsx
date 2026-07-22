@@ -36,6 +36,7 @@ const PRODUCT_CSV_FIELDS: CsvField[] = [
   { key: "price", label: "Preço", hints: ["preco", "venda", "valor"] },
   { key: "cost", label: "Custo", hints: ["custo", "compra"] },
   { key: "stock", label: "Estoque inicial", hints: ["estoque", "saldo", "quantidade", "qtd"] },
+  { key: "minStock", label: "Estoque mínimo", hints: ["minimo", "mínimo", "reposicao", "reposição"] },
 ];
 
 export type Product = {
@@ -48,9 +49,16 @@ export type Product = {
   unit?: string;
   price: number;
   stock: number;
+  /** Ponto de reposição do produto (0 = usa a régua automática). */
+  minStock?: number;
 };
 
-const LOW_STOCK = 5;
+/**
+ * Ponto de reposição padrão, usado só quando o produto não define o seu
+ * (minStock = 0). Com minStock configurado, quem manda é o do produto.
+ */
+const DEFAULT_LOW_STOCK = 5;
+const lowThreshold = (p: Product) => (p.minStock && p.minStock > 0 ? p.minStock : DEFAULT_LOW_STOCK);
 
 function brl(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -81,6 +89,7 @@ export default function ProductsClient({
   const [ncm, setNcm] = useState("");
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
+  const [minStock, setMinStock] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [pendingId, setPendingId] = useState("");
@@ -98,6 +107,7 @@ export default function ProductsClient({
       ncm,
       price: parseFloat(price.replace(",", ".")) || 0,
       stock: parseInt(stock, 10) || 0,
+      minStock: parseInt(minStock, 10) || 0,
     });
     setBusy(false);
     if (res.ok) {
@@ -107,6 +117,7 @@ export default function ProductsClient({
       setNcm("");
       setPrice("");
       setStock("");
+      setMinStock("");
       router.refresh();
     } else {
       setError(res.error);
@@ -174,6 +185,16 @@ export default function ProductsClient({
               onKeyDown={(e) => e.key === "Enter" && add()}
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
              aria-label="Estoque inicial" />
+            <input
+              value={minStock}
+              onChange={(e) => setMinStock(e.target.value)}
+              inputMode="numeric"
+              placeholder="Estoque mínimo (alerta)"
+              title="Quando o saldo chegar nesse valor, o produto entra no alerta de reposição. Deixe 0 para usar a previsão automática."
+              aria-label="Estoque mínimo para alerta de reposição"
+              onKeyDown={(e) => e.key === "Enter" && add()}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+            />
           </div>
           {error && (
             <div className="mt-3 flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">
@@ -255,7 +276,7 @@ export default function ProductsClient({
               </thead>
               <tbody>
                 {products.map((p) => {
-                  const low = p.stock <= LOW_STOCK;
+                  const low = p.stock <= lowThreshold(p);
                   const pending = pendingId === p.id;
                   return (
                     <tr
@@ -306,7 +327,10 @@ export default function ProductsClient({
                             <Plus className="h-3 w-3" />
                           </button>
                           {low && (
-                            <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-500">
+                            <span
+                              className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-medium text-red-500"
+                              title={`No mínimo ou abaixo (limite: ${lowThreshold(p)})`}
+                            >
                               baixo
                             </span>
                           )}
@@ -352,7 +376,7 @@ export default function ProductsClient({
         <CsvImportModal
           title="Importar produtos por planilha"
           fields={PRODUCT_CSV_FIELDS}
-          templateExample="Nome;Código de barras;SKU;Categoria;Unidade;NCM;Preço;Custo;Estoque"
+          templateExample="Nome;Código de barras;SKU;Categoria;Unidade;NCM;Preço;Custo;Estoque;Estoque mínimo"
           onImport={importProductsCsvAction}
           onClose={() => setImporting(false)}
           onDone={() => router.refresh()}
@@ -476,6 +500,7 @@ function EditProductModal({
   const [price, setPrice] = useState(
     product.price ? String(product.price).replace(".", ",") : "",
   );
+  const [minStock, setMinStock] = useState(String(product.minStock ?? 0));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -495,6 +520,7 @@ function EditProductModal({
       ncm,
       unit,
       price: parseFloat(price.replace(",", ".")) || 0,
+      minStock: parseInt(minStock, 10) || 0,
     });
     setBusy(false);
     if (res.ok) onSaved();
@@ -548,8 +574,7 @@ function EditProductModal({
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="—"
-              className={INPUT}
-             aria-label="—" />
+              className={INPUT} />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-500">
@@ -560,8 +585,7 @@ function EditProductModal({
               onChange={(e) => setBarcode(e.target.value)}
               inputMode="numeric"
               placeholder="—"
-              className={INPUT}
-             aria-label="—" />
+              className={INPUT} />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-500">
@@ -572,8 +596,7 @@ function EditProductModal({
               onChange={(e) => setPrice(e.target.value)}
               inputMode="decimal"
               placeholder="0,00"
-              className={INPUT}
-             aria-label="0,00" />
+              className={INPUT} />
           </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-500">
@@ -583,8 +606,20 @@ function EditProductModal({
               value={unit}
               onChange={(e) => setUnit(e.target.value.slice(0, 10))}
               placeholder="un"
+              className={INPUT} />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-500">
+              Estoque mínimo (alerta)
+            </span>
+            <input
+              value={minStock}
+              onChange={(e) => setMinStock(e.target.value.replace(/D/g, ""))}
+              inputMode="numeric"
+              placeholder="0"
+              title="Quando o saldo atingir esse valor, o produto entra no alerta de reposição. 0 = previsão automática pela velocidade de venda."
               className={INPUT}
-             aria-label="un" />
+            />
           </label>
           <label className="block sm:col-span-2">
             <span className="mb-1 block text-xs font-medium text-slate-500">
@@ -595,8 +630,7 @@ function EditProductModal({
               onChange={(e) => setNcm(e.target.value.replace(/\D/g, "").slice(0, 8))}
               inputMode="numeric"
               placeholder="Herda o NCM padrão da empresa se vazio"
-              className={INPUT}
-             aria-label="Herda o NCM padrão da empresa se vazio" />
+              className={INPUT} />
           </label>
         </div>
 

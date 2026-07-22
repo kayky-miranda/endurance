@@ -404,8 +404,7 @@ function SetupModal({ onClose }: { onClose: () => void }) {
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                 placeholder="000000"
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-center font-mono text-lg tracking-[0.4em] focus:border-brand-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-white"
-               aria-label="000000" />
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-center font-mono text-lg tracking-[0.4em] focus:border-brand-500 focus:outline-none dark:border-ink-700 dark:bg-ink-800 dark:text-white" />
             </label>
             {error && (
               <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">

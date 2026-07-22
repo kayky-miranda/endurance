@@ -463,8 +463,7 @@ function SupplierDrawer({
                 className={inputCls}
                 value={form.name ?? ""}
                 onChange={(e) => set("name", e.target.value)}
-                placeholder="Como o fornecedor aparece nas listas"
-               aria-label="Como o fornecedor aparece nas listas" />
+                placeholder="Como o fornecedor aparece nas listas" />
             </Field>
             <Field label="Razão social">
               <input
@@ -487,8 +486,7 @@ function SupplierDrawer({
                   value={form.cnpj ?? ""}
                   onChange={(e) => set("cnpj", e.target.value)}
                   inputMode="numeric"
-                  placeholder="00.000.000/0000-00"
-                 aria-label="00.000.000/0000-00" />
+                  placeholder="00.000.000/0000-00" />
                 <button
                   type="button"
                   onClick={fillFromCnpj}

@@ -361,8 +361,7 @@ function NewCountModal({
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="Ex.: Depósito central, Prateleira A3…"
-              className={INPUT}
-             aria-label="Ex.: Depósito central, Prateleira A3" />
+              className={INPUT} />
           </label>
 
           <label className="block">

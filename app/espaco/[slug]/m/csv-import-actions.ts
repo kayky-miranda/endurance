@@ -53,6 +53,7 @@ const ProductRow = z.object({
   price: z.string().optional().default(""),
   cost: z.string().optional().default(""),
   stock: z.string().optional().default(""),
+  minStock: z.string().optional().default(""),
 });
 
 export async function importProductsCsvAction(
@@ -81,6 +82,7 @@ export async function importProductsCsvAction(
     const price = Math.max(0, brNumber(r.price));
     const cost = Math.max(0, brNumber(r.cost));
     const stock = Math.max(0, Math.trunc(brNumber(r.stock)));
+    const minStock = Math.max(0, Math.trunc(brNumber(r.minStock)));
 
     try {
       // Chave natural: código de barras; senão SKU; senão nome exato.
@@ -110,6 +112,7 @@ export async function importProductsCsvAction(
             ...(r.ncm ? { ncm: r.ncm } : {}),
             ...(r.price !== "" ? { price } : {}),
             ...(r.cost !== "" ? { cost } : {}),
+            ...(r.minStock !== "" ? { minStock } : {}),
           },
         });
         updated++;
@@ -126,6 +129,7 @@ export async function importProductsCsvAction(
               ncm: r.ncm,
               price,
               cost,
+              minStock,
               stock: 0,
             },
           });

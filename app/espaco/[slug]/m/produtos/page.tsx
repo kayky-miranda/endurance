@@ -60,6 +60,7 @@ export default async function ProdutosPage({
     unit: p.unit,
     price: money(p.price),
     stock: p.stock,
+    minStock: p.minStock,
   }));
 
   return (
