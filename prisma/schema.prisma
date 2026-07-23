@@ -66,6 +66,7 @@ model Organization {
   appointments     Appointment[]
   clinicalNotes    ClinicalNote[]
   patientMetrics   PatientMetric[]
+  mealPlans        MealPlan[]
 }
 
 // Configuração do cupom/recibo impresso (um por organização). O logo reaproveita
@@ -573,8 +574,48 @@ model Customer {
   appointments     Appointment[]
   clinicalNotes    ClinicalNote[]
   metrics          PatientMetric[]
+  mealPlans        MealPlan[]
 
   @@index([organizationId, deletedAt])
+}
+
+// Plano alimentar (cardápio) de um paciente — nicho nutrição. Um plano tem
+// vários itens agrupados por refeição. Exclusão LÓGICA preserva o histórico de
+// planos anteriores do paciente.
+model MealPlan {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String
+  title          String   @default("")
+  goal           String   @default("") // objetivo/orientações gerais
+  active         Boolean  @default(true)
+  createdById    String?
+  createdByName  String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items        MealPlanItem[]
+
+  @@index([organizationId, customerId, deletedAt])
+}
+
+// Item de um plano: uma linha de alimento dentro de uma refeição. `meal` é a
+// chave da refeição (cafe_manha, almoco…), `position` ordena dentro do plano.
+model MealPlanItem {
+  id       String @id @default(cuid())
+  planId   String
+  meal     String // chave da refeição
+  food     String @default("")
+  amount   String @default("") // quantidade em texto livre (ex.: "2 fatias")
+  notes    String @default("")
+  position Int    @default(0)
+
+  plan MealPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, position])
 }
 
 // Evolução do paciente: medições numéricas ao longo do tempo (peso, medidas,
