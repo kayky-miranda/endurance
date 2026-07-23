@@ -1,0 +1,81 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/auth";
+import { logActivity } from "@/lib/endurance/activity-log";
+import { saveAnamnese, deleteAnamnese } from "@/lib/endurance/anamnese";
+
+/** Ações da Anamnese. Gate `anamnese.manage` em toda mutação. */
+
+export type AnamneseActionResult =
+  | { ok: true; id?: string }
+  | { ok: false; error: string };
+
+function revalidate(slug: string, customerId: string) {
+  revalidatePath(`/espaco/${slug}/m/anamnese/${customerId}`);
+  revalidatePath(`/espaco/${slug}/m/anamnese`);
+}
+
+export async function saveAnamneseAction(payload: {
+  customerId: string;
+  status?: "rascunho" | "concluida";
+  items: { question: string; answer?: string }[];
+}): Promise<AnamneseActionResult> {
+  const gate = await requirePermission("anamnese.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+  const res = await saveAnamnese(
+    s.org,
+    { id: s.sub, name: s.name },
+    payload,
+  );
+  if (!res.ok) return res;
+  await logActivity(
+    s,
+    "anamnese.save",
+    `Salvou a anamnese de um paciente (${payload.status ?? "rascunho"})`,
+    payload.customerId,
+  );
+  revalidate(s.slug, payload.customerId);
+  return { ok: true, id: res.id };
+}
+
+export async function deleteAnamneseAction(payload: {
+  customerId: string;
+}): Promise<AnamneseActionResult> {
+  const gate = await requirePermission("anamnese.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+  const res = await deleteAnamnese(s.org, payload.customerId);
+  if (!res.ok) return { ok: false, error: res.error ?? "Falha." };
+  await logActivity(s, "anamnese.delete", "Removeu uma anamnese", payload.customerId);
+  revalidate(s.slug, payload.customerId);
+  return { ok: true };
+}
+
+export interface PatientHit {
+  id: string;
+  name: string;
+  phone: string;
+}
+
+export async function searchPatientsAction(term: string): Promise<PatientHit[]> {
+  const gate = await requirePermission("anamnese.manage");
+  if (!gate.ok) return [];
+  const q = term.trim();
+  if (q.length < 2) return [];
+  const rows = await prisma.customer.findMany({
+    where: {
+      organizationId: gate.session.org,
+      OR: [
+        { name: { contains: q, mode: "insensitive" } },
+        { phone: { contains: q } },
+      ],
+    },
+    select: { id: true, name: true, phone: true },
+    orderBy: { name: "asc" },
+    take: 8,
+  });
+  return rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone }));
+}

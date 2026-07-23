@@ -32,7 +32,8 @@ export type PermissionId =
   | "agenda.manage"
   | "prontuario.manage"
   | "evolucao.manage"
-  | "planos.manage";
+  | "planos.manage"
+  | "anamnese.manage";
 
 export interface PermissionDef {
   id: PermissionId;
@@ -86,6 +87,12 @@ export const PERMISSIONS: PermissionDef[] = [
     id: "planos.manage",
     label: "Planos alimentares",
     description: "Montar e entregar cardápios e planos alimentares.",
+    group: "Operação",
+  },
+  {
+    id: "anamnese.manage",
+    label: "Anamnese",
+    description: "Preencher e consultar o questionário inicial do paciente.",
     group: "Operação",
   },
   // ---- Catálogo & Estoque ----
@@ -253,6 +260,7 @@ export const PROFILES: ProfileDef[] = [
       "prontuario.manage",
       "evolucao.manage",
       "planos.manage",
+      "anamnese.manage",
       "sales.view_all",
       "dashboard.view",
       "pdv.sell",
@@ -388,6 +396,7 @@ export const MODULE_PERMISSION: Record<string, PermissionId> = {
   prontuario: "prontuario.manage",
   evolucao: "evolucao.manage",
   planos_alimentares: "planos.manage",
+  anamnese: "anamnese.manage",
   // "agenda" (agendamento online do salão) ainda é placeholder — segue aberto
   // até ganhar tela própria; então será mapeado para a permissão de agenda.
   fornecedores: "suppliers.manage",

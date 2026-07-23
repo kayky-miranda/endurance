@@ -67,6 +67,7 @@ model Organization {
   clinicalNotes    ClinicalNote[]
   patientMetrics   PatientMetric[]
   mealPlans        MealPlan[]
+  anamneses        Anamnese[]
 }
 
 // Configuração do cupom/recibo impresso (um por organização). O logo reaproveita
@@ -575,8 +576,43 @@ model Customer {
   clinicalNotes    ClinicalNote[]
   metrics          PatientMetric[]
   mealPlans        MealPlan[]
+  anamneses        Anamnese[]
 
   @@index([organizationId, deletedAt])
+}
+
+// Anamnese: questionário inicial do paciente (histórico, queixas, hábitos).
+// Uma por paciente por organização; itens são pares pergunta/resposta com
+// modelo inicial por nicho. Exclusão LÓGICA preserva o registro.
+model Anamnese {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String
+  status         String   @default("rascunho") // rascunho | concluida
+  createdById    String?
+  createdByName  String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items        AnamneseItem[]
+
+  @@unique([organizationId, customerId])
+  @@index([organizationId, deletedAt])
+}
+
+model AnamneseItem {
+  id         String @id @default(cuid())
+  anamneseId String
+  question   String @default("")
+  answer     String @default("")
+  position   Int    @default(0)
+
+  anamnese Anamnese @relation(fields: [anamneseId], references: [id], onDelete: Cascade)
+
+  @@index([anamneseId, position])
 }
 
 // Plano alimentar (cardápio) de um paciente — nicho nutrição. Um plano tem
