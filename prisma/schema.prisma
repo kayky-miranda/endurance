@@ -63,6 +63,7 @@ model Organization {
   locations        Location[]
   productStocks    ProductStock[]
   receiptSettings  ReceiptSettings?
+  appointments     Appointment[]
 }
 
 // Configuração do cupom/recibo impresso (um por organização). O logo reaproveita
@@ -567,8 +568,39 @@ model Customer {
   organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   sales            Sale[]
   whatsAppMessages WhatsAppMessage[]
+  appointments     Appointment[]
 
   @@index([organizationId, deletedAt])
+}
+
+// Agenda de atendimentos (consultas, sessões, serviços). Serve os ramos de
+// serviço — nutrição, psicologia, clínica, salão. O "paciente/cliente" é o
+// Customer; o profissional é um User (opcional). Snapshots de nome preservam
+// o histórico mesmo se o cadastro mudar.
+model Appointment {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String? // paciente/cliente (Customer); null = avulso
+  customerName   String   @default("") // snapshot do nome exibido
+  professionalId String? // User que atende
+  professional   String   @default("") // snapshot do nome do profissional
+  service        String   @default("") // tipo de atendimento
+  startsAt       DateTime
+  durationMin    Int      @default(30)
+  status         String   @default("agendado") // agendado | confirmado | atendido | faltou | cancelado
+  price          Decimal  @default(0) @db.Decimal(12, 2)
+  notes          String   @default("")
+  createdById    String?
+  createdByName  String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, startsAt])
+  @@index([organizationId, status])
+  @@index([customerId])
 }
 
 // Produto do catálogo de um negócio (módulo Cadastro de produtos / Estoque).

@@ -28,7 +28,8 @@ export type PermissionId =
   | "integrations.config"
   | "subscription.manage"
   | "settings.general"
-  | "marketing.manage";
+  | "marketing.manage"
+  | "agenda.manage";
 
 export interface PermissionDef {
   id: PermissionId;
@@ -57,6 +58,12 @@ export const PERMISSIONS: PermissionDef[] = [
     id: "customers.manage",
     label: "Gerenciar Clientes",
     description: "Cadastrar e editar clientes (CRM).",
+    group: "Operação",
+  },
+  {
+    id: "agenda.manage",
+    label: "Agenda de atendimentos",
+    description: "Marcar, remarcar e acompanhar consultas, sessões e serviços.",
     group: "Operação",
   },
   // ---- Catálogo & Estoque ----
@@ -220,6 +227,7 @@ export const PROFILES: ProfileDef[] = [
     description: "Gestão operacional ampla e equipe, sem cobrança/integrações.",
     baseRole: "ADMIN",
     permissions: [
+      "agenda.manage",
       "sales.view_all",
       "dashboard.view",
       "pdv.sell",
@@ -351,6 +359,9 @@ export const MODULE_PERMISSION: Record<string, PermissionId> = {
   caixa: "pdv.sell",
   pdv: "pdv.sell",
   crm: "customers.manage",
+  agenda_consultas: "agenda.manage",
+  // "agenda" (agendamento online do salão) ainda é placeholder — segue aberto
+  // até ganhar tela própria; então será mapeado para a permissão de agenda.
   fornecedores: "suppliers.manage",
   // Suprimentos / Compras
   compras: "purchasing.manage",
