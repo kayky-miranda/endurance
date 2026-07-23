@@ -1,4 +1,5 @@
 import "server-only";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { money } from "./money";
 import { T } from "./sql";
@@ -27,6 +28,11 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export async function getSalesSummary(
   orgId: string,
   days = 30,
+  /**
+   * Escopo por registro: quando informado, o painel considera SÓ as vendas
+   * deste vendedor (usado para quem não tem a permissão `sales.view_all`).
+   */
+  sellerId?: string | null,
 ): Promise<SalesSummary> {
   const since = new Date();
   since.setHours(0, 0, 0, 0);
@@ -35,21 +41,33 @@ export async function getSalesSummary(
   const startToday = new Date();
   startToday.setHours(0, 0, 0, 0);
 
+  // Filtro de vendedor para o Prisma e para o SQL cru (parametrizado nos dois).
+  const sellerWhere = sellerId ? { userId: sellerId } : {};
+  const sqlSeller = sellerId
+    ? Prisma.sql`AND s."userId" = ${sellerId}`
+    : Prisma.empty;
+
   const [agg, aggToday, payRows, topRows, dayRows, sellerRows] =
     await Promise.all([
       prisma.sale.aggregate({
-        where: { organizationId: orgId, createdAt: { gte: since } },
+        where: { organizationId: orgId, createdAt: { gte: since }, ...sellerWhere },
         _count: true,
         _sum: { total: true, itemsCount: true },
       }),
       prisma.sale.aggregate({
-        where: { organizationId: orgId, createdAt: { gte: startToday } },
+        where: {
+          organizationId: orgId,
+          createdAt: { gte: startToday },
+          ...sellerWhere,
+        },
         _count: true,
         _sum: { total: true },
       }),
       prisma.salePayment.groupBy({
         by: ["method"],
-        where: { sale: { organizationId: orgId, createdAt: { gte: since } } },
+        where: {
+          sale: { organizationId: orgId, createdAt: { gte: since }, ...sellerWhere },
+        },
         _sum: { amount: true },
       }),
       prisma.$queryRaw<{ name: string; qty: number; revenue: number }[]>`
@@ -58,7 +76,7 @@ export async function getSalesSummary(
                SUM(i."quantity" * i."unitPrice")::float8      AS revenue
         FROM ${T("SaleItem")} i
         JOIN ${T("Sale")} s ON s."id" = i."saleId"
-        WHERE s."organizationId" = ${orgId} AND s."createdAt" >= ${since}
+        WHERE s."organizationId" = ${orgId} AND s."createdAt" >= ${since} ${sqlSeller}
         GROUP BY i."name"
         ORDER BY qty DESC
         LIMIT 5`,
@@ -66,7 +84,7 @@ export async function getSalesSummary(
         SELECT to_char(date_trunc('day', s."createdAt"), 'YYYY-MM-DD') AS date,
                SUM(s."total")::float8                                  AS total
         FROM ${T("Sale")} s
-        WHERE s."organizationId" = ${orgId} AND s."createdAt" >= ${since}
+        WHERE s."organizationId" = ${orgId} AND s."createdAt" >= ${since} ${sqlSeller}
         GROUP BY 1`,
       prisma.$queryRaw<{ name: string; total: number; vendas: number }[]>`
         SELECT COALESCE(u."name", '—') AS name,
@@ -74,7 +92,7 @@ export async function getSalesSummary(
                COUNT(*)::int           AS vendas
         FROM ${T("Sale")} s
         LEFT JOIN ${T("User")} u ON u."id" = s."userId"
-        WHERE s."organizationId" = ${orgId} AND s."createdAt" >= ${since}
+        WHERE s."organizationId" = ${orgId} AND s."createdAt" >= ${since} ${sqlSeller}
         GROUP BY 1
         ORDER BY total DESC
         LIMIT 5`,

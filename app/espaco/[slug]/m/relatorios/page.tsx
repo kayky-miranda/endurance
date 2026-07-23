@@ -6,6 +6,7 @@ import InsightsPanel from "../insights-panel";
 import { SalesByDayChart, PaymentMixChart, CashflowChart } from "../charts-lazy";
 import { loadModule, DeniedModule, KpiCard, RankList, brl } from "../module-kit";
 import { PeriodFilter } from "../period-filter";
+import { hasPermission } from "@/lib/endurance/permissions";
 import { parsePeriod, periodLabel } from "@/lib/endurance/period";
 
 // Painel executivo de vendas (alimentado pelas vendas reais do PDV).
@@ -22,7 +23,15 @@ export default async function RelatoriosPage({
   if (denied) return <DeniedModule slug={slug} mod={mod} />;
 
   const periodo = periodLabel(days);
-  const summary = session ? await getSalesSummary(session.org, days) : null;
+  // Escopo por registro: quem não pode ver as vendas da equipe enxerga só as
+  // próprias no painel (o relatório fica "meu desempenho", não o da loja).
+  const scopedSeller =
+    session && !hasPermission(session.role, session.permissions, "sales.view_all")
+      ? session.sub
+      : null;
+  const summary = session
+    ? await getSalesSummary(session.org, days, scopedSeller)
+    : null;
   const cashflow = session ? await getCashflow(session.org, days) : null;
 
   return (
@@ -43,6 +52,11 @@ export default async function RelatoriosPage({
             Vendas dos últimos {periodo} — em tempo real, com insights
             gerados por IA.
           </p>
+          {scopedSeller && (
+            <p className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-2.5 py-0.5 text-xs font-medium text-brand-600 dark:text-brand-300">
+              Mostrando apenas as suas vendas
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <PeriodFilter days={days} />

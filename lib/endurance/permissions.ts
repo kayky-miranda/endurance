@@ -23,6 +23,7 @@ export type PermissionId =
   | "purchasing.manage"
   | "finance.reports"
   | "reports.export"
+  | "sales.view_all"
   | "team.manage"
   | "integrations.config"
   | "subscription.manage"
@@ -127,6 +128,13 @@ export const PERMISSIONS: PermissionDef[] = [
     description: "Baixar relatórios e documentos em PDF, Excel e XML.",
     group: "Fiscal & Financeiro",
   },
+  {
+    id: "sales.view_all",
+    label: "Ver vendas de toda a equipe",
+    description:
+      "Sem esta permissão, o painel e os relatórios mostram apenas as próprias vendas do usuário.",
+    group: "Fiscal & Financeiro",
+  },
   // ---- Administração ----
   {
     id: "team.manage",
@@ -212,6 +220,7 @@ export const PROFILES: ProfileDef[] = [
     description: "Gestão operacional ampla e equipe, sem cobrança/integrações.",
     baseRole: "ADMIN",
     permissions: [
+      "sales.view_all",
       "dashboard.view",
       "pdv.sell",
       "customers.manage",
@@ -236,6 +245,7 @@ export const PROFILES: ProfileDef[] = [
     description: "Financeiro, fiscal e exportação de relatórios.",
     baseRole: "MEMBER",
     permissions: [
+      "sales.view_all",
       "dashboard.view",
       "finance.reports",
       "reports.export",
