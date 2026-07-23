@@ -13,6 +13,8 @@ import {
   Link2,
   AlertTriangle,
   Clock,
+  Landmark,
+  UploadCloud,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -24,6 +26,7 @@ import type { FinanceRow } from "@/lib/endurance/finance";
 import type { ReconOverview, ReconStatus } from "@/lib/endurance/reconciliation";
 import type { PageMeta } from "@/lib/endurance/pagination";
 import Pager from "./pager";
+import OfxReconcileModal from "./ofx-reconcile-modal";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -256,6 +259,7 @@ const RECON_BADGE: Record<
 function ReconPanel({ data }: { data: ReconOverview | null }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
+  const [ofxOpen, setOfxOpen] = useState(false);
 
   if (!data) return null;
 
@@ -268,6 +272,23 @@ function ReconPanel({ data }: { data: ReconOverview | null }) {
 
   return (
     <div className="space-y-4">
+      {/* Conciliação por extrato bancário (OFX) — casa contas em aberto com o
+          extrato do banco, além da conciliação automática de PIX. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm dark:border-ink-700 dark:bg-ink-900">
+        <p className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <Landmark className="h-4 w-4 text-brand-500" />
+          Importe o extrato do banco (OFX) para dar baixa nas contas em aberto.
+        </p>
+        <button
+          onClick={() => setOfxOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-brand-500/40 bg-brand-500/5 px-3.5 py-2 text-sm font-semibold text-brand-600 transition hover:bg-brand-500/10 dark:text-brand-300"
+        >
+          <UploadCloud className="h-4 w-4" /> Importar OFX
+        </button>
+      </div>
+
+      {ofxOpen && <OfxReconcileModal onClose={() => setOfxOpen(false)} />}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <ReconKpi
           icon={CheckCircle2}

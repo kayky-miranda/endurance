@@ -8,6 +8,10 @@ import {
   type NewEntryInput,
 } from "@/lib/endurance/finance";
 import { markReconciled } from "@/lib/endurance/reconciliation";
+import {
+  buildOfxPreview,
+  applyOfxReconciliation,
+} from "@/lib/endurance/ofx-reconcile";
 import { logActivity } from "@/lib/endurance/activity-log";
 import { FinanceEntrySchema, firstError } from "@/lib/validation";
 
@@ -60,6 +64,47 @@ export async function createEntryAction(input: NewEntryInput): Promise<R> {
       "finance.entry_create",
       `Criou lançamento ${kind} "${data.description.slice(0, 60)}" (${brl(data.amount)})`,
     );
+  }
+  return res;
+}
+
+/** Prévia de conciliação a partir do conteúdo de um arquivo OFX. */
+export async function previewOfxAction(
+  content: string,
+): Promise<
+  | { ok: true; preview: import("@/lib/endurance/ofx-reconcile").OfxPreview }
+  | { ok: false; error: string }
+> {
+  const gate = await requirePermission("finance.reports");
+  if (!gate.ok) return { ok: false, error: gate.error };
+  const s = gate.session;
+  if (!content || content.length > 5_000_000)
+    return { ok: false, error: "Arquivo OFX inválido ou grande demais." };
+  try {
+    const preview = await buildOfxPreview(s.org, content);
+    if (preview.total === 0)
+      return { ok: false, error: "Nenhuma transação encontrada no arquivo OFX." };
+    return { ok: true, preview };
+  } catch {
+    return { ok: false, error: "Não foi possível ler o arquivo OFX." };
+  }
+}
+
+/** Efetiva as conciliações confirmadas (fitid ↔ lançamento). */
+export async function applyOfxAction(
+  pairs: { fitid: string; entryId: string }[],
+): Promise<{ ok: boolean; reconciled?: number; error?: string }> {
+  const gate = await requirePermission("finance.reports");
+  if (!gate.ok) return { ok: false, error: gate.error };
+  const s = gate.session;
+  const res = await applyOfxReconciliation(s.org, pairs);
+  if (res.ok) {
+    await logActivity(
+      s,
+      "finance.ofx_reconcile",
+      `Conciliou ${res.reconciled} lançamento(s) via OFX`,
+    );
+    revalidatePath(`/espaco/${s.slug}/m/financeiro`);
   }
   return res;
 }
