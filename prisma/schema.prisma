@@ -64,6 +64,7 @@ model Organization {
   productStocks    ProductStock[]
   receiptSettings  ReceiptSettings?
   appointments     Appointment[]
+  clinicalNotes    ClinicalNote[]
 }
 
 // Configuração do cupom/recibo impresso (um por organização). O logo reaproveita
@@ -569,8 +570,34 @@ model Customer {
   sales            Sale[]
   whatsAppMessages WhatsAppMessage[]
   appointments     Appointment[]
+  clinicalNotes    ClinicalNote[]
 
   @@index([organizationId, deletedAt])
+}
+
+// Prontuário clínico: anotações confidenciais do paciente (evolução, condutas,
+// queixas). Serve nutrição, psicologia e clínica. É SEMPRE sobre um Customer
+// (paciente) e pode citar o atendimento de origem. Exclusão LÓGICA (deletedAt)
+// por retenção clínica/legal — nada é apagado de fato.
+model ClinicalNote {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String // paciente (Customer) — obrigatório
+  appointmentId  String? // atendimento de origem (opcional)
+  authorId       String?
+  authorName     String   @default("")
+  title          String   @default("")
+  content        String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  editedAt       DateTime? // marcado na 1ª edição — flag confiável de "editada"
+  deletedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, customerId, deletedAt])
+  @@index([customerId, createdAt])
 }
 
 // Agenda de atendimentos (consultas, sessões, serviços). Serve os ramos de

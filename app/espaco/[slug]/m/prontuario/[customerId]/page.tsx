@@ -1,0 +1,56 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, Phone, Mail, IdCard } from "lucide-react";
+import { getPatientRecord } from "@/lib/endurance/prontuario";
+import { loadModule, DeniedModule } from "../../module-kit";
+import RecordClient from "./record-client";
+
+/** Prontuário de um paciente: dados + timeline de anotações + editor. */
+export default async function PatientRecordPage({
+  params,
+}: {
+  params: Promise<{ slug: string; customerId: string }>;
+}) {
+  const { slug, customerId } = await params;
+  const { mod, session, denied } = await loadModule(slug, "prontuario");
+  if (denied) return <DeniedModule slug={slug} mod={mod} />;
+
+  const record = session
+    ? await getPatientRecord(session.org, customerId)
+    : null;
+  if (!record) notFound();
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <Link
+          href={`/espaco/${slug}/m/prontuario`}
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 transition hover:text-brand-500 dark:text-slate-400"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Prontuários
+        </Link>
+        <h1 className="mt-2 text-2xl font-bold tracking-tight">{record.name}</h1>
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+          {record.phone && (
+            <span className="inline-flex items-center gap-1.5">
+              <Phone className="h-3.5 w-3.5" /> {record.phone}
+            </span>
+          )}
+          {record.email && (
+            <span className="inline-flex items-center gap-1.5">
+              <Mail className="h-3.5 w-3.5" /> {record.email}
+            </span>
+          )}
+          {record.document && (
+            <span className="inline-flex items-center gap-1.5">
+              <IdCard className="h-3.5 w-3.5" /> {record.document}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <RecordClient slug={slug} customerId={record.id} notes={record.notes} />
+    </div>
+  );
+}

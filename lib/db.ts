@@ -9,7 +9,12 @@ import { PrismaClient } from "@prisma/client";
  * Para consultar apagados de propósito (ex.: auditoria/restauração), passe
  * `deletedAt` explicitamente no where — a extensão não sobrescreve.
  */
-const SOFT_DELETE_MODELS = new Set(["Product", "Customer", "Supplier"]);
+const SOFT_DELETE_MODELS = new Set([
+  "Product",
+  "Customer",
+  "Supplier",
+  "ClinicalNote",
+]);
 
 function makeClient() {
   const base = new PrismaClient();
