@@ -65,6 +65,7 @@ model Organization {
   receiptSettings  ReceiptSettings?
   appointments     Appointment[]
   clinicalNotes    ClinicalNote[]
+  patientMetrics   PatientMetric[]
 }
 
 // Configuração do cupom/recibo impresso (um por organização). O logo reaproveita
@@ -571,8 +572,34 @@ model Customer {
   whatsAppMessages WhatsAppMessage[]
   appointments     Appointment[]
   clinicalNotes    ClinicalNote[]
+  metrics          PatientMetric[]
 
   @@index([organizationId, deletedAt])
+}
+
+// Evolução do paciente: medições numéricas ao longo do tempo (peso, medidas,
+// escalas). Serve nutrição (antropometria), psicologia (escalas) e clínica.
+// Cada ponto é (metric, value, unit) em measuredAt — modelo genérico para
+// servir qualquer indicador sem novo schema por nicho.
+model PatientMetric {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String
+  metric         String // chave: "peso", "gordura", "abdomen", "escala_humor"…
+  label          String   @default("") // rótulo exibido (snapshot do preset/livre)
+  value          Decimal  @db.Decimal(12, 3)
+  unit           String   @default("")
+  measuredAt     DateTime
+  notes          String   @default("")
+  createdById    String?
+  createdByName  String   @default("")
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, customerId, metric, measuredAt])
+  @@index([customerId, measuredAt])
 }
 
 // Prontuário clínico: anotações confidenciais do paciente (evolução, condutas,
