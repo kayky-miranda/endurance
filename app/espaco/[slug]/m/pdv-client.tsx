@@ -29,6 +29,7 @@ import {
   finalizeSaleAction,
   createCustomerAction,
   suggestCrossSellAction,
+  quickCreateProductAction,
   type CustomerData,
 } from "./pdv-actions";
 import {
@@ -39,6 +40,7 @@ import {
 } from "./pix-actions";
 import { sendSaleReceiptAction } from "./whatsapp-actions";
 import type { PixChargeView } from "@/lib/endurance/pix-service";
+import { useModalA11y } from "../use-modal-a11y";
 
 type Suggestion = { id: string; name: string; price: number; reason: string };
 
@@ -69,10 +71,12 @@ export default function PdvClient({
   products,
   slug,
   pixHasDevice = false,
+  canManageProducts = false,
 }: {
   products: Product[];
   slug: string;
   pixHasDevice?: boolean;
+  canManageProducts?: boolean;
 }) {
   const router = useRouter();
   const [active, setActive] = useState(false);
@@ -117,18 +121,27 @@ export default function PdvClient({
   // IA
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
 
+  // Produtos cadastrados na hora (cadastro rápido): entram na lista vendável
+  // sem esperar o refresh do servidor, que só chega no fim da venda.
+  const [extraProducts, setExtraProducts] = useState<Product[]>([]);
+  const [quickOpen, setQuickOpen] = useState(false);
+
+  const allProducts = useMemo(
+    () => [...extraProducts, ...products],
+    [products, extraProducts],
+  );
   const byId = useMemo(
-    () => new Map(products.map((p) => [p.id, p])),
-    [products],
+    () => new Map(allProducts.map((p) => [p.id, p])),
+    [allProducts],
   );
   const categories = useMemo(
-    () => [...new Set(products.map((p) => p.category).filter(Boolean))],
-    [products],
+    () => [...new Set(allProducts.map((p) => p.category).filter(Boolean))],
+    [allProducts],
   );
 
   const filtered = useMemo(() => {
     const q = norm(search.trim());
-    return products.filter((p) => {
+    return allProducts.filter((p) => {
       if (category && p.category !== category) return false;
       if (!q) return true;
       return (
@@ -137,7 +150,7 @@ export default function PdvClient({
         norm(p.category).includes(q)
       );
     });
-  }, [products, search, category]);
+  }, [allProducts, search, category]);
 
   const lines = Object.entries(cart).map(([id, qty]) => ({
     p: byId.get(id)!,
@@ -216,6 +229,11 @@ export default function PdvClient({
           break;
         case "Escape": {
           // Contextual: fecha o que estiver aberto antes de mexer na venda.
+          if (quickOpen) {
+            e.preventDefault();
+            setQuickOpen(false);
+            return;
+          }
           if (pixModal) {
             e.preventDefault();
             // Só fecha o QR se a cobrança ainda não foi paga — cobrança paga
@@ -250,7 +268,17 @@ export default function PdvClient({
     pixModal,
     pixCharge,
     showCustomerForm,
+    quickOpen,
   ]);
+
+  /** Cria o produto na hora e já joga no carrinho, sem largar a venda. */
+  function onQuickCreated(p: Product) {
+    setExtraProducts((prev) => [p, ...prev]);
+    setQuickOpen(false);
+    setSearch("");
+    setCart((prev) => ({ ...prev, [p.id]: (prev[p.id] ?? 0) + 1 }));
+    setTimeout(() => searchRef.current?.focus(), 50);
+  }
 
   function startSale() {
     setActive(true);
@@ -648,9 +676,19 @@ export default function PdvClient({
             );
           })}
           {filtered.length === 0 && (
-            <p className="col-span-full py-10 text-center text-sm text-slate-400">
-              Nenhum produto encontrado.
-            </p>
+            <div className="col-span-full py-10 text-center">
+              <p className="text-sm text-slate-400">Nenhum produto encontrado.</p>
+              {canManageProducts && (
+                <button
+                  type="button"
+                  onClick={() => setQuickOpen(true)}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-brand-500/40 bg-brand-500/5 px-3.5 py-2 text-sm font-semibold text-brand-600 transition hover:bg-brand-500/10 dark:text-brand-300"
+                >
+                  <Plus className="h-4 w-4" /> Cadastrar
+                  {search.trim() ? ` "${search.trim()}"` : " novo produto"}
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -984,6 +1022,14 @@ export default function PdvClient({
     </div>
 
       {/* Modal de cobrança PIX */}
+      {quickOpen && (
+        <QuickProductModal
+          initialName={search.trim()}
+          onClose={() => setQuickOpen(false)}
+          onCreated={onQuickCreated}
+        />
+      )}
+
       {pixModal && (
         <div
           className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
@@ -1225,6 +1271,142 @@ function ShortcutLegend() {
           {label}
         </span>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Cadastro rápido de produto durante a venda. Campos mínimos (nome, preço,
+ * estoque inicial, código de barras opcional). Ao salvar, o produto entra na
+ * lista vendável e já cai no carrinho — o operador não perde a venda.
+ */
+function QuickProductModal({
+  initialName,
+  onClose,
+  onCreated,
+}: {
+  initialName: string;
+  onClose: () => void;
+  onCreated: (p: Product) => void;
+}) {
+  const dialogRef = useModalA11y<HTMLDivElement>(onClose);
+  const [name, setName] = useState(initialName);
+  const [price, setPrice] = useState("");
+  const [stock, setStock] = useState("1");
+  const [barcode, setBarcode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    if (busy) return;
+    if (!name.trim()) {
+      setError("Informe o nome do produto.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    const res = await quickCreateProductAction({
+      name: name.trim(),
+      price: parseFloat(price.replace(",", ".")) || 0,
+      stock: parseInt(stock, 10) || 0,
+      barcode: barcode.trim(),
+    });
+    setBusy(false);
+    if (res.ok) onCreated(res.product);
+    else setError(res.error);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quick-product-title"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-ink-700 dark:bg-ink-900"
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h3
+            id="quick-product-title"
+            className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-white"
+          >
+            <Package className="h-5 w-5 text-brand-500" /> Novo produto
+          </h3>
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-ink-800"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-500">Nome*</span>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">Preço (R$)</span>
+              <input
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                inputMode="decimal"
+                placeholder="0,00"
+                onKeyDown={(e) => e.key === "Enter" && save()}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-500">Estoque</span>
+              <input
+                value={stock}
+                onChange={(e) => setStock(e.target.value.replace(/\D/g, ""))}
+                inputMode="numeric"
+                onKeyDown={(e) => e.key === "Enter" && save()}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+              />
+            </label>
+          </div>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-500">
+              Código de barras (opcional)
+            </span>
+            <input
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              inputMode="numeric"
+              onKeyDown={(e) => e.key === "Enter" && save()}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+            />
+          </label>
+
+          {error && (
+            <p className="flex items-center gap-1.5 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-500">
+              <AlertCircle className="h-4 w-4 shrink-0" /> {error}
+            </p>
+          )}
+        </div>
+
+        <button
+          onClick={save}
+          disabled={busy || !name.trim()}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-brand-400 disabled:opacity-40"
+        >
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          Cadastrar e adicionar à venda
+        </button>
+      </div>
     </div>
   );
 }

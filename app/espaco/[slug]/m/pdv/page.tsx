@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/endurance/money";
 import { getPixConfigView } from "@/lib/endurance/pix-service";
+import { hasPermission } from "@/lib/endurance/permissions";
 import PdvClient from "../pdv-client";
 import { type Product } from "../products-client";
 import { loadModule, DeniedModule } from "../module-kit";
@@ -38,6 +39,10 @@ export default async function PdvPage({
       products={products}
       slug={slug}
       pixHasDevice={pixConfig?.hasDevice ?? false}
+      canManageProducts={
+        !!session &&
+        hasPermission(session.role, session.permissions, "products.manage")
+      }
     />
   );
 }

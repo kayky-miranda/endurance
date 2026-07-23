@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getSession, requirePermission } from "@/lib/auth";
-import { FinalizeSaleSchema, CustomerSchema, firstError } from "@/lib/validation";
+import { FinalizeSaleSchema, CustomerSchema, ProductSchema, firstError } from "@/lib/validation";
 import { suggestCrossSell, type Suggestion } from "@/lib/endurance/crosssell";
 import { getOpenSession } from "@/lib/endurance/cash";
 import { resolveUserLocation } from "@/lib/endurance/locations";
+import { logActivity } from "@/lib/endurance/activity-log";
 import { createReceivablesForSale } from "@/lib/endurance/finance";
 import { money } from "@/lib/endurance/money";
 import {
@@ -348,4 +349,85 @@ export async function suggestCrossSellAction(
     (cartProductIds ?? []).filter((x) => typeof x === "string"),
   );
   return { ok: true, suggestions };
+}
+
+/** Produto no formato que o PDV consome no carrinho. */
+export type QuickProduct = {
+  id: string;
+  name: string;
+  barcode: string;
+  category: string;
+  price: number;
+  stock: number;
+};
+
+/**
+ * Cadastro RÁPIDO de produto durante a venda: o operador topou com um item
+ * que não estava no catálogo e não pode largar o carrinho para cadastrá-lo.
+ * Cria o produto (com estoque inicial no local do operador, pelo razão) e
+ * devolve o item pronto para entrar no carrinho — sem recarregar a página.
+ *
+ * Exige a permissão de cadastro de produtos: quem só vende não cria item.
+ */
+export async function quickCreateProductAction(input: {
+  name: string;
+  price: number;
+  stock: number;
+  barcode?: string;
+  category?: string;
+}): Promise<{ ok: true; product: QuickProduct } | { ok: false; error: string }> {
+  const gate = await requirePermission("products.manage");
+  if (!gate.ok) return { ok: false, error: gate.error };
+  const s = gate.session;
+
+  const parsed = ProductSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const { name, barcode, category, price, stock: initial } = parsed.data;
+
+  if (barcode) {
+    const dup = await prisma.product.findFirst({
+      where: { organizationId: s.org, barcode },
+      select: { id: true },
+    });
+    if (dup)
+      return { ok: false, error: "Já existe um produto com esse código de barras." };
+  }
+
+  const locationId = await resolveUserLocation(s.org, s.sub);
+  const created = await prisma.$transaction(async (tx) => {
+    const p = await tx.product.create({
+      data: { organizationId: s.org, name, barcode, category, price, stock: 0 },
+    });
+    if (initial > 0)
+      await applyStockMovement(tx, {
+        organizationId: s.org,
+        productId: p.id,
+        delta: initial,
+        reason: "saldo_inicial",
+        refType: "initial",
+        actor: { id: s.sub, name: s.name },
+        locationId,
+      });
+    return p;
+  });
+
+  await logActivity(
+    s,
+    "product.create",
+    `Cadastrou o produto ${name} (rápido, no PDV)`,
+    created.id,
+  );
+  revalidatePath(`/espaco/${s.slug}/m/produtos`);
+  revalidatePath(`/espaco/${s.slug}/m/estoque`);
+  return {
+    ok: true,
+    product: {
+      id: created.id,
+      name: created.name,
+      barcode: created.barcode,
+      category: created.category,
+      price: money(created.price),
+      stock: initial,
+    },
+  };
 }
