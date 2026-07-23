@@ -149,6 +149,8 @@ export const getWorkspace = cache(async function getWorkspace(
   if (!org) return null;
 
   const modules = org.modules
+    // Módulo desligado nas Configurações some da navegação e do gate de acesso.
+    .filter((om) => om.enabled)
     .map((om) => {
       const def = moduleById(om.moduleId);
       if (!def) return null;

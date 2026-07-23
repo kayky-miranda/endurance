@@ -15,7 +15,9 @@ export type NicheId =
   | "mercado_varejo"
   | "academia"
   | "cabelereiro"
-  | "nutricionista";
+  | "nutricionista"
+  | "psicologia"
+  | "clinica";
 
 /** Inclui "outro" para quando a descrição não casa com nenhum nicho do MVP. */
 export type NicheOrOther = NicheId | "outro";
@@ -101,6 +103,38 @@ export const NICHES: Niche[] = [
       "consultorio nutri",
     ],
     example: "Sou nutricionista e atendo em consultório no Recife.",
+  },
+  {
+    id: "psicologia",
+    label: "Psicologia",
+    keywords: [
+      "psico",
+      "psicologo",
+      "psicologa",
+      "psicologia",
+      "terapia",
+      "terapeuta",
+      "psicoterapia",
+      "psicanalise",
+    ],
+    example: "Sou psicólogo e atendo em consultório em Curitiba.",
+  },
+  {
+    id: "clinica",
+    label: "Clínica / Consultório",
+    keywords: [
+      "clinica",
+      "consultorio",
+      "medico",
+      "medica",
+      "fisioterapia",
+      "fisioterapeuta",
+      "odonto",
+      "dentista",
+      "fonoaudiologia",
+      "terapia ocupacional",
+    ],
+    example: "Tenho uma clínica de fisioterapia em Salvador.",
   },
 ];
 
@@ -356,7 +390,7 @@ export const MODULES: ModuleDef[] = [
     id: "prontuario",
     label: "Prontuário clínico",
     description: "Histórico clínico e anotações do paciente.",
-    scope: ["nutricionista"],
+    scope: ["nutricionista", "psicologia", "clinica"],
   },
   {
     id: "planos_alimentares",
@@ -368,31 +402,31 @@ export const MODULES: ModuleDef[] = [
     id: "agenda_consultas",
     label: "Agenda de consultas",
     description: "Marcação e controle de consultas.",
-    scope: ["nutricionista"],
+    scope: ["nutricionista", "psicologia", "clinica"],
   },
   {
     id: "evolucao",
     label: "Evolução do paciente",
     description: "Acompanhamento de peso e metas ao longo do tempo.",
-    scope: ["nutricionista"],
+    scope: ["nutricionista", "psicologia", "clinica"],
   },
   {
     id: "anamnese",
     label: "Anamnese digital",
     description: "Questionário inicial preenchido pelo paciente.",
-    scope: ["nutricionista"],
+    scope: ["nutricionista", "psicologia", "clinica"],
   },
   {
     id: "confirmacao_auto",
     label: "Confirmação automática",
     description: "Confirmação de consulta por mensagem.",
-    scope: ["nutricionista"],
+    scope: ["nutricionista", "psicologia", "clinica"],
   },
   {
     id: "recibo",
     label: "Emissão de recibo",
     description: "Recibo de atendimento para o paciente.",
-    scope: ["nutricionista"],
+    scope: ["nutricionista", "psicologia", "clinica"],
   },
 ];
 
