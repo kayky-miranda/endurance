@@ -62,6 +62,22 @@ model Organization {
   apiKeys          ApiKey[]
   locations        Location[]
   productStocks    ProductStock[]
+  receiptSettings  ReceiptSettings?
+}
+
+// Configuração do cupom/recibo impresso (um por organização). O logo reaproveita
+// o de ThemeSettings; aqui ficam formato do papel, rodapé e o que exibir.
+model ReceiptSettings {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  paperSize      String   @default("80mm") // 80mm (bobina) | a4
+  showLogo       Boolean  @default(true)
+  showDocument   Boolean  @default(true)  // CNPJ/telefone no cabeçalho
+  headerNote     String   @default("")    // linha extra no topo (ex.: endereço)
+  footer         String   @default("Obrigado pela preferência!")
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 // Local de estoque: matriz, filial, depósito ou loja. Toda organização tem ao

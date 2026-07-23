@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireOrgAccess } from "@/lib/auth";
 import { money } from "@/lib/endurance/money";
+import { getReceiptConfig } from "@/lib/endurance/receipt-settings";
 import ReceiptActions from "./receipt-actions";
 
 const brl = (n: number) =>
@@ -34,6 +35,17 @@ export default async function ReciboPage({
   });
   if (!sale || sale.organizationId !== session.org) notFound();
 
+  const [cfg, theme] = await Promise.all([
+    getReceiptConfig(session.org),
+    prisma.themeSettings.findUnique({
+      where: { organizationId: session.org },
+      select: { logoDataUrl: true },
+    }),
+  ]);
+  const logo = cfg.showLogo ? theme?.logoDataUrl : null;
+  // A4 usa uma largura confortável de leitura; 80mm imita a bobina.
+  const widthCls = cfg.paperSize === "a4" ? "max-w-[620px]" : "max-w-[360px]";
+
   // Vendas novas guardam o troco em sale.change e os pagamentos líquidos (o
   // dinheiro entregue é líquido + troco). Vendas antigas guardavam o valor
   // entregue cheio — o troco é derivado de paid - total nesse caso.
@@ -54,21 +66,32 @@ export default async function ReciboPage({
     <div>
       <ReceiptActions slug={slug} />
 
-      <div className="receipt mx-auto max-w-[360px] rounded-xl border border-slate-200 bg-white p-6 font-mono text-xs text-slate-800 shadow-sm print:border-0 print:shadow-none">
+      <div
+        className={`receipt mx-auto ${widthCls} rounded-xl border border-slate-200 bg-white p-6 font-mono text-xs text-slate-800 shadow-sm print:border-0 print:shadow-none`}
+      >
         <div className="text-center">
+          {logo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logo}
+              alt=""
+              className="mx-auto mb-2 max-h-16 w-auto object-contain"
+            />
+          )}
           <p className="text-sm font-bold uppercase tracking-wide">
             {sale.organization.name}
           </p>
-          {(sale.organization.city || sale.organization.state) && (
+          {cfg.showDocument && (sale.organization.city || sale.organization.state) && (
             <p className="text-[11px] text-slate-500">
               {[sale.organization.city, sale.organization.state]
                 .filter(Boolean)
                 .join(" - ")}
             </p>
           )}
-          <p className="mt-1 text-[11px] text-slate-500">
-            CUPOM NÃO FISCAL
-          </p>
+          {cfg.headerNote && (
+            <p className="text-[11px] text-slate-500">{cfg.headerNote}</p>
+          )}
+          <p className="mt-1 text-[11px] text-slate-500">CUPOM NÃO FISCAL</p>
         </div>
 
         <div className="my-3 border-t border-dashed border-slate-300" />
@@ -141,9 +164,7 @@ export default async function ReciboPage({
 
         <div className="my-3 border-t border-dashed border-slate-300" />
 
-        <p className="text-center text-[11px] text-slate-500">
-          Obrigado pela preferência!
-        </p>
+        <p className="text-center text-[11px] text-slate-500">{cfg.footer}</p>
         <p className="mt-1 text-center text-[10px] text-slate-400">
           Emitido por ENDURANCE
         </p>
