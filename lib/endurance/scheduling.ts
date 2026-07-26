@@ -76,6 +76,19 @@ export function overlaps(
   return aStart < bEnd && bStart < aEnd;
 }
 
+/**
+ * Sobreposição de dois intervalos [aStart, aEnd) e [bStart, bEnd) (ms).
+ * Meio-aberto: encostar não conflita. Usado para bloqueio de agenda.
+ */
+export function rangesOverlap(
+  aStart: number,
+  aEnd: number,
+  bStart: number,
+  bEnd: number,
+): boolean {
+  return aStart < bEnd && bStart < aEnd;
+}
+
 /** Faixa [00:00, 24:00) de um dia local "YYYY-MM-DD". Inválido → hoje. */
 export function dayRange(dateStr: string): { start: Date; end: Date } {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr ?? "");

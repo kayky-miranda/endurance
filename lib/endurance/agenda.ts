@@ -9,6 +9,12 @@ import {
   overlaps,
   dayRange,
 } from "./scheduling";
+import { findBlockConflict } from "./schedule-blocks";
+
+/** Mensagem de erro padrão quando o horário cai sobre um bloqueio de agenda. */
+function blockError(block: { kindLabel: string; reason: string }): string {
+  return `Horário indisponível: ${block.kindLabel}${block.reason ? ` — ${block.reason}` : ""}.`;
+}
 
 /**
  * Agenda de atendimentos: consultas, sessões e serviços com hora marcada.
@@ -274,6 +280,9 @@ export async function createAppointment(
       conflict,
     };
 
+  const block = await findBlockConflict(org, prof.id, input.startsAt, input.durationMin);
+  if (block) return { ok: false, error: blockError(block) };
+
   const created = await prisma.appointment.create({
     data: {
       organizationId: org,
@@ -325,6 +334,9 @@ export async function updateAppointment(
       error: `Conflito de horário com ${conflict.customerName || "outro atendimento"} (${conflict.startTime}–${conflict.endTime}).`,
       conflict,
     };
+
+  const block = await findBlockConflict(org, prof.id, input.startsAt, input.durationMin);
+  if (block) return { ok: false, error: blockError(block) };
 
   await prisma.appointment.update({
     where: { id },

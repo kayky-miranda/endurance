@@ -14,6 +14,7 @@ import {
   Pencil,
   Trash2,
   CalendarDays,
+  Ban,
 } from "lucide-react";
 import {
   STATUS_LABEL,
@@ -29,11 +30,14 @@ import {
   type AppointmentStatus,
 } from "@/lib/endurance/scheduling";
 import type { AppointmentRow, ProfessionalOption } from "@/lib/endurance/agenda";
+import type { BlockRow } from "@/lib/endurance/schedule-blocks";
 import {
   setAppointmentStatusAction,
   deleteAppointmentAction,
+  deleteBlockAction,
 } from "./agenda-actions";
 import AppointmentModal from "./appointment-modal";
+import BlockModal from "./block-modal";
 
 export type AgendaViewMode = "dia" | "semana" | "mes";
 
@@ -75,6 +79,7 @@ export default function AgendaView({
   date,
   professionalId,
   appointments,
+  blocks,
   professionals,
 }: {
   slug: string;
@@ -82,11 +87,13 @@ export default function AgendaView({
   date: string; // YYYY-MM-DD (âncora da visão)
   professionalId: string;
   appointments: AppointmentRow[];
+  blocks: BlockRow[];
   professionals: ProfessionalOption[];
 }) {
   const router = useRouter();
   const [busy, startTransition] = useTransition();
   const [modal, setModal] = useState<ModalState>(null);
+  const [blockOpen, setBlockOpen] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -126,6 +133,18 @@ export default function AgendaView({
     setPendingId(id);
     startTransition(async () => {
       const res = await deleteAppointmentAction(id);
+      setPendingId(null);
+      if (res.ok) router.refresh();
+      else setError(res.error);
+    });
+  }
+
+  function removeBlock(id: string) {
+    if (!confirm("Remover este bloqueio?")) return;
+    setError("");
+    setPendingId(id);
+    startTransition(async () => {
+      const res = await deleteBlockAction(id);
       setPendingId(null);
       if (res.ok) router.refresh();
       else setError(res.error);
@@ -186,8 +205,14 @@ export default function AgendaView({
         )}
 
         <button
+          onClick={() => setBlockOpen(true)}
+          className="ml-auto inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-600 hover:border-rose-400 hover:text-rose-500 dark:border-ink-600 dark:text-slate-300"
+        >
+          <Ban className="h-4 w-4" /> Bloquear
+        </button>
+        <button
           onClick={() => setModal({ mode: "new", initialDate: date })}
-          className="ml-auto inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-ink-950 hover:bg-brand-400"
+          className="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-ink-950 hover:bg-brand-400"
         >
           <Plus className="h-4 w-4" /> Novo atendimento
         </button>
@@ -201,18 +226,22 @@ export default function AgendaView({
 
       {view === "dia" && (
         <DayList
+          date={date}
           appointments={appointments}
+          blocks={blocks}
           busy={busy}
           pendingId={pendingId}
           onEdit={(a) => setModal({ mode: "edit", appointment: a })}
           onQuickStatus={quickStatus}
           onRemove={remove}
+          onRemoveBlock={removeBlock}
         />
       )}
       {view === "semana" && (
         <WeekGrid
           anchor={anchor}
           appointments={appointments}
+          blocks={blocks}
           onEdit={(a) => setModal({ mode: "edit", appointment: a })}
           onSlot={(d, t) => setModal({ mode: "new", initialDate: d, initialTime: t })}
           onPickDay={(d) => go({ view: "dia", data: d })}
@@ -241,40 +270,127 @@ export default function AgendaView({
           }}
         />
       )}
+
+      {blockOpen && (
+        <BlockModal
+          professionals={professionals}
+          initialDate={date}
+          onClose={() => setBlockOpen(false)}
+          onSaved={() => {
+            setBlockOpen(false);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
 
+/** Clampa um bloqueio ao dia D dentro da janela do grid; null se fora. */
+function blockBandForDay(
+  block: BlockRow,
+  day: Date,
+): { top: number; height: number } | null {
+  const dayMidnight = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+  const nextMidnight = dayMidnight + 86_400_000;
+  const s = Math.max(new Date(block.startsAt).getTime(), dayMidnight);
+  const e = Math.min(new Date(block.endsAt).getTime(), nextMidnight);
+  if (e <= s) return null;
+  let startMin = (s - dayMidnight) / 60_000;
+  let endMin = (e - dayMidnight) / 60_000;
+  startMin = Math.min(Math.max(startMin, DAY_START_MIN), DAY_END_MIN);
+  endMin = Math.min(Math.max(endMin, DAY_START_MIN), DAY_END_MIN);
+  if (endMin <= startMin) return null;
+  return {
+    top: ((startMin - DAY_START_MIN) / 60) * HOUR_PX,
+    height: ((endMin - startMin) / 60) * HOUR_PX,
+  };
+}
+
 // ---------- Visão DIA (lista rica com ações rápidas) ----------
 function DayList({
+  date,
   appointments,
+  blocks,
   busy,
   pendingId,
   onEdit,
   onQuickStatus,
   onRemove,
+  onRemoveBlock,
 }: {
+  date: string;
   appointments: AppointmentRow[];
+  blocks: BlockRow[];
   busy: boolean;
   pendingId: string | null;
   onEdit: (a: AppointmentRow) => void;
   onQuickStatus: (id: string, s: AppointmentStatus) => void;
   onRemove: (id: string) => void;
+  onRemoveBlock: (id: string) => void;
 }) {
+  const day = parseDate(date);
+  const dayBlocks = blocks.filter(
+    (b) =>
+      new Date(b.startsAt).getTime() <
+        new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1).getTime() &&
+      new Date(b.endsAt).getTime() >
+        new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime(),
+  );
+
+  const hhmm = (iso: string) =>
+    new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  const blocksStrip = dayBlocks.length > 0 && (
+    <ul className="space-y-1.5">
+      {dayBlocks.map((b) => (
+        <li
+          key={b.id}
+          className="flex items-center gap-2 rounded-xl border border-dashed border-rose-300 bg-rose-500/5 px-3 py-2 text-xs text-rose-700 dark:border-rose-500/30 dark:text-rose-300"
+        >
+          <Ban className="h-3.5 w-3.5 shrink-0" />
+          <span className="font-semibold">{b.kindLabel}</span>
+          <span className="text-rose-500/80">
+            {hhmm(b.startsAt)}–{hhmm(b.endsAt)}
+            {b.professional ? ` · ${b.professional}` : " · toda a agenda"}
+            {b.reason ? ` · ${b.reason}` : ""}
+          </span>
+          {pendingId === b.id ? (
+            <Loader2 className="ml-auto h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <button
+              onClick={() => onRemoveBlock(b.id)}
+              disabled={busy}
+              aria-label="Remover bloqueio"
+              className="ml-auto grid h-6 w-6 place-items-center rounded-lg hover:bg-rose-500/10"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+
   if (appointments.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center dark:border-ink-700 dark:bg-ink-900">
-        <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand-500/10 text-brand-500">
-          <Clock className="h-6 w-6" />
+      <div className="space-y-3">
+        {blocksStrip}
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center dark:border-ink-700 dark:bg-ink-900">
+          <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand-500/10 text-brand-500">
+            <Clock className="h-6 w-6" />
+          </div>
+          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+            Nenhum atendimento neste dia. Clique em <strong>Novo atendimento</strong>.
+          </p>
         </div>
-        <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-          Nenhum atendimento neste dia. Clique em <strong>Novo atendimento</strong>.
-        </p>
       </div>
     );
   }
   return (
-    <ul className="space-y-2">
+    <div className="space-y-3">
+      {blocksStrip}
+      <ul className="space-y-2">
       {appointments.map((a) => (
         <li key={a.id} className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 dark:border-ink-700 dark:bg-ink-900">
           <div className="flex w-16 shrink-0 flex-col items-center rounded-xl bg-slate-50 py-2 dark:bg-ink-950">
@@ -332,7 +448,8 @@ function DayList({
           </div>
         </li>
       ))}
-    </ul>
+      </ul>
+    </div>
   );
 }
 
@@ -340,12 +457,14 @@ function DayList({
 function WeekGrid({
   anchor,
   appointments,
+  blocks,
   onEdit,
   onSlot,
   onPickDay,
 }: {
   anchor: Date;
   appointments: AppointmentRow[];
+  blocks: BlockRow[];
   onEdit: (a: AppointmentRow) => void;
   onSlot: (date: string, time: string) => void;
   onPickDay: (date: string) => void;
@@ -387,7 +506,7 @@ function WeekGrid({
             ))}
           </div>
           {days.map((d) => (
-            <DayColumn key={d.toISOString()} day={d} appointments={appointments} onEdit={onEdit} onSlot={onSlot} />
+            <DayColumn key={d.toISOString()} day={d} appointments={appointments} blocks={blocks} onEdit={onEdit} onSlot={onSlot} />
           ))}
         </div>
       </div>
@@ -398,18 +517,23 @@ function WeekGrid({
 function DayColumn({
   day,
   appointments,
+  blocks,
   onEdit,
   onSlot,
 }: {
   day: Date;
   appointments: AppointmentRow[];
+  blocks: BlockRow[];
   onEdit: (a: AppointmentRow) => void;
   onSlot: (date: string, time: string) => void;
 }) {
   const dayAppts = appointments.filter((a) => isSameDay(new Date(a.startsAt), day));
+  const dayBlocks = blocks
+    .map((b) => ({ b, band: blockBandForDay(b, day) }))
+    .filter((x): x is { b: BlockRow; band: { top: number; height: number } } => x.band !== null);
 
   function onColumnClick(e: React.MouseEvent<HTMLDivElement>) {
-    // Só cria se clicou no fundo (não num bloco).
+    // Só cria se clicou no fundo (não num bloco/atendimento).
     if ((e.target as HTMLElement).closest("[data-appt]")) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
@@ -425,6 +549,17 @@ function DayColumn({
       {/* Linhas de hora */}
       {hourMarks().map((h) => (
         <div key={h} className="absolute inset-x-0 border-t border-slate-50 dark:border-ink-800/60" style={{ top: ((h * 60 - DAY_START_MIN) / 60) * HOUR_PX }} />
+      ))}
+      {/* Bloqueios (faixas hachuradas, atrás dos atendimentos) */}
+      {dayBlocks.map(({ b, band }) => (
+        <div
+          key={b.id}
+          className="pointer-events-none absolute inset-x-0 overflow-hidden bg-[repeating-linear-gradient(45deg,rgba(244,63,94,0.10),rgba(244,63,94,0.10)_6px,transparent_6px,transparent_12px)] px-1 py-0.5 text-[10px] font-medium text-rose-500/80"
+          style={{ top: band.top, height: band.height }}
+          title={`${b.kindLabel}${b.reason ? " — " + b.reason : ""}`}
+        >
+          {b.kindLabel}
+        </div>
       ))}
       {dayAppts.map((a) => {
         const start = minutesSinceMidnight(new Date(a.startsAt));

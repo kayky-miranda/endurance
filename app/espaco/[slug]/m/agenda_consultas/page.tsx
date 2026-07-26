@@ -1,5 +1,6 @@
 import { CalendarCheck, CalendarClock, CheckCircle2, XCircle } from "lucide-react";
 import { getDayAgenda, getAgendaRange, listProfessionals } from "@/lib/endurance/agenda";
+import { listBlocksRange } from "@/lib/endurance/schedule-blocks";
 import {
   toDateInput,
   startOfWeek,
@@ -40,13 +41,14 @@ export default async function AgendaPage({
   // Intervalo carregado conforme a visão.
   const { from, to } = rangeFor(view, anchor);
 
-  const [dayAgenda, rangeAppts, professionals] = session
+  const [dayAgenda, rangeAppts, blocks, professionals] = session
     ? await Promise.all([
         getDayAgenda(session.org, date, { professionalId: prof }),
         getAgendaRange(session.org, from, to, { professionalId: prof }),
+        listBlocksRange(session.org, from, to, { professionalId: prof }),
         listProfessionals(session.org),
       ])
-    : [null, [], []];
+    : [null, [], [], []];
 
   return (
     <div className="space-y-6">
@@ -79,6 +81,7 @@ export default async function AgendaPage({
             date={date}
             professionalId={sp.prof || ""}
             appointments={view === "dia" ? dayAgenda.appointments : rangeAppts}
+            blocks={blocks}
             professionals={professionals}
           />
         </>

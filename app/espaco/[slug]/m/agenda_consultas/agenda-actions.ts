@@ -12,6 +12,8 @@ import {
   type AppointmentRow,
 } from "@/lib/endurance/agenda";
 import { STATUS_LABEL, type AppointmentStatus } from "@/lib/endurance/scheduling";
+import { createBlock, deleteBlock } from "@/lib/endurance/schedule-blocks";
+import { blockKindLabel } from "@/lib/endurance/schedule-block";
 
 /**
  * Ações da Agenda de atendimentos. Toda mutação abre com o gate de
@@ -149,4 +151,66 @@ export async function searchCustomersAction(
     take: 8,
   });
   return rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone }));
+}
+
+// ---- Bloqueios de agenda ----
+
+function combineDT(date: string, time: string): Date {
+  const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date ?? "");
+  const tm = /^(\d{1,2}):(\d{2})$/.exec(time ?? "");
+  if (!dm) return new Date(NaN);
+  return new Date(
+    Number(dm[1]),
+    Number(dm[2]) - 1,
+    Number(dm[3]),
+    tm ? Number(tm[1]) : 0,
+    tm ? Number(tm[2]) : 0,
+    0,
+    0,
+  );
+}
+
+export async function createBlockAction(payload: {
+  professionalId?: string | null;
+  kind?: string;
+  reason?: string;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+}): Promise<ActionResult> {
+  const gate = await requirePermission("agenda.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+  const res = await createBlock(
+    s.org,
+    { id: s.sub, name: s.name },
+    {
+      professionalId: payload.professionalId ?? null,
+      kind: payload.kind,
+      reason: payload.reason,
+      startsAt: combineDT(payload.startDate, payload.startTime),
+      endsAt: combineDT(payload.endDate, payload.endTime),
+    },
+  );
+  if (!res.ok) return res;
+  await logActivity(
+    s,
+    "agenda.block.create",
+    `Criou bloqueio de agenda (${blockKindLabel(payload.kind ?? "bloqueio")})`,
+    res.id,
+  );
+  revalidate(s.slug);
+  return { ok: true, id: res.id };
+}
+
+export async function deleteBlockAction(id: string): Promise<ActionResult> {
+  const gate = await requirePermission("agenda.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+  const res = await deleteBlock(s.org, id);
+  if (!res.ok) return { ok: false, error: res.error ?? "Falha ao remover." };
+  await logActivity(s, "agenda.block.delete", "Removeu um bloqueio de agenda", id);
+  revalidate(s.slug);
+  return { ok: true };
 }

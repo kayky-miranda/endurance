@@ -73,6 +73,29 @@ model Organization {
   assessments      PhysicalAssessment[]
   patientProfiles  PatientProfile[]
   patientFiles     PatientAttachment[]
+  scheduleBlocks   ScheduleBlock[]
+}
+
+// Bloqueio de agenda: intervalo indisponível para agendamento — bloqueio
+// pontual, férias, feriado, almoço. `professionalId` nulo bloqueia a agenda
+// TODA (ex.: feriado); preenchido bloqueia só aquele profissional.
+model ScheduleBlock {
+  id             String   @id @default(cuid())
+  organizationId String
+  professionalId String? // null = toda a agenda
+  professional   String   @default("") // snapshot do nome
+  kind           String   @default("bloqueio") // bloqueio | ferias | feriado | almoco | outro
+  reason         String   @default("")
+  startsAt       DateTime
+  endsAt         DateTime
+  createdById    String?
+  createdByName  String   @default("")
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, startsAt])
+  @@index([organizationId, professionalId, startsAt])
 }
 
 // Configuração do cupom/recibo impresso (um por organização). O logo reaproveita
