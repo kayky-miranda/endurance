@@ -17,9 +17,11 @@ import {
   modulePermission,
 } from "@/lib/endurance/permissions";
 import { getSalesSummary } from "@/lib/endurance/sales-analytics";
+import { isHealthNiche } from "@/lib/endurance/clinic-dashboard";
 import { money } from "@/lib/endurance/money";
 import { SalesByDayChart, PaymentMixChart } from "./m/charts-lazy";
 import OnboardingChecklist from "./onboarding-checklist";
+import ClinicDashboard from "./clinic-dashboard";
 import { KpiCard } from "./m/module-kit";
 
 const brl = (n: number) =>
@@ -68,20 +70,23 @@ export default async function EspacoPage({
   }
 
   const orgId = session?.org ?? "";
-  // As três consultas são independentes → buscam em paralelo (1 round-trip de
-  // latência somada vira o tempo da mais lenta, não a soma das três).
-  const [summary, recent, customerCount] = orgId
-    ? await Promise.all([
-        getSalesSummary(orgId, 30),
-        prisma.sale.findMany({
-          where: { organizationId: orgId },
-          include: { customer: true, payments: true },
-          orderBy: { createdAt: "desc" },
-          take: 5,
-        }),
-        prisma.customer.count({ where: { organizationId: orgId } }),
-      ])
-    : [null, [], 0];
+  const health = isHealthNiche(ws.niche);
+
+  // O painel de varejo (vendas) só carrega os dados de venda quando o nicho
+  // NÃO é de saúde — a clínica usa o ClinicDashboard, com dados próprios.
+  const [summary, recent, customerCount] =
+    orgId && !health
+      ? await Promise.all([
+          getSalesSummary(orgId, 30),
+          prisma.sale.findMany({
+            where: { organizationId: orgId },
+            include: { customer: true, payments: true },
+            orderBy: { createdAt: "desc" },
+            take: 5,
+          }),
+          prisma.customer.count({ where: { organizationId: orgId } }),
+        ])
+      : [null, [], 0];
 
   const core = visible.filter((m) => m.core);
   const niche = visible.filter((m) => !m.core);
@@ -124,7 +129,9 @@ export default async function EspacoPage({
           Bem-vindo{firstName ? `, ${firstName}` : ""}! 👋
         </h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Um resumo do {ws.name} — dados reais das suas vendas.
+          {health
+            ? `Um resumo do ${ws.name} — sua operação clínica em tempo real.`
+            : `Um resumo do ${ws.name} — dados reais das suas vendas.`}
         </p>
       </div>
 
@@ -136,97 +143,103 @@ export default async function EspacoPage({
         />
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((s) => (
-          <KpiCard
-            key={s.label}
-            label={s.label}
-            value={s.value}
-            sub={s.sub}
-            icon={s.icon}
-            from={s.from}
-          />
-        ))}
-      </div>
-
-      {/* Gráficos reais */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-ink-700 dark:bg-ink-900 lg:col-span-2">
-          <h2 className="mb-3 text-sm font-semibold text-slate-800 dark:text-slate-100">
-            Vendas por dia
-          </h2>
-          {summary && summary.vendas > 0 ? (
-            <SalesByDayChart data={summary.porDia} />
-          ) : (
-            <EmptySales slug={slug} />
-          )}
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-ink-700 dark:bg-ink-900">
-          <h2 className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-            Formas de pagamento
-          </h2>
-          <PaymentMixChart data={summary?.pagamentos ?? []} />
-        </div>
-      </div>
-
-      {/* Vendas recentes (reais) */}
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-ink-700 dark:bg-ink-900">
-        <div className="flex items-center justify-between px-5 py-4">
-          <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-            Vendas recentes
-          </h2>
-          <Link
-            href={`/espaco/${slug}/m/relatorios`}
-            className="text-xs text-brand-500 hover:underline"
-          >
-            ver painel
-          </Link>
-        </div>
-        {recent.length === 0 ? (
-          <p className="px-5 pb-6 text-sm text-slate-400">
-            Nenhuma venda ainda.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-y border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400 dark:border-ink-800">
-                  <th className="px-5 py-2.5 font-medium">Data</th>
-                  <th className="px-5 py-2.5 font-medium">Cliente</th>
-                  <th className="px-5 py-2.5 font-medium">Pagamento</th>
-                  <th className="px-5 py-2.5 font-medium">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recent.map((s) => (
-                  <tr
-                    key={s.id}
-                    className="border-b border-slate-100 last:border-0 dark:border-ink-800"
-                  >
-                    <td className="px-5 py-3 text-slate-500 dark:text-slate-400">
-                      {s.createdAt.toLocaleDateString("pt-BR", {
-                        day: "2-digit",
-                        month: "2-digit",
-                      })}
-                    </td>
-                    <td className="px-5 py-3 text-slate-700 dark:text-slate-200">
-                      {s.customer?.name ?? "—"}
-                    </td>
-                    <td className="px-5 py-3 text-slate-500 dark:text-slate-400">
-                      {s.payments
-                        .map((p) => PAY_LABEL[p.method] ?? p.method)
-                        .join(", ") || "—"}
-                    </td>
-                    <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-200">
-                      {brl(money(s.total))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {health && orgId ? (
+        <ClinicDashboard orgId={orgId} slug={slug} />
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {stats.map((s) => (
+              <KpiCard
+                key={s.label}
+                label={s.label}
+                value={s.value}
+                sub={s.sub}
+                icon={s.icon}
+                from={s.from}
+              />
+            ))}
           </div>
-        )}
-      </section>
+
+          {/* Gráficos reais */}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-ink-700 dark:bg-ink-900 lg:col-span-2">
+              <h2 className="mb-3 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                Vendas por dia
+              </h2>
+              {summary && summary.vendas > 0 ? (
+                <SalesByDayChart data={summary.porDia} />
+              ) : (
+                <EmptySales slug={slug} />
+              )}
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-ink-700 dark:bg-ink-900">
+              <h2 className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                Formas de pagamento
+              </h2>
+              <PaymentMixChart data={summary?.pagamentos ?? []} />
+            </div>
+          </div>
+
+          {/* Vendas recentes (reais) */}
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-ink-700 dark:bg-ink-900">
+            <div className="flex items-center justify-between px-5 py-4">
+              <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                Vendas recentes
+              </h2>
+              <Link
+                href={`/espaco/${slug}/m/relatorios`}
+                className="text-xs text-brand-500 hover:underline"
+              >
+                ver painel
+              </Link>
+            </div>
+            {recent.length === 0 ? (
+              <p className="px-5 pb-6 text-sm text-slate-400">
+                Nenhuma venda ainda.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-y border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400 dark:border-ink-800">
+                      <th className="px-5 py-2.5 font-medium">Data</th>
+                      <th className="px-5 py-2.5 font-medium">Cliente</th>
+                      <th className="px-5 py-2.5 font-medium">Pagamento</th>
+                      <th className="px-5 py-2.5 font-medium">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recent.map((s) => (
+                      <tr
+                        key={s.id}
+                        className="border-b border-slate-100 last:border-0 dark:border-ink-800"
+                      >
+                        <td className="px-5 py-3 text-slate-500 dark:text-slate-400">
+                          {s.createdAt.toLocaleDateString("pt-BR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                          })}
+                        </td>
+                        <td className="px-5 py-3 text-slate-700 dark:text-slate-200">
+                          {s.customer?.name ?? "—"}
+                        </td>
+                        <td className="px-5 py-3 text-slate-500 dark:text-slate-400">
+                          {s.payments
+                            .map((p) => PAY_LABEL[p.method] ?? p.method)
+                            .join(", ") || "—"}
+                        </td>
+                        <td className="px-5 py-3 font-medium text-slate-700 dark:text-slate-200">
+                          {brl(money(s.total))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
       <ToolGrid title="O essencial — todo negócio usa" slug={slug} modules={core} />
       {niche.length > 0 && (

@@ -36,3 +36,11 @@ export const CategoryChart = dynamic(
   () => import("./purchasing-charts").then((m) => m.CategoryChart),
   { ssr: false, loading: () => <ChartSkeleton /> },
 );
+export const AppointmentsByDayChart = dynamic(
+  () => import("../clinic-charts").then((m) => m.AppointmentsByDayChart),
+  { ssr: false, loading: () => <ChartSkeleton /> },
+);
+export const StatusMixChart = dynamic(
+  () => import("../clinic-charts").then((m) => m.StatusMixChart),
+  { ssr: false, loading: () => <ChartSkeleton /> },
+);
