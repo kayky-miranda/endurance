@@ -6,6 +6,12 @@ import {
   overlaps,
   dayRange,
   toDateInput,
+  addDays,
+  startOfWeek,
+  weekDays,
+  monthGridDays,
+  minutesSinceMidnight,
+  isSameDay,
 } from "@/lib/endurance/scheduling";
 
 describe("isValidStatus", () => {
@@ -79,5 +85,50 @@ describe("toDateInput", () => {
   it("formata YYYY-MM-DD com zero à esquerda no fuso local", () => {
     expect(toDateInput(new Date(2026, 2, 5))).toBe("2026-03-05");
     expect(toDateInput(new Date(2026, 11, 31))).toBe("2026-12-31");
+  });
+});
+
+describe("addDays", () => {
+  it("soma dias atravessando fim de mês sem drift", () => {
+    expect(toDateInput(addDays(new Date(2026, 0, 30), 3))).toBe("2026-02-02");
+    expect(toDateInput(addDays(new Date(2026, 0, 1), -1))).toBe("2025-12-31");
+  });
+});
+
+describe("startOfWeek / weekDays", () => {
+  it("início no domingo (padrão) da semana que contém a data", () => {
+    // 2026-06-17 é uma quarta-feira → domingo da semana é 2026-06-14
+    expect(toDateInput(startOfWeek(new Date(2026, 5, 17)))).toBe("2026-06-14");
+  });
+  it("início na segunda quando weekStartsOn=1", () => {
+    expect(toDateInput(startOfWeek(new Date(2026, 5, 17), 1))).toBe("2026-06-15");
+  });
+  it("weekDays devolve 7 dias consecutivos", () => {
+    const days = weekDays(new Date(2026, 5, 17)).map(toDateInput);
+    expect(days).toHaveLength(7);
+    expect(days[0]).toBe("2026-06-14");
+    expect(days[6]).toBe("2026-06-20");
+  });
+});
+
+describe("monthGridDays", () => {
+  it("devolve 42 dias cobrindo o mês, iniciando no domingo", () => {
+    const grid = monthGridDays(new Date(2026, 5, 15)); // junho/2026
+    expect(grid).toHaveLength(42);
+    // 1º de junho/2026 é segunda → a grade começa no domingo 31/05
+    expect(toDateInput(grid[0])).toBe("2026-05-31");
+    expect(grid.some((d) => toDateInput(d) === "2026-06-01")).toBe(true);
+    expect(grid.some((d) => toDateInput(d) === "2026-06-30")).toBe(true);
+  });
+});
+
+describe("minutesSinceMidnight / isSameDay", () => {
+  it("minutos desde a meia-noite", () => {
+    expect(minutesSinceMidnight(new Date(2026, 5, 15, 9, 30))).toBe(570);
+    expect(minutesSinceMidnight(new Date(2026, 5, 15, 0, 0))).toBe(0);
+  });
+  it("isSameDay ignora horas", () => {
+    expect(isSameDay(new Date(2026, 5, 15, 8), new Date(2026, 5, 15, 20))).toBe(true);
+    expect(isSameDay(new Date(2026, 5, 15), new Date(2026, 5, 16))).toBe(false);
   });
 });

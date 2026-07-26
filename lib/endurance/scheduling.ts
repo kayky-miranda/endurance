@@ -94,3 +94,60 @@ export function toDateInput(d: Date): string {
 }
 
 export const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120] as const;
+
+// ---- Aritmética de calendário (semana/mês) — pura e testável ----
+
+/** Data + n dias, preservando a hora local (sem drift de fuso). */
+export function addDays(d: Date, n: number): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+}
+
+/**
+ * Início da semana que contém `d` (domingo, padrão pt-BR de calendário), à
+ * meia-noite local. `weekStartsOn` permite iniciar na segunda (1).
+ */
+export function startOfWeek(d: Date, weekStartsOn: 0 | 1 = 0): Date {
+  const base = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = (base.getDay() - weekStartsOn + 7) % 7;
+  return addDays(base, -diff);
+}
+
+/** Os 7 dias da semana que contém `d`. */
+export function weekDays(d: Date, weekStartsOn: 0 | 1 = 0): Date[] {
+  const start = startOfWeek(d, weekStartsOn);
+  return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+}
+
+export function startOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+export function endOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+}
+
+/**
+ * Grade do mês para renderização: sempre 6 semanas (42 dias) começando no
+ * início da semana que contém o dia 1 — cobre o mês inteiro e completa as
+ * bordas com dias dos meses vizinhos (como Google Calendar).
+ */
+export function monthGridDays(d: Date, weekStartsOn: 0 | 1 = 0): Date[] {
+  const first = startOfMonth(d);
+  const gridStart = startOfWeek(first, weekStartsOn);
+  return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
+}
+
+/** Minutos desde a meia-noite local (para posicionar no grid de horários). */
+export function minutesSinceMidnight(d: Date): number {
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+export function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+export const WEEKDAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];

@@ -119,6 +119,27 @@ export async function getDayAgenda(
   };
 }
 
+/**
+ * Consultas num intervalo [from, to) — base das visões de semana e mês.
+ * Ordenadas por horário; opcionalmente filtradas por profissional.
+ */
+export async function getAgendaRange(
+  org: string,
+  from: Date,
+  to: Date,
+  opts: { professionalId?: string } = {},
+): Promise<AppointmentRow[]> {
+  const rows = await prisma.appointment.findMany({
+    where: {
+      organizationId: org,
+      startsAt: { gte: from, lt: to },
+      ...(opts.professionalId ? { professionalId: opts.professionalId } : {}),
+    },
+    orderBy: { startsAt: "asc" },
+  });
+  return rows.map(toRow);
+}
+
 /** Profissionais disponíveis (usuários ativos da organização). */
 export async function listProfessionals(
   org: string,
