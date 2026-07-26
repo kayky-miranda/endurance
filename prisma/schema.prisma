@@ -76,6 +76,36 @@ model Organization {
   scheduleBlocks   ScheduleBlock[]
   waitlist         WaitlistEntry[]
   prescriptions    Prescription[]
+  certificates     Certificate[]
+}
+
+// Atestado médico — documento imprimível. Comparecimento, afastamento (com nº
+// de dias e início) ou outro. `text` é o corpo livre. Exclusão LÓGICA.
+model Certificate {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  customerId          String
+  appointmentId       String?
+  professionalId      String?
+  professional        String   @default("")
+  professionalCouncil String   @default("")
+  kind                String   @default("afastamento") // comparecimento | afastamento | outro
+  cid                 String   @default("")
+  cidDescription      String   @default("")
+  days                Int? // dias de afastamento
+  startDate           DateTime? // início do afastamento
+  text                String   @default("") // corpo/observações
+  issuedAt            DateTime @default(now())
+  createdById         String?
+  createdByName       String   @default("")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  deletedAt           DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, customerId, deletedAt])
 }
 
 // Receituário — receita do paciente com itens (medicamento + posologia).
@@ -677,6 +707,7 @@ model Customer {
   patientProfile   PatientProfile?
   patientFiles     PatientAttachment[]
   prescriptions    Prescription[]
+  certificates     Certificate[]
 
   @@index([organizationId, deletedAt])
 }
