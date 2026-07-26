@@ -74,6 +74,29 @@ model Organization {
   patientProfiles  PatientProfile[]
   patientFiles     PatientAttachment[]
   scheduleBlocks   ScheduleBlock[]
+  waitlist         WaitlistEntry[]
+}
+
+// Lista de espera da agenda: pacientes aguardando encaixe. Quando um horário
+// abre, a recepção agenda a partir daqui (a entrada vira "agendado").
+model WaitlistEntry {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String?
+  customerName   String   @default("")
+  professionalId String? // preferência de profissional
+  professional   String   @default("")
+  service        String   @default("")
+  notes          String   @default("") // preferência de horário / observações
+  status         String   @default("aguardando") // aguardando | agendado | removido
+  createdById    String?
+  createdByName  String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, createdAt])
 }
 
 // Bloqueio de agenda: intervalo indisponível para agendamento — bloqueio

@@ -1,6 +1,7 @@
 import { CalendarCheck, CalendarClock, CheckCircle2, XCircle } from "lucide-react";
 import { getDayAgenda, getAgendaRange, listProfessionals } from "@/lib/endurance/agenda";
 import { listBlocksRange } from "@/lib/endurance/schedule-blocks";
+import { listWaitlist } from "@/lib/endurance/waitlist";
 import {
   toDateInput,
   startOfWeek,
@@ -10,6 +11,7 @@ import {
 } from "@/lib/endurance/scheduling";
 import { loadModule, DeniedModule, ModuleHeader, KpiCard } from "../module-kit";
 import AgendaView, { type AgendaViewMode } from "./agenda-client";
+import WaitlistPanel from "./waitlist-panel";
 
 /**
  * Agenda de atendimentos — visões dia / semana / mês (estilo calendário).
@@ -41,14 +43,15 @@ export default async function AgendaPage({
   // Intervalo carregado conforme a visão.
   const { from, to } = rangeFor(view, anchor);
 
-  const [dayAgenda, rangeAppts, blocks, professionals] = session
+  const [dayAgenda, rangeAppts, blocks, waitlist, professionals] = session
     ? await Promise.all([
         getDayAgenda(session.org, date, { professionalId: prof }),
         getAgendaRange(session.org, from, to, { professionalId: prof }),
         listBlocksRange(session.org, from, to, { professionalId: prof }),
+        listWaitlist(session.org),
         listProfessionals(session.org),
       ])
-    : [null, [], [], []];
+    : [null, [], [], [], []];
 
   return (
     <div className="space-y-6">
@@ -84,6 +87,8 @@ export default async function AgendaPage({
             blocks={blocks}
             professionals={professionals}
           />
+
+          <WaitlistPanel date={date} entries={waitlist} professionals={professionals} />
         </>
       )}
     </div>

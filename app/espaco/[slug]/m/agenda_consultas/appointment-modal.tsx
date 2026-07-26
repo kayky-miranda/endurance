@@ -17,12 +17,20 @@ import {
  * visões da agenda (dia/semana/mês). Ao criar a partir de um horário clicado no
  * calendário, `initialDate`/`initialTime` pré-preenchem o slot.
  */
+export interface AppointmentPrefill {
+  customerId?: string | null;
+  customerName?: string;
+  professionalId?: string | null;
+  service?: string;
+}
+
 export default function AppointmentModal({
   date,
   professionals,
   appointment,
   initialDate,
   initialTime,
+  prefill,
   onClose,
   onSaved,
 }: {
@@ -32,6 +40,8 @@ export default function AppointmentModal({
   appointment: AppointmentRow | null;
   initialDate?: string;
   initialTime?: string;
+  /** Pré-preenchimento ao criar (ex.: a partir da lista de espera). */
+  prefill?: AppointmentPrefill;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -42,10 +52,10 @@ export default function AppointmentModal({
   const initDate = appointment ? appointment.startsAt.slice(0, 10) : initialDate ?? date;
   const initTime = appointment ? appointment.startTime : initialTime ?? "09:00";
 
-  const [customerId, setCustomerId] = useState<string | null>(appointment?.customerId ?? null);
-  const [customerName, setCustomerName] = useState(appointment?.customerName ?? "");
-  const [professionalIdSel, setProfessionalIdSel] = useState(appointment?.professionalId ?? "");
-  const [service, setService] = useState(appointment?.service ?? "");
+  const [customerId, setCustomerId] = useState<string | null>(appointment?.customerId ?? prefill?.customerId ?? null);
+  const [customerName, setCustomerName] = useState(appointment?.customerName ?? prefill?.customerName ?? "");
+  const [professionalIdSel, setProfessionalIdSel] = useState(appointment?.professionalId ?? prefill?.professionalId ?? "");
+  const [service, setService] = useState(appointment?.service ?? prefill?.service ?? "");
   const [dateVal, setDateVal] = useState(initDate);
   const [time, setTime] = useState(initTime);
   const [durationMin, setDurationMin] = useState(appointment?.durationMin ?? 30);
