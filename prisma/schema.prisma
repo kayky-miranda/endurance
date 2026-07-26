@@ -625,6 +625,7 @@ model FinancialEntry {
   status         String    @default("pendente") // pendente | pago
   method         String    @default("")
   saleId         String?
+  appointmentId  String? // receita vinda de uma consulta atendida (clínica)
   dueDate        DateTime
   paidAt         DateTime?
   // Conciliação: quando o recebível foi batido contra a cobrança/extrato externo.
@@ -637,6 +638,7 @@ model FinancialEntry {
   @@index([organizationId, status])
   @@index([organizationId, kind])
   @@index([saleId])
+  @@index([appointmentId])
 }
 
 // Configuração fiscal da empresa (emitente da NFC-e, modelo 65). Uma por org.

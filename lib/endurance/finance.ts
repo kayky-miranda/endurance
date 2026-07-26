@@ -66,6 +66,41 @@ export async function createReceivablesForSale(
   if (data.length > 0) await db.financialEntry.createMany({ data });
 }
 
+/**
+ * Gera o recebível de uma CONSULTA atendida (financeiro da clínica).
+ * IDEMPOTENTE por appointmentId — chamar de novo não duplica. Recebível fica
+ * "pendente" (a baixa acontece no financeiro quando o pagamento é confirmado).
+ */
+export async function createReceivableForAppointment(
+  i: {
+    organizationId: string;
+    appointmentId: string;
+    amount: number;
+    patientName: string;
+    when: Date;
+  },
+  db: Tx | typeof prisma = prisma,
+): Promise<void> {
+  if (i.amount <= 0) return;
+  const existing = await db.financialEntry.findFirst({
+    where: { organizationId: i.organizationId, appointmentId: i.appointmentId },
+    select: { id: true },
+  });
+  if (existing) return;
+  await db.financialEntry.create({
+    data: {
+      organizationId: i.organizationId,
+      kind: "receber",
+      description: `Consulta · ${i.patientName || "paciente"}`,
+      category: "Consultas",
+      amount: round2(i.amount),
+      status: "pendente",
+      appointmentId: i.appointmentId,
+      dueDate: i.when,
+    },
+  });
+}
+
 export interface FinanceRow {
   id: string;
   description: string;

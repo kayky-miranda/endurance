@@ -11,6 +11,7 @@ import {
   dayRange,
 } from "./scheduling";
 import { findBlockConflict } from "./schedule-blocks";
+import { createReceivableForAppointment } from "./finance";
 
 /** Mensagem de erro padrão quando o horário cai sobre um bloqueio de agenda. */
 function blockError(block: { kindLabel: string; reason: string }): string {
@@ -435,7 +436,7 @@ export async function setAppointmentStatus(
   if (!isValidStatus(status)) return { ok: false, error: "Status inválido." };
   const existing = await prisma.appointment.findFirst({
     where: { id, organizationId: org },
-    select: { id: true, status: true },
+    select: { id: true, status: true, price: true, customerName: true, startsAt: true },
   });
   if (!existing) return { ok: false, error: "Atendimento não encontrado." };
   const from = isValidStatus(existing.status) ? existing.status : "agendado";
@@ -445,6 +446,20 @@ export async function setAppointmentStatus(
       error: `Não é possível mudar de "${from}" para "${status}".`,
     };
   await prisma.appointment.update({ where: { id }, data: { status } });
+
+  // Consulta ATENDIDA gera receita no financeiro da clínica (idempotente).
+  if (status === "atendido") {
+    const price = money(existing.price);
+    if (price > 0) {
+      await createReceivableForAppointment({
+        organizationId: org,
+        appointmentId: id,
+        amount: price,
+        patientName: existing.customerName,
+        when: existing.startsAt,
+      });
+    }
+  }
   return { ok: true };
 }
 
