@@ -11,7 +11,10 @@ import {
   Check,
 } from "lucide-react";
 import type { CommissionReport } from "@/lib/endurance/commissions";
-import { setCommissionPercentAction } from "./commissions-actions";
+import {
+  setCommissionPercentAction,
+  setProfessionalCouncilAction,
+} from "./commissions-actions";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -30,6 +33,8 @@ export default function CommissionsPanel({
   const [busy, startTransition] = useTransition();
   const [editing, setEditing] = useState<string | null>(null);
   const [value, setValue] = useState("");
+  const [editingCouncil, setEditingCouncil] = useState<string | null>(null);
+  const [councilValue, setCouncilValue] = useState("");
   const [error, setError] = useState("");
 
   function save(userId: string) {
@@ -38,6 +43,17 @@ export default function CommissionsPanel({
       const res = await setCommissionPercentAction(userId, Number(value.replace(",", ".")) || 0);
       if (res.ok) {
         setEditing(null);
+        router.refresh();
+      } else setError(res.error);
+    });
+  }
+
+  function saveCouncil(userId: string) {
+    setError("");
+    startTransition(async () => {
+      const res = await setProfessionalCouncilAction(userId, councilValue);
+      if (res.ok) {
+        setEditingCouncil(null);
         router.refresh();
       } else setError(res.error);
     });
@@ -72,6 +88,7 @@ export default function CommissionsPanel({
               <thead>
                 <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-400 dark:border-ink-800">
                   <th className="py-2 pr-3 font-medium">Profissional</th>
+                  <th className="py-2 pr-3 font-medium">Registro</th>
                   <th className="py-2 pr-3 text-right font-medium">Atend.</th>
                   <th className="py-2 pr-3 text-right font-medium">Receita</th>
                   <th className="py-2 pr-3 text-right font-medium">%</th>
@@ -82,6 +99,40 @@ export default function CommissionsPanel({
                 {report.rows.map((r) => (
                   <tr key={r.userId}>
                     <td className="py-2 pr-3 font-medium text-slate-700 dark:text-slate-200">{r.name}</td>
+                    <td className="py-2 pr-3">
+                      {canConfig && editingCouncil === r.userId ? (
+                        <span className="inline-flex items-center gap-1">
+                          <input
+                            autoFocus
+                            value={councilValue}
+                            onChange={(e) => setCouncilValue(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && saveCouncil(r.userId)}
+                            placeholder="CRM-SP 123456"
+                            className="w-28 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+                          />
+                          {busy ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                          ) : (
+                            <button onClick={() => saveCouncil(r.userId)} aria-label="Salvar registro" className="text-emerald-500 hover:text-emerald-600">
+                              <Check className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </span>
+                      ) : canConfig ? (
+                        <button
+                          onClick={() => {
+                            setError("");
+                            setEditingCouncil(r.userId);
+                            setCouncilValue(r.council);
+                          }}
+                          className="rounded px-1.5 py-0.5 text-slate-500 hover:bg-slate-100 hover:text-brand-500 dark:hover:bg-ink-800"
+                        >
+                          {r.council || <span className="text-slate-300 dark:text-slate-600">definir</span>}
+                        </button>
+                      ) : (
+                        <span className="text-slate-500">{r.council || "—"}</span>
+                      )}
+                    </td>
                     <td className="py-2 pr-3 text-right text-slate-500">{r.atendidos}</td>
                     <td className="py-2 pr-3 text-right text-slate-600 dark:text-slate-300">{brl(r.revenue)}</td>
                     <td className="py-2 pr-3 text-right">
@@ -125,6 +176,7 @@ export default function CommissionsPanel({
               <tfoot>
                 <tr className="border-t border-slate-200 text-sm font-semibold dark:border-ink-700">
                   <td className="py-2 pr-3 text-slate-500">Total</td>
+                  <td />
                   <td />
                   <td className="py-2 pr-3 text-right text-slate-600 dark:text-slate-300">{brl(report.totalRevenue)}</td>
                   <td />

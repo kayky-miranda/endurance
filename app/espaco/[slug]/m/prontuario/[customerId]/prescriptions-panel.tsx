@@ -223,7 +223,16 @@ function PrescriptionEditor({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block text-xs font-medium text-slate-500">
           Profissional
-          <select value={professionalId} onChange={(e) => setProfessionalId(e.target.value)} className={`mt-1 w-full ${inputCls}`}>
+          <select
+            value={professionalId}
+            onChange={(e) => {
+              const id = e.target.value;
+              setProfessionalId(id);
+              const p = professionals.find((x) => x.id === id);
+              if (p?.council) setProfessionalCouncil(p.council);
+            }}
+            className={`mt-1 w-full ${inputCls}`}
+          >
             <option value="">
               {prescription?.professional ? `Manter (${prescription.professional})` : "— (você)"}
             </option>

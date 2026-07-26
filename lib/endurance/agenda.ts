@@ -52,6 +52,8 @@ export interface DayAgenda {
 export interface ProfessionalOption {
   id: string;
   name: string;
+  /** Registro no conselho (CRM/CRN/CRP), do ProfessionalProfile — se houver. */
+  council?: string;
 }
 
 const hhmm = (d: Date) =>
@@ -148,16 +150,31 @@ export async function getAgendaRange(
   return rows.map(toRow);
 }
 
-/** Profissionais disponíveis (usuários ativos da organização). */
+/**
+ * Profissionais disponíveis (usuários ativos da organização), com o registro
+ * no conselho (CRM/CRN/CRP) do ProfessionalProfile quando existir — usado para
+ * auto-preencher receita/atestado. As duas consultas rodam em paralelo.
+ */
 export async function listProfessionals(
   org: string,
 ): Promise<ProfessionalOption[]> {
-  const users = await prisma.user.findMany({
-    where: { organizationId: org, status: { not: "deleted" } },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
-  return users.map((u) => ({ id: u.id, name: u.name }));
+  const [users, profiles] = await Promise.all([
+    prisma.user.findMany({
+      where: { organizationId: org, status: { not: "deleted" } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.professionalProfile.findMany({
+      where: { organizationId: org, council: { not: "" } },
+      select: { userId: true, council: true },
+    }),
+  ]);
+  const councilByUser = new Map(profiles.map((p) => [p.userId, p.council]));
+  return users.map((u) => ({
+    id: u.id,
+    name: u.name,
+    council: councilByUser.get(u.id) ?? "",
+  }));
 }
 
 export type SaveResult =

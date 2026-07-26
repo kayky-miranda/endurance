@@ -211,7 +211,16 @@ function CertificateEditor({
         </label>
         <label className="block text-xs font-medium text-slate-500">
           Profissional
-          <select value={professionalId} onChange={(e) => setProfessionalId(e.target.value)} className={inputCls}>
+          <select
+            value={professionalId}
+            onChange={(e) => {
+              const id = e.target.value;
+              setProfessionalId(id);
+              const p = professionals.find((x) => x.id === id);
+              if (p?.council) setProfessionalCouncil(p.council);
+            }}
+            className={inputCls}
+          >
             <option value="">
               {certificate?.professional ? `Manter (${certificate.professional})` : "— (você)"}
             </option>

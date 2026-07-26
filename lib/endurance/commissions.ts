@@ -121,3 +121,24 @@ export async function setCommissionPercent(
   });
   return { ok: true };
 }
+
+/** Define o registro no conselho (CRM/CRN/CRP) de um profissional (upsert). */
+export async function setProfessionalCouncil(
+  org: string,
+  userId: string,
+  council: string,
+): Promise<ProfileResult> {
+  const value = (council ?? "").trim().slice(0, 40);
+  const user = await prisma.user.findFirst({
+    where: { id: userId, organizationId: org },
+    select: { id: true },
+  });
+  if (!user) return { ok: false, error: "Profissional não encontrado." };
+
+  await prisma.professionalProfile.upsert({
+    where: { userId },
+    update: { council: value },
+    create: { organizationId: org, userId, council: value },
+  });
+  return { ok: true };
+}
