@@ -188,6 +188,8 @@ export default function Shell({
     pathname.startsWith(`${base}/nfce/`) ||
     pathname.startsWith(`${base}/relatorio`) ||
     pathname.startsWith(`${base}/pedido/`) ||
+    pathname.startsWith(`${base}/receita/`) ||
+    pathname.startsWith(`${base}/atestado/`) ||
     pathname.startsWith(`${base}/etiquetas`)
   ) {
     return (

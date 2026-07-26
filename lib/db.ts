@@ -17,6 +17,7 @@ const SOFT_DELETE_MODELS = new Set([
   "MealPlan",
   "Anamnese",
   "WorkoutPlan",
+  "Prescription",
 ]);
 
 function makeClient() {

@@ -2,8 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Phone, Mail, IdCard } from "lucide-react";
 import { getPatientRecord } from "@/lib/endurance/prontuario";
+import { listPrescriptions } from "@/lib/endurance/prescriptions";
+import { listProfessionals } from "@/lib/endurance/agenda";
 import { loadModule, DeniedModule } from "../../module-kit";
 import RecordClient from "./record-client";
+import PrescriptionsPanel from "./prescriptions-panel";
 
 /** Prontuário de um paciente: dados + timeline de anotações + editor. */
 export default async function PatientRecordPage({
@@ -19,6 +22,13 @@ export default async function PatientRecordPage({
     ? await getPatientRecord(session.org, customerId)
     : null;
   if (!record) notFound();
+
+  const [prescriptions, professionals] = session
+    ? await Promise.all([
+        listPrescriptions(session.org, customerId),
+        listProfessionals(session.org),
+      ])
+    : [[], []];
 
   return (
     <div className="space-y-6">
@@ -51,6 +61,13 @@ export default async function PatientRecordPage({
       </div>
 
       <RecordClient slug={slug} customerId={record.id} notes={record.notes} />
+
+      <PrescriptionsPanel
+        slug={slug}
+        customerId={record.id}
+        prescriptions={prescriptions}
+        professionals={professionals}
+      />
     </div>
   );
 }

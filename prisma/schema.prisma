@@ -75,6 +75,49 @@ model Organization {
   patientFiles     PatientAttachment[]
   scheduleBlocks   ScheduleBlock[]
   waitlist         WaitlistEntry[]
+  prescriptions    Prescription[]
+}
+
+// Receituário — receita do paciente com itens (medicamento + posologia).
+// Documento imprimível. `professionalCouncil` guarda o registro profissional
+// (CRM/CRN/CRP…) informado na emissão.
+model Prescription {
+  id                 String   @id @default(cuid())
+  organizationId     String
+  customerId         String
+  appointmentId      String? // atendimento de origem (opcional)
+  professionalId     String?
+  professional       String   @default("") // snapshot do nome
+  professionalCouncil String  @default("") // ex.: CRM-SP 123456
+  cid                String   @default("")
+  cidDescription     String   @default("")
+  instructions       String   @default("") // orientações gerais
+  issuedAt           DateTime @default(now())
+  createdById        String?
+  createdByName      String   @default("")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items        PrescriptionItem[]
+
+  @@index([organizationId, customerId, deletedAt])
+}
+
+model PrescriptionItem {
+  id             String @id @default(cuid())
+  prescriptionId String
+  medication     String @default("") // nome do medicamento/insumo
+  dosage         String @default("") // posologia (ex.: "1 cp 8/8h por 7 dias")
+  quantity       String @default("") // quantidade (ex.: "1 caixa")
+  notes          String @default("")
+  position       Int    @default(0)
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+
+  @@index([prescriptionId, position])
 }
 
 // Lista de espera da agenda: pacientes aguardando encaixe. Quando um horário
@@ -633,6 +676,7 @@ model Customer {
   assessments      PhysicalAssessment[]
   patientProfile   PatientProfile?
   patientFiles     PatientAttachment[]
+  prescriptions    Prescription[]
 
   @@index([organizationId, deletedAt])
 }
