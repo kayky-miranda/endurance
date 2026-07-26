@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Phone, Mail, IdCard } from "lucide-react";
+import { ArrowLeft, Phone, Mail, IdCard, FileText } from "lucide-react";
 import { getPatientRecord } from "@/lib/endurance/prontuario";
 import { listPrescriptions } from "@/lib/endurance/prescriptions";
 import { listCertificates } from "@/lib/endurance/certificates";
@@ -45,7 +45,17 @@ export default async function PatientRecordPage({
           <ArrowLeft className="h-4 w-4" />
           Prontuários
         </Link>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight">{record.name}</h1>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <h1 className="text-2xl font-bold tracking-tight">{record.name}</h1>
+          <a
+            href={`/espaco/${slug}/paciente-resumo/${record.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-brand-400 hover:text-brand-500 dark:border-ink-600 dark:text-slate-300"
+          >
+            <FileText className="h-3.5 w-3.5" /> Resumo (imprimir)
+          </a>
+        </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
           {record.phone && (
             <span className="inline-flex items-center gap-1.5">
