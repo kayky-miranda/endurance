@@ -15,9 +15,12 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getClinicDashboard } from "@/lib/endurance/clinic-dashboard";
+import { getCommissionReport } from "@/lib/endurance/commissions";
+import { getSession, sessionHasPermission } from "@/lib/auth";
 import { STATUS_LABEL, type AppointmentStatus } from "@/lib/endurance/scheduling";
 import { KpiCard } from "./m/module-kit";
 import { AppointmentsByDayChart, StatusMixChart } from "./m/charts-lazy";
+import CommissionsPanel from "./commissions-panel";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -48,7 +51,17 @@ export default async function ClinicDashboard({
   orgId: string;
   slug: string;
 }) {
-  const d = await getClinicDashboard(orgId, { periodDays: 30 });
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+  const [d, session, commissions] = await Promise.all([
+    getClinicDashboard(orgId, { periodDays: 30 }),
+    getSession(),
+    getCommissionReport(orgId, monthStart, nextMonth),
+  ]);
+  const canConfigCommission = session ? sessionHasPermission(session, "settings.general") : false;
+  const monthLabel = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   return (
     <div className="space-y-6">
@@ -205,6 +218,9 @@ export default async function ClinicDashboard({
           <StatusMixChart data={d.statusMix} />
         </div>
       </div>
+
+      {/* Comissões dos profissionais (mês) */}
+      <CommissionsPanel report={commissions} canConfig={canConfigCommission} periodLabel={monthLabel} />
     </div>
   );
 }

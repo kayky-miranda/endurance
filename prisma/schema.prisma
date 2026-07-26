@@ -78,6 +78,23 @@ model Organization {
   prescriptions    Prescription[]
   certificates     Certificate[]
   docTemplates     DocumentTemplate[]
+  professionalProfiles ProfessionalProfile[]
+}
+
+// Configuração do profissional (isolada do User, que é crítico p/ auth). Guarda
+// a comissão sobre consultas e o registro no conselho (CRM/CRN/CRP).
+model ProfessionalProfile {
+  id                String   @id @default(cuid())
+  organizationId    String
+  userId            String   @unique
+  commissionPercent Float    @default(0) // % sobre a receita de consultas atendidas
+  council           String   @default("") // registro (CRM/CRN/CRP)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
 
 // Modelo pronto de documento/texto clínico reutilizável (anotação, receita,
