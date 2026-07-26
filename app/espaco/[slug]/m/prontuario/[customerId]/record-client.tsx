@@ -15,6 +15,8 @@ import {
 import { useModalA11y } from "../../../use-modal-a11y";
 import type { ClinicalNoteRow } from "@/lib/endurance/prontuario";
 import type { TemplateRow } from "@/lib/endurance/document-templates";
+import { suggestCidFromText, type CidCode } from "@/lib/endurance/cid";
+import { CidPicker } from "./prescriptions-panel";
 import {
   createNoteAction,
   updateNoteAction,
@@ -114,6 +116,14 @@ export default function RecordClient({
                         <User className="h-3 w-3" /> {n.authorName}
                       </span>
                     )}
+                    {n.cid && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-brand-500/10 px-1.5 py-0.5 font-medium text-brand-600 dark:text-brand-300"
+                        title={n.cidDescription}
+                      >
+                        CID {n.cid}
+                      </span>
+                    )}
                     {n.edited && <span className="italic">editada</span>}
                   </p>
                 </div>
@@ -189,6 +199,9 @@ function NoteModal({
   const [error, setError] = useState("");
   const [title, setTitle] = useState(note?.title ?? "");
   const [content, setContent] = useState(note?.content ?? "");
+  const [cid, setCid] = useState(note?.cid ?? "");
+  const [cidDescription, setCidDescription] = useState(note?.cidDescription ?? "");
+  const [suggestions, setSuggestions] = useState<CidCode[]>([]);
 
   function insertTemplate(id: string) {
     const t = templates.find((x) => x.id === id);
@@ -196,12 +209,16 @@ function NoteModal({
     setContent((prev) => (prev.trim() ? `${prev}\n\n${t.content}` : t.content));
   }
 
+  function suggestCid() {
+    setSuggestions(suggestCidFromText(`${title} ${content}`));
+  }
+
   function submit() {
     setError("");
     startTransition(async () => {
       const res = note
-        ? await updateNoteAction({ id: note.id, customerId, title, content })
-        : await createNoteAction({ customerId, title, content });
+        ? await updateNoteAction({ id: note.id, customerId, title, content, cid, cidDescription })
+        : await createNoteAction({ customerId, title, content, cid, cidDescription });
       if (res.ok) onSaved();
       else setError(res.error);
     });
@@ -270,6 +287,42 @@ function NoteModal({
               className="mt-1 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
             />
           </label>
+
+          {/* CID + sugestão automática a partir do texto */}
+          <div>
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <CidPicker code={cid} description={cidDescription} onPick={(c, d) => { setCid(c); setCidDescription(d); }} />
+              </div>
+              <button
+                type="button"
+                onClick={suggestCid}
+                className="mb-0.5 shrink-0 rounded-lg border border-slate-300 px-2.5 py-2 text-xs font-semibold text-slate-600 hover:border-brand-400 hover:text-brand-500 dark:border-ink-600 dark:text-slate-300"
+              >
+                Sugerir do texto
+              </button>
+            </div>
+            {suggestions.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {suggestions.map((c) => (
+                  <button
+                    key={c.code}
+                    type="button"
+                    onClick={() => {
+                      setCid(c.code);
+                      setCidDescription(c.description);
+                      setSuggestions([]);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600 hover:border-brand-400 hover:text-brand-500 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-300"
+                    title={c.description}
+                  >
+                    <span className="font-semibold text-brand-600 dark:text-brand-300">{c.code}</span>
+                    <span className="max-w-[10rem] truncate">{c.description}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {error && (
             <p className="flex items-center gap-1.5 rounded-lg bg-rose-500/10 px-3 py-2 text-xs text-rose-600 dark:text-rose-300">

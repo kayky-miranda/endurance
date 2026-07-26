@@ -24,6 +24,8 @@ export interface ClinicalNoteRow {
   id: string;
   title: string;
   content: string;
+  cid: string;
+  cidDescription: string;
   authorName: string;
   appointmentId: string | null;
   createdAt: string; // ISO
@@ -44,6 +46,8 @@ function toNoteRow(n: {
   id: string;
   title: string;
   content: string;
+  cid: string;
+  cidDescription: string;
   authorName: string;
   appointmentId: string | null;
   createdAt: Date;
@@ -54,6 +58,8 @@ function toNoteRow(n: {
     id: n.id,
     title: n.title,
     content: n.content,
+    cid: n.cid,
+    cidDescription: n.cidDescription,
     authorName: n.authorName,
     appointmentId: n.appointmentId,
     createdAt: n.createdAt.toISOString(),
@@ -144,6 +150,8 @@ export async function getPatientRecord(
       id: true,
       title: true,
       content: true,
+      cid: true,
+      cidDescription: true,
       authorName: true,
       appointmentId: true,
       createdAt: true,
@@ -164,6 +172,8 @@ interface NoteInput {
   appointmentId?: string | null;
   title?: string;
   content: string;
+  cid?: string;
+  cidDescription?: string;
 }
 
 function validateNote(input: NoteInput): string | null {
@@ -207,6 +217,8 @@ export async function createNote(
       authorName: actor.name,
       title: (input.title ?? "").trim(),
       content: input.content.trim(),
+      cid: (input.cid ?? "").trim(),
+      cidDescription: (input.cidDescription ?? "").trim(),
     },
     select: { id: true },
   });
@@ -216,7 +228,7 @@ export async function createNote(
 export async function updateNote(
   org: string,
   id: string,
-  input: { title?: string; content: string },
+  input: { title?: string; content: string; cid?: string; cidDescription?: string },
 ): Promise<NoteResult> {
   if (!input.content || input.content.trim().length < 1)
     return { ok: false, error: "A anotação não pode ficar vazia." };
@@ -234,6 +246,8 @@ export async function updateNote(
     data: {
       title: (input.title ?? "").trim(),
       content: input.content.trim(),
+      cid: (input.cid ?? "").trim(),
+      cidDescription: (input.cidDescription ?? "").trim(),
       editedAt: new Date(),
     },
   });

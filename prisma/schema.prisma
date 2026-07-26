@@ -1021,6 +1021,8 @@ model ClinicalNote {
   authorName     String   @default("")
   title          String   @default("")
   content        String   @default("")
+  cid            String   @default("") // código CID-10 associado (opcional)
+  cidDescription String   @default("")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   editedAt       DateTime? // marcado na 1ª edição — flag confiável de "editada"

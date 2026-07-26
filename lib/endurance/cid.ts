@@ -134,3 +134,55 @@ export function findCid(code: string): CidCode | undefined {
   const c = norm(code);
   return CID10_CATALOG.find((x) => norm(x.code) === c);
 }
+
+// Palavras genéricas que não ajudam a discriminar um CID.
+const STOP = new Set([
+  "outras",
+  "outros",
+  "localizacao",
+  "especificada",
+  "especificado",
+  "nao",
+  "para",
+  "com",
+  "sem",
+  "por",
+  "presumivel",
+  "origem",
+  "aguda",
+  "agudo",
+  "cronica",
+  "cronico",
+  "transtorno",
+  "transtornos",
+  "doenca",
+  "doencas",
+  "sindrome",
+  "geral",
+]);
+
+/**
+ * Sugere CIDs a partir de um TEXTO livre (anotação/queixa) — heurística pura,
+ * instantânea e sem IA: pontua cada CID pelas palavras significativas da sua
+ * descrição que aparecem no texto. Base para futura melhoria com IA, mas já
+ * útil e determinística.
+ */
+export function suggestCidFromText(text: string, limit = 5): CidCode[] {
+  const t = norm(text);
+  if (t.length < 4) return [];
+  const scored = CID10_CATALOG.map((c) => {
+    const words = norm(c.description)
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length > 3 && !STOP.has(w));
+    let score = 0;
+    for (const w of words) {
+      // limite de palavra p/ evitar casar "gripe" dentro de outra palavra
+      const re = new RegExp(`\\b${w}\\b`);
+      if (re.test(t)) score += w.length;
+    }
+    return { c, score };
+  })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit).map((x) => x.c);
+}

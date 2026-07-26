@@ -26,6 +26,8 @@ export async function createNoteAction(payload: {
   appointmentId?: string | null;
   title?: string;
   content: string;
+  cid?: string;
+  cidDescription?: string;
 }): Promise<NoteActionResult> {
   const gate = await requirePermission("prontuario.manage");
   if (!gate.ok) return gate;
@@ -47,6 +49,8 @@ export async function updateNoteAction(payload: {
   customerId: string;
   title?: string;
   content: string;
+  cid?: string;
+  cidDescription?: string;
 }): Promise<NoteActionResult> {
   const gate = await requirePermission("prontuario.manage");
   if (!gate.ok) return gate;
@@ -54,6 +58,8 @@ export async function updateNoteAction(payload: {
   const res = await updateNote(s.org, payload.id, {
     title: payload.title,
     content: payload.content,
+    cid: payload.cid,
+    cidDescription: payload.cidDescription,
   });
   if (!res.ok) return res;
   await logActivity(
