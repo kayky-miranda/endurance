@@ -448,6 +448,39 @@ export async function setAppointmentStatus(
   return { ok: true };
 }
 
+/**
+ * Reagenda um atendimento movendo apenas o horário (arrastar no calendário),
+ * mantendo cliente/profissional/duração. Passa pela mesma detecção de conflito
+ * (outro atendimento e bloqueio). Estados finais não se movem.
+ */
+export async function rescheduleAppointment(
+  org: string,
+  id: string,
+  newStartsAt: Date,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!(newStartsAt instanceof Date) || isNaN(newStartsAt.getTime()))
+    return { ok: false, error: "Horário inválido." };
+  const existing = await prisma.appointment.findFirst({
+    where: { id, organizationId: org },
+  });
+  if (!existing) return { ok: false, error: "Atendimento não encontrado." };
+  const status = isValidStatus(existing.status) ? existing.status : "agendado";
+  if (status === "atendido" || status === "cancelado")
+    return { ok: false, error: "Atendimentos concluídos ou cancelados não podem ser remarcados." };
+
+  const conflict = await findConflict(org, existing.professionalId, newStartsAt, existing.durationMin, id);
+  if (conflict)
+    return {
+      ok: false,
+      error: `Conflito com ${conflict.customerName || "outro atendimento"} (${conflict.startTime}–${conflict.endTime}).`,
+    };
+  const block = await findBlockConflict(org, existing.professionalId, newStartsAt, existing.durationMin);
+  if (block) return { ok: false, error: blockError(block) };
+
+  await prisma.appointment.update({ where: { id }, data: { startsAt: newStartsAt } });
+  return { ok: true };
+}
+
 export async function deleteAppointment(
   org: string,
   id: string,

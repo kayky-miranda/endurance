@@ -35,6 +35,7 @@ import {
   setAppointmentStatusAction,
   deleteAppointmentAction,
   deleteBlockAction,
+  rescheduleAction,
 } from "./agenda-actions";
 import AppointmentModal from "./appointment-modal";
 import BlockModal from "./block-modal";
@@ -151,6 +152,15 @@ export default function AgendaView({
     });
   }
 
+  function reschedule(id: string, d: string, t: string) {
+    setError("");
+    startTransition(async () => {
+      const res = await rescheduleAction(id, d, t);
+      if (res.ok) router.refresh();
+      else setError(res.error);
+    });
+  }
+
   const label = rangeLabel(view, anchor);
 
   return (
@@ -245,6 +255,7 @@ export default function AgendaView({
           onEdit={(a) => setModal({ mode: "edit", appointment: a })}
           onSlot={(d, t) => setModal({ mode: "new", initialDate: d, initialTime: t })}
           onPickDay={(d) => go({ view: "dia", data: d })}
+          onReschedule={reschedule}
         />
       )}
       {view === "mes" && (
@@ -461,6 +472,7 @@ function WeekGrid({
   onEdit,
   onSlot,
   onPickDay,
+  onReschedule,
 }: {
   anchor: Date;
   appointments: AppointmentRow[];
@@ -468,6 +480,7 @@ function WeekGrid({
   onEdit: (a: AppointmentRow) => void;
   onSlot: (date: string, time: string) => void;
   onPickDay: (date: string) => void;
+  onReschedule: (id: string, date: string, time: string) => void;
 }) {
   const days = weekDays(anchor);
   const hours = hourMarks();
@@ -506,7 +519,7 @@ function WeekGrid({
             ))}
           </div>
           {days.map((d) => (
-            <DayColumn key={d.toISOString()} day={d} appointments={appointments} blocks={blocks} onEdit={onEdit} onSlot={onSlot} />
+            <DayColumn key={d.toISOString()} day={d} appointments={appointments} blocks={blocks} onEdit={onEdit} onSlot={onSlot} onReschedule={onReschedule} />
           ))}
         </div>
       </div>
@@ -520,32 +533,57 @@ function DayColumn({
   blocks,
   onEdit,
   onSlot,
+  onReschedule,
 }: {
   day: Date;
   appointments: AppointmentRow[];
   blocks: BlockRow[];
   onEdit: (a: AppointmentRow) => void;
   onSlot: (date: string, time: string) => void;
+  onReschedule: (id: string, date: string, time: string) => void;
 }) {
+  const [dragOver, setDragOver] = useState(false);
   const dayAppts = appointments.filter((a) => isSameDay(new Date(a.startsAt), day));
   const dayBlocks = blocks
     .map((b) => ({ b, band: blockBandForDay(b, day) }))
     .filter((x): x is { b: BlockRow; band: { top: number; height: number } } => x.band !== null);
 
+  /** Converte a posição Y do cursor num horário "HH:MM" alinhado a 15 min. */
+  function timeAtY(clientY: number, el: HTMLElement): string {
+    const rect = el.getBoundingClientRect();
+    const y = clientY - rect.top;
+    let minutes = DAY_START_MIN + (y / HOUR_PX) * 60;
+    minutes = Math.min(DAY_END_MIN, Math.max(DAY_START_MIN, Math.round(minutes / 15) * 15));
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+
   function onColumnClick(e: React.MouseEvent<HTMLDivElement>) {
     // Só cria se clicou no fundo (não num bloco/atendimento).
     if ((e.target as HTMLElement).closest("[data-appt]")) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    let minutes = DAY_START_MIN + (y / HOUR_PX) * 60;
-    minutes = Math.max(DAY_START_MIN, Math.round(minutes / 15) * 15);
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    onSlot(toDateInput(day), `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`);
+    onSlot(toDateInput(day), timeAtY(e.clientY, e.currentTarget));
+  }
+
+  function onDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    const id = e.dataTransfer.getData("text/appointment-id");
+    if (id) onReschedule(id, toDateInput(day), timeAtY(e.clientY, e.currentTarget));
   }
 
   return (
-    <div className="relative border-l border-slate-100 dark:border-ink-800" style={{ height: gridHeight }} onClick={onColumnClick}>
+    <div
+      className={`relative border-l border-slate-100 dark:border-ink-800 ${dragOver ? "bg-brand-500/5" : ""}`}
+      style={{ height: gridHeight }}
+      onClick={onColumnClick}
+      onDragOver={(e) => {
+        e.preventDefault();
+        if (!dragOver) setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={onDrop}
+    >
       {/* Linhas de hora */}
       {hourMarks().map((h) => (
         <div key={h} className="absolute inset-x-0 border-t border-slate-50 dark:border-ink-800/60" style={{ top: ((h * 60 - DAY_START_MIN) / 60) * HOUR_PX }} />
@@ -565,17 +603,23 @@ function DayColumn({
         const start = minutesSinceMidnight(new Date(a.startsAt));
         const top = ((start - DAY_START_MIN) / 60) * HOUR_PX;
         const height = Math.max(18, (a.durationMin / 60) * HOUR_PX - 2);
+        const movable = a.status !== "atendido" && a.status !== "cancelado";
         return (
           <button
             key={a.id}
             data-appt
+            draggable={movable}
+            onDragStart={(e) => {
+              e.dataTransfer.setData("text/appointment-id", a.id);
+              e.dataTransfer.effectAllowed = "move";
+            }}
             onClick={(e) => {
               e.stopPropagation();
               onEdit(a);
             }}
-            className={`absolute inset-x-1 overflow-hidden rounded-md border-l-2 px-1.5 py-0.5 text-left text-[11px] leading-tight ${BLOCK_STYLE[a.status]}`}
+            className={`absolute inset-x-1 overflow-hidden rounded-md border-l-2 px-1.5 py-0.5 text-left text-[11px] leading-tight ${BLOCK_STYLE[a.status]} ${movable ? "cursor-grab active:cursor-grabbing" : ""}`}
             style={{ top: Math.max(0, top), height }}
-            title={`${a.startTime} ${a.customerName} — ${STATUS_LABEL[a.status]}`}
+            title={`${a.startTime} ${a.customerName} — ${STATUS_LABEL[a.status]}${movable ? " (arraste para remarcar)" : ""}`}
           >
             <span className="block font-semibold">{a.startTime}</span>
             <span className="block truncate">{a.customerName || "Sem nome"}</span>

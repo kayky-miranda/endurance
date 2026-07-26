@@ -10,6 +10,7 @@ import {
   setAppointmentStatus,
   deleteAppointment,
   createRecurringSeries,
+  rescheduleAppointment,
   type AppointmentRow,
 } from "@/lib/endurance/agenda";
 import {
@@ -263,4 +264,22 @@ export async function createSeriesAction(
   );
   revalidate(s.slug);
   return { ok: true, created: res.created, skipped: res.skipped };
+}
+
+/** Reagenda (arrastar): move só o horário, mantendo o resto. */
+export async function rescheduleAction(
+  id: string,
+  date: string,
+  time: string,
+): Promise<ActionResult> {
+  const gate = await requirePermission("agenda.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+  const newStart = combine(date, time);
+  if (isNaN(newStart.getTime())) return { ok: false, error: "Horário inválido." };
+  const res = await rescheduleAppointment(s.org, id, newStart);
+  if (!res.ok) return { ok: false, error: res.error ?? "Falha ao remarcar." };
+  await logActivity(s, "appointment.reschedule", `Remarcou atendimento para ${date} ${time}`, id);
+  revalidate(s.slug);
+  return { ok: true, id };
 }
