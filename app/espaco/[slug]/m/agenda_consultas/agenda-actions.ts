@@ -9,9 +9,15 @@ import {
   updateAppointment,
   setAppointmentStatus,
   deleteAppointment,
+  createRecurringSeries,
   type AppointmentRow,
 } from "@/lib/endurance/agenda";
-import { STATUS_LABEL, type AppointmentStatus } from "@/lib/endurance/scheduling";
+import {
+  STATUS_LABEL,
+  recurrenceDates,
+  isValidRecurrenceFreq,
+  type AppointmentStatus,
+} from "@/lib/endurance/scheduling";
 import { createBlock, deleteBlock } from "@/lib/endurance/schedule-blocks";
 import { blockKindLabel } from "@/lib/endurance/schedule-block";
 
@@ -213,4 +219,48 @@ export async function deleteBlockAction(id: string): Promise<ActionResult> {
   await logActivity(s, "agenda.block.delete", "Removeu um bloqueio de agenda", id);
   revalidate(s.slug);
   return { ok: true };
+}
+
+export type SeriesActionResult =
+  | { ok: true; created: number; skipped: { date: string; reason: string }[] }
+  | { ok: false; error: string };
+
+/** Cria uma série recorrente de atendimentos (semanal/quinzenal/mensal). */
+export async function createSeriesAction(
+  payload: FormPayload & { freq: string; count: number },
+): Promise<SeriesActionResult> {
+  const gate = await requirePermission("agenda.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+
+  if (!isValidRecurrenceFreq(payload.freq))
+    return { ok: false, error: "Frequência inválida." };
+
+  const start = combine(payload.date, payload.time);
+  if (isNaN(start.getTime())) return { ok: false, error: "Data e hora inválidas." };
+
+  const dates = recurrenceDates(start, payload.freq, Number(payload.count) || 1);
+  const res = await createRecurringSeries(
+    s.org,
+    { id: s.sub, name: s.name },
+    {
+      customerId: payload.customerId ?? null,
+      customerName: payload.customerName,
+      professionalId: payload.professionalId ?? null,
+      service: payload.service,
+      startsAt: start,
+      durationMin: Number(payload.durationMin) || 30,
+      price: Number(payload.price) || 0,
+      notes: payload.notes,
+    },
+    dates,
+  );
+  if (!res.ok) return res;
+  await logActivity(
+    s,
+    "appointment.series",
+    `Criou serie recorrente (${res.created}x) de ${payload.customerName || "cliente"}`,
+  );
+  revalidate(s.slug);
+  return { ok: true, created: res.created, skipped: res.skipped };
 }

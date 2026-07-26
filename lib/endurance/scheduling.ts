@@ -164,3 +164,49 @@ export function isSameDay(a: Date, b: Date): boolean {
 }
 
 export const WEEKDAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+// ---- Recorrência de agendamentos ----
+
+export type RecurrenceFreq = "semanal" | "quinzenal" | "mensal";
+
+export const RECURRENCE_FREQUENCIES: { value: RecurrenceFreq; label: string }[] = [
+  { value: "semanal", label: "Semanal" },
+  { value: "quinzenal", label: "Quinzenal" },
+  { value: "mensal", label: "Mensal" },
+];
+
+export function isValidRecurrenceFreq(s: string): s is RecurrenceFreq {
+  return s === "semanal" || s === "quinzenal" || s === "mensal";
+}
+
+/** Limite de segurança de ocorrências geradas por série. */
+export const MAX_RECURRENCE = 52;
+
+/**
+ * Datas de uma série recorrente a partir de `start` (inclusa), preservando a
+ * hora local. `count` ocorrências no total (clampado a [1, MAX_RECURRENCE]).
+ * Mensal soma meses de calendário (mantém o dia; meses curtos ajustam para o
+ * último dia via new Date, comportamento padrão do JS tratado explicitamente).
+ */
+export function recurrenceDates(
+  start: Date,
+  freq: RecurrenceFreq,
+  count: number,
+): Date[] {
+  const n = Math.min(MAX_RECURRENCE, Math.max(1, Math.floor(count)));
+  const out: Date[] = [];
+  const h = start.getHours();
+  const min = start.getMinutes();
+  for (let i = 0; i < n; i++) {
+    if (freq === "semanal") out.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i * 7, h, min));
+    else if (freq === "quinzenal") out.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i * 14, h, min));
+    else {
+      // Mensal: mantém o dia; se o mês não tiver o dia, cai no último dia dele.
+      const target = new Date(start.getFullYear(), start.getMonth() + i, 1, h, min);
+      const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+      target.setDate(Math.min(start.getDate(), lastDay));
+      out.push(target);
+    }
+  }
+  return out;
+}

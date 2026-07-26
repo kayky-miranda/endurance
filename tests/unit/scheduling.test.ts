@@ -12,6 +12,9 @@ import {
   monthGridDays,
   minutesSinceMidnight,
   isSameDay,
+  recurrenceDates,
+  isValidRecurrenceFreq,
+  MAX_RECURRENCE,
 } from "@/lib/endurance/scheduling";
 
 describe("isValidStatus", () => {
@@ -119,6 +122,43 @@ describe("monthGridDays", () => {
     expect(toDateInput(grid[0])).toBe("2026-05-31");
     expect(grid.some((d) => toDateInput(d) === "2026-06-01")).toBe(true);
     expect(grid.some((d) => toDateInput(d) === "2026-06-30")).toBe(true);
+  });
+});
+
+describe("recurrenceDates", () => {
+  const start = new Date(2026, 0, 5, 9, 30); // 05/01/2026 09:30 (segunda)
+
+  it("semanal soma 7 dias e preserva a hora", () => {
+    const d = recurrenceDates(start, "semanal", 3);
+    expect(d.map(toDateInput)).toEqual(["2026-01-05", "2026-01-12", "2026-01-19"]);
+    expect(d[1].getHours()).toBe(9);
+    expect(d[1].getMinutes()).toBe(30);
+  });
+
+  it("quinzenal soma 14 dias", () => {
+    const d = recurrenceDates(start, "quinzenal", 3);
+    expect(d.map(toDateInput)).toEqual(["2026-01-05", "2026-01-19", "2026-02-02"]);
+  });
+
+  it("mensal mantém o dia entre meses", () => {
+    const d = recurrenceDates(start, "mensal", 3);
+    expect(d.map(toDateInput)).toEqual(["2026-01-05", "2026-02-05", "2026-03-05"]);
+  });
+
+  it("mensal ajusta para o último dia em meses curtos", () => {
+    // 31/01 → fevereiro não tem 31 → 28/02/2026
+    const d = recurrenceDates(new Date(2026, 0, 31, 8, 0), "mensal", 2);
+    expect(toDateInput(d[1])).toBe("2026-02-28");
+  });
+
+  it("clampa a contagem em [1, MAX_RECURRENCE]", () => {
+    expect(recurrenceDates(start, "semanal", 0)).toHaveLength(1);
+    expect(recurrenceDates(start, "semanal", 999)).toHaveLength(MAX_RECURRENCE);
+  });
+
+  it("isValidRecurrenceFreq valida as frequências", () => {
+    expect(isValidRecurrenceFreq("mensal")).toBe(true);
+    expect(isValidRecurrenceFreq("anual")).toBe(false);
   });
 });
 

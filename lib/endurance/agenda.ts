@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { money } from "./money";
 import {
@@ -301,6 +302,77 @@ export async function createAppointment(
     select: { id: true },
   });
   return { ok: true, id: created.id };
+}
+
+export interface SeriesResult {
+  ok: true;
+  seriesId: string;
+  created: number;
+  skipped: { date: string; reason: string }[];
+}
+
+/**
+ * Cria uma SÉRIE recorrente de atendimentos. Resolve cliente/profissional uma
+ * vez, gera as datas e materializa cada ocorrência que NÃO conflita (com outro
+ * atendimento ou bloqueio). As que conflitam são puladas e reportadas — a série
+ * nunca cria em cima de um horário ocupado. Precisa de ao menos uma criada.
+ */
+export async function createRecurringSeries(
+  org: string,
+  actor: { id: string; name: string },
+  input: AppointmentInput,
+  dates: Date[],
+): Promise<SeriesResult | { ok: false; error: string }> {
+  const invalid = validate({ ...input, startsAt: dates[0] ?? input.startsAt });
+  if (invalid) return { ok: false, error: invalid };
+  if (dates.length === 0) return { ok: false, error: "Nenhuma data na série." };
+
+  const cust = await resolveCustomer(org, input.customerId, input.customerName);
+  if ("error" in cust) return { ok: false, error: cust.error };
+  const prof = await resolveProfessional(org, input.professionalId);
+  if ("error" in prof) return { ok: false, error: prof.error };
+
+  const seriesId = randomUUID();
+  const skipped: { date: string; reason: string }[] = [];
+  let created = 0;
+
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+  for (const startsAt of dates) {
+    const conflict = await findConflict(org, prof.id, startsAt, input.durationMin);
+    if (conflict) {
+      skipped.push({ date: fmt(startsAt), reason: `ocupado (${conflict.startTime})` });
+      continue;
+    }
+    const block = await findBlockConflict(org, prof.id, startsAt, input.durationMin);
+    if (block) {
+      skipped.push({ date: fmt(startsAt), reason: block.kindLabel.toLowerCase() });
+      continue;
+    }
+    await prisma.appointment.create({
+      data: {
+        organizationId: org,
+        customerId: cust.id,
+        customerName: cust.name,
+        professionalId: prof.id,
+        professional: prof.name,
+        service: (input.service ?? "").trim(),
+        startsAt,
+        durationMin: input.durationMin,
+        price: input.price ?? 0,
+        notes: (input.notes ?? "").trim(),
+        seriesId,
+        createdById: actor.id,
+        createdByName: actor.name,
+      },
+    });
+    created++;
+  }
+
+  if (created === 0)
+    return { ok: false, error: "Todos os horários da série estão ocupados ou bloqueados." };
+  return { ok: true, seriesId, created, skipped };
 }
 
 export async function updateAppointment(

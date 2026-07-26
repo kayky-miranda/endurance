@@ -913,6 +913,7 @@ model Appointment {
   status         String   @default("agendado") // agendado | confirmado | atendido | faltou | cancelado
   price          Decimal  @default(0) @db.Decimal(12, 2)
   notes          String   @default("")
+  seriesId       String? // agrupa ocorrências de um agendamento recorrente
   createdById    String?
   createdByName  String   @default("")
   createdAt      DateTime @default(now())
@@ -924,6 +925,7 @@ model Appointment {
   @@index([organizationId, startsAt])
   @@index([organizationId, status])
   @@index([customerId])
+  @@index([seriesId])
 }
 
 // Produto do catálogo de um negócio (módulo Cadastro de produtos / Estoque).
