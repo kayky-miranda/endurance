@@ -71,6 +71,8 @@ model Organization {
   studentProfiles  StudentProfile[]
   workoutPlans     WorkoutPlan[]
   assessments      PhysicalAssessment[]
+  patientProfiles  PatientProfile[]
+  patientFiles     PatientAttachment[]
 }
 
 // Configuração do cupom/recibo impresso (um por organização). O logo reaproveita
@@ -583,8 +585,79 @@ model Customer {
   studentProfile   StudentProfile?
   workoutPlans     WorkoutPlan[]
   assessments      PhysicalAssessment[]
+  patientProfile   PatientProfile?
+  patientFiles     PatientAttachment[]
 
   @@index([organizationId, deletedAt])
+}
+
+// Ficha clínica do paciente — dados 1:1 com o Customer (a pessoa). Mantém o
+// Customer genérico (nome/telefone/e-mail/CPF=document) e concentra aqui o que
+// é do prontuário/atendimento: identificação estendida, endereço, convênio e
+// responsável. Serve os nichos de saúde.
+model PatientProfile {
+  id             String    @id @default(cuid())
+  organizationId String
+  customerId     String    @unique
+
+  // Identificação
+  rg            String    @default("")
+  birthDate     DateTime?
+  sex           String    @default("") // M | F | outro
+  maritalStatus String    @default("")
+  profession    String    @default("")
+
+  // Endereço
+  cep        String @default("")
+  street     String @default("")
+  number     String @default("")
+  complement String @default("")
+  district   String @default("")
+  city       String @default("")
+  state      String @default("")
+
+  // Convênio
+  insuranceName     String    @default("")
+  insurancePlan     String    @default("")
+  insuranceCard     String    @default("")
+  insuranceValidity DateTime?
+
+  // Responsável (menores/dependentes)
+  responsibleName     String @default("")
+  responsiblePhone    String @default("")
+  responsibleRelation String @default("")
+
+  photoUrl String @default("") // link da foto (armazenamento externo)
+  notes    String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// Anexo/documento do paciente. Guardado como REFERÊNCIA (url) — o upload
+// binário depende de um storage (Vercel Blob/Drive) a ser plugado; enquanto
+// isso, aceita links (Drive/OneDrive) de forma funcional e sem gambiarra.
+model PatientAttachment {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String
+  name           String   @default("")
+  category       String   @default("documento") // documento | exame | foto | receita | outro
+  url            String   @default("")
+  notes          String   @default("")
+  uploadedById   String?
+  uploadedByName String   @default("")
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, customerId, createdAt])
 }
 
 // Ficha do aluno (academia) — dados de matrícula 1:1 com o Customer (a pessoa).

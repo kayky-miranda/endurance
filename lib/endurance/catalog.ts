@@ -393,6 +393,12 @@ export const MODULES: ModuleDef[] = [
 
   // ---- Nutricionista ----
   {
+    id: "pacientes",
+    label: "Cadastro de pacientes",
+    description: "Ficha completa: dados, convênio, endereço e documentos.",
+    scope: ["nutricionista", "psicologia", "clinica"],
+  },
+  {
     id: "prontuario",
     label: "Prontuário clínico",
     description: "Histórico clínico e anotações do paciente.",
@@ -471,6 +477,7 @@ const MODULE_CATEGORY: Record<string, ModuleCategory> = {
   comandas: "Operação",
   alunos: "Operação",
   treinos: "Operação",
+  pacientes: "Operação",
   prontuario: "Operação",
   anamnese: "Operação",
   avaliacao: "Operação",

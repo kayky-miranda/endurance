@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
+  UserRound,
   LogOut,
   Search,
   Sun,
@@ -93,6 +94,7 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   estoque_produtos: Boxes,
   fidelidade: Star,
   lembrete_whatsapp: MessageCircle,
+  pacientes: UserRound,
   prontuario: ClipboardList,
   planos_alimentares: Salad,
   agenda_consultas: CalendarDays,
