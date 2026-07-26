@@ -68,6 +68,9 @@ model Organization {
   patientMetrics   PatientMetric[]
   mealPlans        MealPlan[]
   anamneses        Anamnese[]
+  studentProfiles  StudentProfile[]
+  workoutPlans     WorkoutPlan[]
+  assessments      PhysicalAssessment[]
 }
 
 // Configuração do cupom/recibo impresso (um por organização). O logo reaproveita
@@ -577,8 +580,101 @@ model Customer {
   metrics          PatientMetric[]
   mealPlans        MealPlan[]
   anamneses        Anamnese[]
+  studentProfile   StudentProfile?
+  workoutPlans     WorkoutPlan[]
+  assessments      PhysicalAssessment[]
 
   @@index([organizationId, deletedAt])
+}
+
+// Ficha do aluno (academia) — dados de matrícula 1:1 com o Customer (a pessoa).
+// Separar em StudentProfile mantém o Customer genérico (serve todos os nichos)
+// e concentra aqui o que é de academia: plano, situação, mensalidade.
+model StudentProfile {
+  id             String    @id @default(cuid())
+  organizationId String
+  customerId     String    @unique
+  status         String    @default("ativo") // ativo | inativo | trancado
+  plan           String    @default("") // modalidade/plano (texto livre)
+  monthlyFee     Decimal   @default(0) @db.Decimal(12, 2)
+  goal           String    @default("")
+  notes          String    @default("")
+  birthDate      DateTime?
+  enrolledAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+}
+
+// Ficha de treino do aluno — grupos de exercícios (A/B/C…). Exclusão LÓGICA
+// preserva o histórico de treinos anteriores.
+model WorkoutPlan {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String
+  title          String   @default("")
+  goal           String   @default("")
+  active         Boolean  @default(true)
+  createdById    String?
+  createdByName  String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items        WorkoutItem[]
+
+  @@index([organizationId, customerId, deletedAt])
+}
+
+model WorkoutItem {
+  id       String @id @default(cuid())
+  planId   String
+  group    String // divisão do treino: "A", "B"… (ou nome livre)
+  exercise String @default("")
+  sets     String @default("") // séries x repetições (texto: "4x12")
+  load     String @default("") // carga (texto: "20kg")
+  rest     String @default("") // descanso
+  notes    String @default("")
+  position Int    @default(0)
+
+  plan WorkoutPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, position])
+}
+
+// Avaliação física do aluno — sessão datada com medidas antropométricas.
+// Campos fixos (comuns em academia) + observações; o progresso vem de comparar
+// avaliações ao longo do tempo.
+model PhysicalAssessment {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String
+  assessedAt     DateTime
+  weightKg       Decimal? @db.Decimal(6, 2)
+  heightCm       Decimal? @db.Decimal(6, 2)
+  bodyFatPct     Decimal? @db.Decimal(5, 2)
+  muscleMassKg   Decimal? @db.Decimal(6, 2)
+  waistCm        Decimal? @db.Decimal(6, 2)
+  hipCm          Decimal? @db.Decimal(6, 2)
+  chestCm        Decimal? @db.Decimal(6, 2)
+  armCm          Decimal? @db.Decimal(6, 2)
+  thighCm        Decimal? @db.Decimal(6, 2)
+  restingHr      Int?
+  notes          String   @default("")
+  createdById    String?
+  createdByName  String   @default("")
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, customerId, assessedAt])
 }
 
 // Anamnese: questionário inicial do paciente (histórico, queixas, hábitos).

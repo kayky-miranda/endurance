@@ -83,6 +83,7 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   mensalidades: CreditCard,
   planos: Layers,
   equipamentos: Dumbbell,
+  treinos: Dumbbell,
   avaliacao: ClipboardList,
   qr_acesso: QrCode,
   chatbot_cobranca: MessageCircle,

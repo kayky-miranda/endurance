@@ -33,7 +33,10 @@ export type PermissionId =
   | "prontuario.manage"
   | "evolucao.manage"
   | "planos.manage"
-  | "anamnese.manage";
+  | "anamnese.manage"
+  | "alunos.manage"
+  | "treinos.manage"
+  | "avaliacao.manage";
 
 export interface PermissionDef {
   id: PermissionId;
@@ -93,6 +96,24 @@ export const PERMISSIONS: PermissionDef[] = [
     id: "anamnese.manage",
     label: "Anamnese",
     description: "Preencher e consultar o questionário inicial do paciente.",
+    group: "Operação",
+  },
+  {
+    id: "alunos.manage",
+    label: "Cadastro de alunos",
+    description: "Cadastrar alunos, plano, mensalidade e situação.",
+    group: "Operação",
+  },
+  {
+    id: "treinos.manage",
+    label: "Fichas de treino",
+    description: "Montar e ajustar treinos por divisão do aluno.",
+    group: "Operação",
+  },
+  {
+    id: "avaliacao.manage",
+    label: "Avaliação física",
+    description: "Registrar avaliações físicas e acompanhar a evolução.",
     group: "Operação",
   },
   // ---- Catálogo & Estoque ----
@@ -261,6 +282,9 @@ export const PROFILES: ProfileDef[] = [
       "evolucao.manage",
       "planos.manage",
       "anamnese.manage",
+      "alunos.manage",
+      "treinos.manage",
+      "avaliacao.manage",
       "sales.view_all",
       "dashboard.view",
       "pdv.sell",
@@ -397,6 +421,9 @@ export const MODULE_PERMISSION: Record<string, PermissionId> = {
   evolucao: "evolucao.manage",
   planos_alimentares: "planos.manage",
   anamnese: "anamnese.manage",
+  alunos: "alunos.manage",
+  treinos: "treinos.manage",
+  avaliacao: "avaliacao.manage",
   // "agenda" (agendamento online do salão) ainda é placeholder — segue aberto
   // até ganhar tela própria; então será mapeado para a permissão de agenda.
   fornecedores: "suppliers.manage",

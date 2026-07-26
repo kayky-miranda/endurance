@@ -329,6 +329,12 @@ export const MODULES: ModuleDef[] = [
     scope: ["academia"],
   },
   {
+    id: "treinos",
+    label: "Fichas de treino",
+    description: "Montagem de treinos por divisão (A/B/C) para o aluno.",
+    scope: ["academia"],
+  },
+  {
     id: "avaliacao",
     label: "Avaliação física",
     description: "Registro de medidas e evolução do aluno.",
@@ -464,6 +470,7 @@ const MODULE_CATEGORY: Record<string, ModuleCategory> = {
   agenda_consultas: "Operação",
   comandas: "Operação",
   alunos: "Operação",
+  treinos: "Operação",
   prontuario: "Operação",
   anamnese: "Operação",
   avaliacao: "Operação",
