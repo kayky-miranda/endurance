@@ -4,6 +4,7 @@ import { ArrowLeft, Phone, Mail, IdCard } from "lucide-react";
 import { getPatientRecord } from "@/lib/endurance/prontuario";
 import { listPrescriptions } from "@/lib/endurance/prescriptions";
 import { listCertificates } from "@/lib/endurance/certificates";
+import { listTemplates } from "@/lib/endurance/document-templates";
 import { listProfessionals } from "@/lib/endurance/agenda";
 import { loadModule, DeniedModule } from "../../module-kit";
 import RecordClient from "./record-client";
@@ -25,13 +26,14 @@ export default async function PatientRecordPage({
     : null;
   if (!record) notFound();
 
-  const [prescriptions, certificates, professionals] = session
+  const [prescriptions, certificates, noteTemplates, professionals] = session
     ? await Promise.all([
         listPrescriptions(session.org, customerId),
         listCertificates(session.org, customerId),
+        listTemplates(session.org, { type: "nota" }),
         listProfessionals(session.org),
       ])
-    : [[], [], []];
+    : [[], [], [], []];
 
   return (
     <div className="space-y-6">
@@ -63,7 +65,7 @@ export default async function PatientRecordPage({
         </div>
       </div>
 
-      <RecordClient slug={slug} customerId={record.id} notes={record.notes} />
+      <RecordClient slug={slug} customerId={record.id} notes={record.notes} templates={noteTemplates} />
 
       <PrescriptionsPanel
         slug={slug}

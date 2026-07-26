@@ -77,6 +77,26 @@ model Organization {
   waitlist         WaitlistEntry[]
   prescriptions    Prescription[]
   certificates     Certificate[]
+  docTemplates     DocumentTemplate[]
+}
+
+// Modelo pronto de documento/texto clínico reutilizável (anotação, receita,
+// atestado ou geral). Acelera o preenchimento do prontuário. Exclusão LÓGICA.
+model DocumentTemplate {
+  id             String   @id @default(cuid())
+  organizationId String
+  type           String   @default("nota") // nota | receita | atestado | geral
+  title          String   @default("")
+  content        String   @default("")
+  createdById    String?
+  createdByName  String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, type, deletedAt])
 }
 
 // Atestado médico — documento imprimível. Comparecimento, afastamento (com nº

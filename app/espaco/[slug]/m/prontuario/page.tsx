@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { FileText, ChevronRight, ShieldCheck } from "lucide-react";
 import { listPatients } from "@/lib/endurance/prontuario";
+import { listTemplates } from "@/lib/endurance/document-templates";
 import { loadModule, DeniedModule, ModuleHeader, EmptyCard } from "../module-kit";
 import Pager from "../pager";
 import PatientSearch from "./patient-search";
+import TemplatesManager from "./templates-manager";
 
 /**
  * Prontuário clínico — lista de pacientes com registro e busca para abrir/
@@ -21,9 +23,12 @@ export default async function ProntuarioPage({
   const { mod, session, denied } = await loadModule(slug, "prontuario");
   if (denied) return <DeniedModule slug={slug} mod={mod} />;
 
-  const data = session
-    ? await listPatients(session.org, { page: sp.pagina })
-    : null;
+  const [data, templates] = session
+    ? await Promise.all([
+        listPatients(session.org, { page: sp.pagina }),
+        listTemplates(session.org),
+      ])
+    : [null, []];
 
   return (
     <div className="space-y-6">
@@ -39,6 +44,8 @@ export default async function ProntuarioPage({
       </div>
 
       <PatientSearch slug={slug} />
+
+      <TemplatesManager templates={templates} />
 
       {!data || data.total === 0 ? (
         <EmptyCard>

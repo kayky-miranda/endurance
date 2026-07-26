@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useModalA11y } from "../../../use-modal-a11y";
 import type { ClinicalNoteRow } from "@/lib/endurance/prontuario";
+import type { TemplateRow } from "@/lib/endurance/document-templates";
 import {
   createNoteAction,
   updateNoteAction,
@@ -25,10 +26,12 @@ export default function RecordClient({
   slug,
   customerId,
   notes,
+  templates = [],
 }: {
   slug: string;
   customerId: string;
   notes: ClinicalNoteRow[];
+  templates?: TemplateRow[];
 }) {
   const router = useRouter();
   const [busy, startTransition] = useTransition();
@@ -152,6 +155,7 @@ export default function RecordClient({
         <NoteModal
           customerId={customerId}
           note={editing}
+          templates={templates}
           onClose={() => {
             setCreating(false);
             setEditing(null);
@@ -170,11 +174,13 @@ export default function RecordClient({
 function NoteModal({
   customerId,
   note,
+  templates,
   onClose,
   onSaved,
 }: {
   customerId: string;
   note: ClinicalNoteRow | null;
+  templates: TemplateRow[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -183,6 +189,12 @@ function NoteModal({
   const [error, setError] = useState("");
   const [title, setTitle] = useState(note?.title ?? "");
   const [content, setContent] = useState(note?.content ?? "");
+
+  function insertTemplate(id: string) {
+    const t = templates.find((x) => x.id === id);
+    if (!t) return;
+    setContent((prev) => (prev.trim() ? `${prev}\n\n${t.content}` : t.content));
+  }
 
   function submit() {
     setError("");
@@ -231,7 +243,25 @@ function NoteModal({
             />
           </label>
           <label className="block text-xs font-medium text-slate-500">
-            Anotação
+            <span className="flex items-center justify-between gap-2">
+              Anotação
+              {templates.length > 0 && (
+                <select
+                  aria-label="Inserir modelo"
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) insertTemplate(e.target.value);
+                    e.target.value = "";
+                  }}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-normal dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+                >
+                  <option value="">+ inserir modelo</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>{t.title}</option>
+                  ))}
+                </select>
+              )}
+            </span>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
