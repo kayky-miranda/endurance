@@ -23,6 +23,7 @@ import {
   updateNoteAction,
   deleteNoteAction,
   summarizeRecordAction,
+  suggestConductAction,
 } from "../prontuario-actions";
 
 /** Timeline do prontuário + editor de anotações (criar/editar/excluir). */
@@ -247,6 +248,8 @@ function NoteModal({
   const [cid, setCid] = useState(note?.cid ?? "");
   const [cidDescription, setCidDescription] = useState(note?.cidDescription ?? "");
   const [suggestions, setSuggestions] = useState<CidCode[]>([]);
+  const [conductBusy, startConduct] = useTransition();
+  const [conduct, setConduct] = useState<{ text: string; source: "ai" | "unavailable" } | null>(null);
 
   function insertTemplate(id: string) {
     const t = templates.find((x) => x.id === id);
@@ -256,6 +259,13 @@ function NoteModal({
 
   function suggestCid() {
     setSuggestions(suggestCidFromText(`${title} ${content}`));
+  }
+
+  function askConduct() {
+    startConduct(async () => {
+      const res = await suggestConductAction({ text: `${title}\n${content}`.trim(), cid, cidDescription });
+      if (res.ok) setConduct({ text: res.text, source: res.source });
+    });
   }
 
   function submit() {
@@ -366,6 +376,38 @@ function NoteModal({
                   </button>
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* Apoio à decisão (IA opcional) */}
+          <div className="rounded-xl border border-slate-200 p-3 dark:border-ink-700">
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                <Sparkles className="h-3.5 w-3.5 text-brand-500" /> Apoio à decisão
+              </span>
+              <button
+                type="button"
+                onClick={askConduct}
+                disabled={conductBusy}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-brand-400 hover:text-brand-500 disabled:opacity-40 dark:border-ink-600 dark:text-slate-300"
+              >
+                {conductBusy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Sugerir conduta / exames
+              </button>
+            </div>
+            {conduct && (
+              conduct.source === "unavailable" ? (
+                <p className="mt-2 text-[11px] text-slate-400">
+                  Sugestões com IA precisam de uma chave (GEMINI_API_KEY) configurada.
+                </p>
+              ) : (
+                <div className="mt-2">
+                  <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">{conduct.text}</p>
+                  <p className="mt-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+                    Sugestão gerada por IA — apoio à decisão, não substitui o julgamento do profissional.
+                  </p>
+                </div>
+              )
             )}
           </div>
 

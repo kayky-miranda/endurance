@@ -12,6 +12,7 @@ import {
   getPatientRecord,
 } from "@/lib/endurance/prontuario";
 import { summarizeClinicalNotes } from "@/lib/endurance/clinical-summary";
+import { suggestConduct } from "@/lib/endurance/clinical-suggestions";
 
 /**
  * Ações do Prontuário clínico. Tudo abre com o gate `prontuario.manage` — é
@@ -156,5 +157,34 @@ export async function summarizeRecordAction(
     })),
   );
   await logActivity(s, "prontuario.summary", "Gerou resumo do prontuário", customerId);
+  return { ok: true, text: res.text, source: res.source };
+}
+
+export type SuggestionResult =
+  | { ok: true; text: string; source: "ai" | "unavailable" }
+  | { ok: false; error: string };
+
+/**
+ * Sugestão de conduta/exames a partir do quadro digitado + CID (apoio à decisão,
+ * IA opcional). Gate prontuario.manage + rate limit. O texto vem do RASCUNHO do
+ * cliente; nada é gravado — é aporte para o profissional avaliar.
+ */
+export async function suggestConductAction(input: {
+  text: string;
+  cid: string;
+  cidDescription: string;
+}): Promise<SuggestionResult> {
+  const gate = await requirePermission("prontuario.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+  if (!(await hit(`prontuario:suggest:${s.sub}`, 15, 60_000)).ok)
+    return { ok: false, error: "Muitas sugestões seguidas. Aguarde um instante." };
+
+  const res = await suggestConduct({
+    text: (input.text ?? "").slice(0, 4000),
+    cid: (input.cid ?? "").trim(),
+    cidDescription: (input.cidDescription ?? "").trim(),
+  });
+  await logActivity(s, "prontuario.suggest", "Solicitou sugestão de conduta (IA)");
   return { ok: true, text: res.text, source: res.source };
 }
