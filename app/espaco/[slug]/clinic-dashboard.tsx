@@ -16,6 +16,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { getClinicDashboard } from "@/lib/endurance/clinic-dashboard";
 import { getCommissionReport } from "@/lib/endurance/commissions";
+import { getNoShowRisk } from "@/lib/endurance/no-show";
 import { getSession, sessionHasPermission } from "@/lib/auth";
 import { STATUS_LABEL, type AppointmentStatus } from "@/lib/endurance/scheduling";
 import { KpiCard } from "./m/module-kit";
@@ -55,10 +56,11 @@ export default async function ClinicDashboard({
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-  const [d, session, commissions] = await Promise.all([
+  const [d, session, commissions, noShowRisk] = await Promise.all([
     getClinicDashboard(orgId, { periodDays: 30 }),
     getSession(),
     getCommissionReport(orgId, monthStart, nextMonth),
+    getNoShowRisk(orgId),
   ]);
   const canConfigCommission = session ? sessionHasPermission(session, "settings.general") : false;
   const monthLabel = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
@@ -128,6 +130,32 @@ export default async function ClinicDashboard({
           tone="rose"
         />
       </div>
+
+      {/* Risco de falta — pacientes de hoje com histórico alto de faltas */}
+      {noShowRisk.length > 0 && (
+        <section className="rounded-2xl border border-amber-200 bg-amber-500/5 p-4 dark:border-amber-500/20">
+          <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-amber-700 dark:text-amber-300">
+            <AlertTriangle className="h-4 w-4" /> Risco de falta hoje
+            <span className="text-xs font-normal text-amber-600/80">
+              · confirme estes pacientes
+            </span>
+          </h2>
+          <ul className="divide-y divide-amber-200/50 dark:divide-amber-500/10">
+            {noShowRisk.slice(0, 6).map((r) => (
+              <li key={r.appointmentId} className="flex items-center gap-3 py-1.5 text-sm">
+                <span className="w-12 shrink-0 font-semibold text-slate-700 dark:text-slate-200">{r.time}</span>
+                <span className="min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200">{r.patient}</span>
+                {r.professional && (
+                  <span className="hidden text-xs text-slate-400 sm:inline">{r.professional}</span>
+                )}
+                <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                  {Math.round(r.rate * 100)}% faltas ({r.pastFaltas}/{r.pastFinalized})
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Próximas consultas */}
