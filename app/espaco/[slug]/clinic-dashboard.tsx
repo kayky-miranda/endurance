@@ -15,15 +15,10 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getClinicDashboard } from "@/lib/endurance/clinic-dashboard";
-import { getCommissionReport } from "@/lib/endurance/commissions";
 import { getNoShowRisk } from "@/lib/endurance/no-show";
-import { getProductivityReport } from "@/lib/endurance/productivity";
-import { getSession, sessionHasPermission } from "@/lib/auth";
 import { STATUS_LABEL, type AppointmentStatus } from "@/lib/endurance/scheduling";
 import { KpiCard } from "./m/module-kit";
 import { AppointmentsByDayChart, StatusMixChart } from "./m/charts-lazy";
-import CommissionsPanel from "./commissions-panel";
-import ProductivityPanel from "./productivity-panel";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -54,19 +49,10 @@ export default async function ClinicDashboard({
   orgId: string;
   slug: string;
 }) {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
-  const [d, session, commissions, noShowRisk, productivity] = await Promise.all([
+  const [d, noShowRisk] = await Promise.all([
     getClinicDashboard(orgId, { periodDays: 30 }),
-    getSession(),
-    getCommissionReport(orgId, monthStart, nextMonth),
     getNoShowRisk(orgId),
-    getProductivityReport(orgId, monthStart, nextMonth),
   ]);
-  const canConfigCommission = session ? sessionHasPermission(session, "settings.general") : false;
-  const monthLabel = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   return (
     <div className="space-y-6">
@@ -250,9 +236,22 @@ export default async function ClinicDashboard({
         </div>
       </div>
 
-      {/* Produtividade e comissões dos profissionais (mês) */}
-      <ProductivityPanel report={productivity} periodLabel={monthLabel} />
-      <CommissionsPanel report={commissions} canConfig={canConfigCommission} periodLabel={monthLabel} />
+      {/* Análises completas (produtividade, comissões) vivem em página própria
+          para manter o home leve e rápido. */}
+      <Link
+        href={`/espaco/${slug}/m/relatorios_clinica`}
+        className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm shadow-sm transition hover:border-brand-500/40 hover:shadow-md dark:border-ink-700 dark:bg-ink-900"
+      >
+        <span className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-100">
+          <TrendingUp className="h-4 w-4 text-brand-500" /> Relatórios da clínica
+          <span className="hidden text-xs font-normal text-slate-400 sm:inline">
+            · produtividade, comissões e indicadores por período
+          </span>
+        </span>
+        <span className="inline-flex items-center gap-1 text-brand-500">
+          abrir <ArrowRight className="h-3.5 w-3.5" />
+        </span>
+      </Link>
     </div>
   );
 }

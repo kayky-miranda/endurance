@@ -10,11 +10,13 @@ const brl = (n: number) =>
 export default function ProductivityPanel({
   report,
   periodLabel,
+  defaultOpen = false,
 }: {
   report: ProductivityReport;
   periodLabel: string;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   if (report.rows.length === 0) return null;
 
   return (

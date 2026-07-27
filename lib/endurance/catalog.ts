@@ -440,6 +440,12 @@ export const MODULES: ModuleDef[] = [
     description: "Recibo de atendimento para o paciente.",
     scope: ["nutricionista", "psicologia", "clinica"],
   },
+  {
+    id: "relatorios_clinica",
+    label: "Relatórios da clínica",
+    description: "Produtividade, comissões e indicadores por período.",
+    scope: ["nutricionista", "psicologia", "clinica"],
+  },
 ];
 
 const MODULE_BY_ID = new Map(MODULES.map((m) => [m.id, m]));
@@ -466,6 +472,7 @@ export type ModuleCategory = (typeof MODULE_CATEGORIES)[number];
 const MODULE_CATEGORY: Record<string, ModuleCategory> = {
   // Dashboards
   relatorios: "Dashboards",
+  relatorios_clinica: "Dashboards",
   marketing: "Operação",
   // Operação
   pdv: "Operação",

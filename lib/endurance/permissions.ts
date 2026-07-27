@@ -413,6 +413,7 @@ export function effectivePermissions(
 // ---------------------------------------------------------------------------
 export const MODULE_PERMISSION: Record<string, PermissionId> = {
   relatorios: "finance.reports",
+  relatorios_clinica: "finance.reports",
   financeiro: "finance.reports",
   produtos: "products.manage",
   precificacao: "products.manage",

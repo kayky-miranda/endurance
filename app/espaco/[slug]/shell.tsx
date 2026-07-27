@@ -20,6 +20,7 @@ import {
   Wallet,
   Bell,
   BarChart3,
+  Activity,
   Boxes,
   ClipboardCheck,
   ArrowLeftRight,
@@ -102,6 +103,7 @@ const MODULE_ICONS: Record<string, LucideIcon> = {
   anamnese: FileText,
   confirmacao_auto: BadgeCheck,
   recibo: Receipt,
+  relatorios_clinica: Activity,
   // Suprimentos / Compras
   compras: BarChart3,
   solicitacoes: ClipboardList,

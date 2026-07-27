@@ -23,13 +23,15 @@ export default function CommissionsPanel({
   report,
   canConfig,
   periodLabel,
+  defaultOpen = false,
 }: {
   report: CommissionReport;
   canConfig: boolean;
   periodLabel: string;
+  defaultOpen?: boolean;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [busy, startTransition] = useTransition();
   const [editing, setEditing] = useState<string | null>(null);
   const [value, setValue] = useState("");
