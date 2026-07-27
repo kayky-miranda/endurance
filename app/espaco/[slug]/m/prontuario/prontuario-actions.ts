@@ -3,8 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
+import { hit } from "@/lib/rate-limit";
 import { logActivity } from "@/lib/endurance/activity-log";
-import { createNote, updateNote, deleteNote } from "@/lib/endurance/prontuario";
+import {
+  createNote,
+  updateNote,
+  deleteNote,
+  getPatientRecord,
+} from "@/lib/endurance/prontuario";
+import { summarizeClinicalNotes } from "@/lib/endurance/clinical-summary";
 
 /**
  * Ações do Prontuário clínico. Tudo abre com o gate `prontuario.manage` — é
@@ -116,4 +123,38 @@ export async function searchPatientsAction(term: string): Promise<PatientHit[]> 
     take: 8,
   });
   return rows.map((r) => ({ id: r.id, name: r.name, phone: r.phone }));
+}
+
+export type SummaryResult =
+  | { ok: true; text: string; source: "ai" | "heuristic" }
+  | { ok: false; error: string };
+
+/**
+ * Resumo das anotações clínicas do paciente (IA opcional + fallback heurístico).
+ * Gate prontuario.manage; rate limit por usuário (é chamada potencialmente paga).
+ */
+export async function summarizeRecordAction(
+  customerId: string,
+): Promise<SummaryResult> {
+  const gate = await requirePermission("prontuario.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+  if (!(await hit(`prontuario:summary:${s.sub}`, 12, 60_000)).ok)
+    return { ok: false, error: "Muitos resumos seguidos. Aguarde um instante." };
+
+  const record = await getPatientRecord(s.org, customerId);
+  if (!record) return { ok: false, error: "Paciente não encontrado." };
+
+  const res = await summarizeClinicalNotes(
+    record.name,
+    record.notes.map((n) => ({
+      createdAt: n.createdAt,
+      title: n.title,
+      content: n.content,
+      cid: n.cid,
+      cidDescription: n.cidDescription,
+    })),
+  );
+  await logActivity(s, "prontuario.summary", "Gerou resumo do prontuário", customerId);
+  return { ok: true, text: res.text, source: res.source };
 }
