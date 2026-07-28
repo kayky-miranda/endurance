@@ -13,6 +13,7 @@ import {
 } from "@/lib/endurance/prontuario";
 import { summarizeClinicalNotes } from "@/lib/endurance/clinical-summary";
 import { suggestConduct } from "@/lib/endurance/clinical-suggestions";
+import { proofreadText, type ProofreadSource } from "@/lib/endurance/text-proofreading";
 
 /**
  * Ações do Prontuário clínico. Tudo abre com o gate `prontuario.manage` — é
@@ -186,5 +187,27 @@ export async function suggestConductAction(input: {
     cidDescription: (input.cidDescription ?? "").trim(),
   });
   await logActivity(s, "prontuario.suggest", "Solicitou sugestão de conduta (IA)");
+  return { ok: true, text: res.text, source: res.source };
+}
+
+export type ProofreadResult =
+  | { ok: true; text: string; source: ProofreadSource }
+  | { ok: false; error: string };
+
+/**
+ * Correção ortográfica/gramatical do rascunho da anotação (IA opcional). Gate
+ * prontuario.manage + rate limit. Só corrige a escrita — nada é gravado aqui; o
+ * profissional revê e aplica no editor. Sem chave de IA, retorna "unavailable".
+ */
+export async function proofreadNoteAction(
+  text: string,
+): Promise<ProofreadResult> {
+  const gate = await requirePermission("prontuario.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+  if (!(await hit(`prontuario:proofread:${s.sub}`, 20, 60_000)).ok)
+    return { ok: false, error: "Muitas correções seguidas. Aguarde um instante." };
+
+  const res = await proofreadText((text ?? "").slice(0, 6000));
   return { ok: true, text: res.text, source: res.source };
 }

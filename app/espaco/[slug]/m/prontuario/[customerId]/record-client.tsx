@@ -12,6 +12,8 @@ import {
   Clock,
   X,
   Sparkles,
+  SpellCheck,
+  Undo2,
 } from "lucide-react";
 import { useModalA11y } from "../../../use-modal-a11y";
 import type { ClinicalNoteRow } from "@/lib/endurance/prontuario";
@@ -24,6 +26,7 @@ import {
   deleteNoteAction,
   summarizeRecordAction,
   suggestConductAction,
+  proofreadNoteAction,
 } from "../prontuario-actions";
 
 /** Timeline do prontuário + editor de anotações (criar/editar/excluir). */
@@ -250,6 +253,10 @@ function NoteModal({
   const [suggestions, setSuggestions] = useState<CidCode[]>([]);
   const [conductBusy, startConduct] = useTransition();
   const [conduct, setConduct] = useState<{ text: string; source: "ai" | "unavailable" } | null>(null);
+  const [proofBusy, startProof] = useTransition();
+  const [proof, setProof] = useState<
+    { source: "ai" | "unchanged" | "unavailable"; previous?: string } | null
+  >(null);
 
   function insertTemplate(id: string) {
     const t = templates.find((x) => x.id === id);
@@ -266,6 +273,29 @@ function NoteModal({
       const res = await suggestConductAction({ text: `${title}\n${content}`.trim(), cid, cidDescription });
       if (res.ok) setConduct({ text: res.text, source: res.source });
     });
+  }
+
+  function proofread() {
+    if (!content.trim()) return;
+    setError("");
+    startProof(async () => {
+      const res = await proofreadNoteAction(content);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      if (res.source === "ai") {
+        setProof({ source: "ai", previous: content });
+        setContent(res.text);
+      } else {
+        setProof({ source: res.source });
+      }
+    });
+  }
+
+  function undoProof() {
+    if (proof?.previous !== undefined) setContent(proof.previous);
+    setProof(null);
   }
 
   function submit() {
@@ -317,30 +347,72 @@ function NoteModal({
           <label className="block text-xs font-medium text-slate-500">
             <span className="flex items-center justify-between gap-2">
               Anotação
-              {templates.length > 0 && (
-                <select
-                  aria-label="Inserir modelo"
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value) insertTemplate(e.target.value);
-                    e.target.value = "";
-                  }}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-normal dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+              <span className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={proofread}
+                  disabled={proofBusy || !content.trim()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-normal text-slate-600 hover:border-brand-400 hover:text-brand-500 disabled:opacity-40 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-300"
                 >
-                  <option value="">+ inserir modelo</option>
-                  {templates.map((t) => (
-                    <option key={t.id} value={t.id}>{t.title}</option>
-                  ))}
-                </select>
-              )}
+                  {proofBusy ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <SpellCheck className="h-3 w-3" />
+                  )}
+                  Corrigir texto
+                </button>
+                {templates.length > 0 && (
+                  <select
+                    aria-label="Inserir modelo"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) insertTemplate(e.target.value);
+                      e.target.value = "";
+                    }}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-normal dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
+                  >
+                    <option value="">+ inserir modelo</option>
+                    {templates.map((t) => (
+                      <option key={t.id} value={t.id}>{t.title}</option>
+                    ))}
+                  </select>
+                )}
+              </span>
             </span>
             <textarea
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={(e) => {
+                setContent(e.target.value);
+                if (proof) setProof(null);
+              }}
               rows={8}
               placeholder="Evolução, conduta, queixas, orientações…"
               className="mt-1 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
             />
+            {proof && (
+              <span className="mt-1 flex items-center gap-2 text-[11px] font-normal">
+                {proof.source === "ai" ? (
+                  <>
+                    <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                      <SpellCheck className="h-3 w-3" /> Texto corrigido pela IA — revise antes de salvar.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={undoProof}
+                      className="inline-flex items-center gap-1 text-slate-500 hover:text-brand-500 dark:text-slate-400"
+                    >
+                      <Undo2 className="h-3 w-3" /> desfazer
+                    </button>
+                  </>
+                ) : proof.source === "unchanged" ? (
+                  <span className="text-slate-400">Nenhuma correção necessária.</span>
+                ) : (
+                  <span className="text-slate-400">
+                    A correção com IA precisa de uma chave (GEMINI_API_KEY) configurada.
+                  </span>
+                )}
+              </span>
+            )}
           </label>
 
           {/* CID + sugestão automática a partir do texto */}
