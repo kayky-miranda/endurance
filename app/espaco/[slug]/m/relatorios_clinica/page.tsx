@@ -7,6 +7,7 @@ import { loadModule, DeniedModule, ModuleHeader, KpiCard, EmptyCard } from "../m
 import { PeriodFilter } from "../period-filter";
 import ProductivityPanel from "../../productivity-panel";
 import CommissionsPanel from "../../commissions-panel";
+import ClinicInsightsPanel from "./clinic-insights-panel";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -101,6 +102,8 @@ export default async function RelatoriosClinicaPage({
               from="from-amber-500"
             />
           </div>
+
+          <ClinicInsightsPanel days={days} />
 
           <ProductivityPanel report={productivity} periodLabel={label} defaultOpen />
           <CommissionsPanel
