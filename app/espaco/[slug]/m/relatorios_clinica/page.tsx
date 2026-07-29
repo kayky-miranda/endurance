@@ -1,4 +1,5 @@
-import { CalendarCheck2, DollarSign, Percent, TrendingUp } from "lucide-react";
+import Link from "next/link";
+import { CalendarCheck2, DollarSign, Percent, TrendingUp, Printer } from "lucide-react";
 import { getProductivityReport } from "@/lib/endurance/productivity";
 import { getCommissionReport } from "@/lib/endurance/commissions";
 import { sessionHasPermission } from "@/lib/auth";
@@ -62,7 +63,19 @@ export default async function RelatoriosClinicaPage({
         slug={slug}
         label={mod.label}
         description={mod.description}
-        action={<PeriodFilter days={days} />}
+        action={
+          <div className="flex items-center gap-2">
+            <PeriodFilter days={days} />
+            {hasData && (
+              <Link
+                href={`/espaco/${slug}/relatorio/clinica${days === 30 ? "" : `?dias=${days}`}`}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-semibold text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:text-slate-300"
+              >
+                <Printer className="h-4 w-4" /> Exportar PDF
+              </Link>
+            )}
+          </div>
+        }
       />
 
       {!hasData ? (
