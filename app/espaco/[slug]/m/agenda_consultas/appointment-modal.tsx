@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef, useEffect } from "react";
-import { Loader2, AlertCircle, Search, X, Repeat, CheckCircle2 } from "lucide-react";
+import { Loader2, AlertCircle, Search, X, Repeat, CheckCircle2, MessageCircle } from "lucide-react";
 import { useModalA11y } from "../../use-modal-a11y";
 import { DURATION_OPTIONS, RECURRENCE_FREQUENCIES } from "@/lib/endurance/scheduling";
 import type { AppointmentRow, ProfessionalOption } from "@/lib/endurance/agenda";
@@ -9,6 +9,7 @@ import {
   saveAppointmentAction,
   createSeriesAction,
   searchCustomersAction,
+  confirmByWhatsappAction,
   type CustomerHit,
 } from "./agenda-actions";
 
@@ -47,7 +48,18 @@ export default function AppointmentModal({
 }) {
   const ref = useModalA11y<HTMLDivElement>(onClose);
   const [busy, startTransition] = useTransition();
+  const [waBusy, startWa] = useTransition();
   const [error, setError] = useState("");
+
+  function confirmWhatsapp() {
+    if (!appointment) return;
+    setError("");
+    startWa(async () => {
+      const res = await confirmByWhatsappAction(appointment.id);
+      if (res.ok) window.open(res.url, "_blank");
+      else setError(res.error);
+    });
+  }
 
   const initDate = appointment ? appointment.startsAt.slice(0, 10) : initialDate ?? date;
   const initTime = appointment ? appointment.startTime : initialTime ?? "09:00";
@@ -294,6 +306,17 @@ export default function AppointmentModal({
         </div>
 
         <div className="mt-5 flex items-center justify-end gap-2">
+          {appointment && (
+            <button
+              onClick={confirmWhatsapp}
+              disabled={waBusy}
+              title="Enviar confirmação por WhatsApp"
+              className="mr-auto inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 px-3 py-2.5 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-500/10 disabled:opacity-40 dark:text-emerald-400"
+            >
+              {waBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+              Confirmar por WhatsApp
+            </button>
+          )}
           <button onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
             Cancelar
           </button>

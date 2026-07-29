@@ -21,6 +21,8 @@ import {
 } from "@/lib/endurance/scheduling";
 import { createBlock, deleteBlock } from "@/lib/endurance/schedule-blocks";
 import { blockKindLabel } from "@/lib/endurance/schedule-block";
+import { getWorkspace } from "@/lib/endurance/workspace";
+import { buildConfirmationMessage, waLink } from "@/lib/endurance/appointment-message";
 
 /**
  * Ações da Agenda de atendimentos. Toda mutação abre com o gate de
@@ -282,4 +284,73 @@ export async function rescheduleAction(
   await logActivity(s, "appointment.reschedule", `Remarcou atendimento para ${date} ${time}`, id);
   revalidate(s.slug);
   return { ok: true, id };
+}
+
+export type WhatsAppConfirmResult =
+  | { ok: true; url: string }
+  | { ok: false; error: string };
+
+/**
+ * Handoff de confirmação de consulta por WhatsApp: monta a mensagem e devolve a
+ * URL wa.me para o cliente abrir (1 clique). NÃO envia sozinho nem altera o
+ * status — é comunicação; a recepção marca "confirmado" depois. Gate
+ * agenda.manage; exige paciente vinculado ao cadastro com telefone válido.
+ */
+export async function confirmByWhatsappAction(
+  appointmentId: string,
+): Promise<WhatsAppConfirmResult> {
+  const gate = await requirePermission("agenda.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+
+  const appt = await prisma.appointment.findFirst({
+    where: { id: appointmentId, organizationId: s.org },
+    select: {
+      customerId: true,
+      customerName: true,
+      service: true,
+      professional: true,
+      startsAt: true,
+    },
+  });
+  if (!appt) return { ok: false, error: "Atendimento não encontrado." };
+  if (!appt.customerId)
+    return { ok: false, error: "Vincule o paciente ao cadastro para confirmar por WhatsApp." };
+
+  const cust = await prisma.customer.findFirst({
+    where: { id: appt.customerId, organizationId: s.org },
+    select: { phone: true, name: true },
+  });
+
+  const dateLabel = appt.startsAt.toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+  });
+  const timeLabel = appt.startsAt.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const ws = await getWorkspace(s.slug);
+  const text = buildConfirmationMessage({
+    orgName: ws?.name ?? "nossa clínica",
+    customerName: appt.customerName || cust?.name || "",
+    service: appt.service || undefined,
+    dateLabel,
+    timeLabel,
+    professional: appt.professional || undefined,
+  });
+
+  const url = waLink(cust?.phone ?? "", text);
+  if (!url)
+    return { ok: false, error: "O paciente não tem um telefone válido no cadastro." };
+
+  await logActivity(
+    s,
+    "agenda.confirm_whatsapp",
+    "Abriu confirmação de consulta por WhatsApp",
+    appt.customerId,
+  );
+  return { ok: true, url };
 }
