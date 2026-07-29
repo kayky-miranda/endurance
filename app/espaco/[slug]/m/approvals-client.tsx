@@ -119,7 +119,7 @@ export default function ApprovalsClient({
             </div>
 
             {open && (
-              <div className="mt-3 overflow-hidden rounded-xl border border-slate-100 dark:border-ink-800">
+              <div className="mt-3 overflow-x-auto rounded-xl border border-slate-100 dark:border-ink-800">
                 <table className="w-full text-sm">
                   <tbody>
                     {r.items.map((it, i) => (

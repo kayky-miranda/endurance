@@ -141,8 +141,8 @@ export default function OfxReconcileModal({ onClose }: { onClose: () => void }) 
                 <strong>{preview.matched}</strong> com sugestão de baixa. Confira e
                 confirme as que devem dar baixa no financeiro.
               </p>
-              <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-ink-700">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-ink-700">
+                <table className="w-full min-w-[520px] text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-400 dark:border-ink-800">
                       <th className="px-3 py-2 font-medium">Extrato</th>
