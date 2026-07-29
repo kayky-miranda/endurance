@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
 import { logActivity } from "@/lib/endurance/activity-log";
+import { hit } from "@/lib/rate-limit";
 import { saveAnamnese, deleteAnamnese } from "@/lib/endurance/anamnese";
+import { summarizeAnamnese } from "@/lib/endurance/anamnese-summary";
 
 /** Ações da Anamnese. Gate `anamnese.manage` em toda mutação. */
 
@@ -52,6 +54,39 @@ export async function deleteAnamneseAction(payload: {
   await logActivity(s, "anamnese.delete", "Removeu uma anamnese", payload.customerId);
   revalidate(s.slug, payload.customerId);
   return { ok: true };
+}
+
+export type AnamneseSummaryResult =
+  | { ok: true; text: string; source: "ai" | "heuristic" }
+  | { ok: false; error: string };
+
+/**
+ * Resumo da anamnese (IA opcional + fallback). Gate anamnese.manage + rate
+ * limit. Resume o RASCUNHO enviado pelo cliente; nada é gravado — é apoio à
+ * leitura para o profissional.
+ */
+export async function summarizeAnamneseAction(payload: {
+  customerId: string;
+  items: { question: string; answer?: string }[];
+}): Promise<AnamneseSummaryResult> {
+  const gate = await requirePermission("anamnese.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+  if (!(await hit(`anamnese:summary:${s.sub}`, 12, 60_000)).ok)
+    return { ok: false, error: "Muitos resumos seguidos. Aguarde um instante." };
+
+  const customer = await prisma.customer.findFirst({
+    where: { id: payload.customerId, organizationId: s.org },
+    select: { name: true },
+  });
+  if (!customer) return { ok: false, error: "Paciente não encontrado." };
+
+  const res = await summarizeAnamnese(
+    customer.name,
+    payload.items.map((i) => ({ question: i.question, answer: i.answer ?? "" })),
+  );
+  await logActivity(s, "anamnese.summary", "Gerou resumo da anamnese", payload.customerId);
+  return { ok: true, text: res.text, source: res.source };
 }
 
 export interface PatientHit {

@@ -9,9 +9,15 @@ import {
   Trash2,
   CheckCircle2,
   Save,
+  Sparkles,
+  X,
 } from "lucide-react";
 import type { AnamneseData } from "@/lib/endurance/anamnese";
-import { saveAnamneseAction, deleteAnamneseAction } from "../anamnese-actions";
+import {
+  saveAnamneseAction,
+  deleteAnamneseAction,
+  summarizeAnamneseAction,
+} from "../anamnese-actions";
 
 interface Row {
   key: string;
@@ -39,6 +45,8 @@ export default function AnamneseClient({
   const [busy, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
+  const [summarizing, startSummary] = useTransition();
+  const [summary, setSummary] = useState<{ text: string; source: "ai" | "heuristic" } | null>(null);
   const [rows, setRows] = useState<Row[]>(
     data.items.length
       ? data.items.map((it) => mkRow(it.question, it.answer))
@@ -68,6 +76,18 @@ export default function AnamneseClient({
         setOk(status === "concluida" ? "Anamnese concluída." : "Rascunho salvo.");
         router.refresh();
       } else setError(res.error);
+    });
+  }
+
+  function summarize() {
+    setError("");
+    startSummary(async () => {
+      const res = await summarizeAnamneseAction({
+        customerId,
+        items: rows.map((r) => ({ question: r.question, answer: r.answer })),
+      });
+      if (res.ok) setSummary({ text: res.text, source: res.source });
+      else setError(res.error);
     });
   }
 
@@ -104,16 +124,46 @@ export default function AnamneseClient({
             </span>
           )}
         </div>
-        {data.exists && (
+        <div className="flex items-center gap-3">
           <button
-            onClick={remove}
-            disabled={busy}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-rose-500 disabled:opacity-40"
+            onClick={summarize}
+            disabled={summarizing}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-brand-400 hover:text-brand-500 disabled:opacity-40 dark:border-ink-600 dark:text-slate-300"
           >
-            <Trash2 className="h-3.5 w-3.5" /> Remover
+            {summarizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            Resumo com IA
           </button>
-        )}
+          {data.exists && (
+            <button
+              onClick={remove}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-rose-500 disabled:opacity-40"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Remover
+            </button>
+          )}
+        </div>
       </div>
+
+      {summary && (
+        <div className="rounded-2xl border border-brand-200 bg-brand-500/5 p-4 dark:border-brand-500/20">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-brand-600 dark:text-brand-300">
+              <Sparkles className="h-3.5 w-3.5" /> Resumo da anamnese
+              <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-ink-800">
+                {summary.source === "ai" ? "IA" : "automático"}
+              </span>
+            </span>
+            <button onClick={() => setSummary(null)} aria-label="Fechar resumo" className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">{summary.text}</p>
+          <p className="mt-2 text-[11px] text-slate-400">
+            Resumo factual das respostas — confira antes de usar; não é diagnóstico.
+          </p>
+        </div>
+      )}
 
       {!data.exists && (
         <p className="rounded-lg bg-brand-500/5 px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
