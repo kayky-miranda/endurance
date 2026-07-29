@@ -88,7 +88,7 @@ export default async function AgendaPage({
             professionals={professionals}
           />
 
-          <WaitlistPanel date={date} entries={waitlist} professionals={professionals} />
+          <WaitlistPanel slug={slug} date={date} entries={waitlist} professionals={professionals} />
         </>
       )}
     </div>

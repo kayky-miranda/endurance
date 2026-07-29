@@ -23,10 +23,12 @@ import {
 import AppointmentModal from "./appointment-modal";
 
 export default function WaitlistPanel({
+  slug,
   date,
   entries,
   professionals,
 }: {
+  slug: string;
   date: string;
   entries: WaitlistRow[];
   professionals: ProfessionalOption[];
@@ -140,6 +142,7 @@ export default function WaitlistPanel({
 
       {scheduling && (
         <AppointmentModal
+          slug={slug}
           date={date}
           professionals={professionals}
           appointment={null}

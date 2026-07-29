@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef, useEffect } from "react";
-import { Loader2, AlertCircle, Search, X, Repeat, CheckCircle2, MessageCircle } from "lucide-react";
+import { Loader2, AlertCircle, Search, X, Repeat, CheckCircle2, MessageCircle, CalendarPlus } from "lucide-react";
 import { useModalA11y } from "../../use-modal-a11y";
 import { DURATION_OPTIONS, RECURRENCE_FREQUENCIES } from "@/lib/endurance/scheduling";
 import type { AppointmentRow, ProfessionalOption } from "@/lib/endurance/agenda";
@@ -26,6 +26,7 @@ export interface AppointmentPrefill {
 }
 
 export default function AppointmentModal({
+  slug,
   date,
   professionals,
   appointment,
@@ -35,6 +36,7 @@ export default function AppointmentModal({
   onClose,
   onSaved,
 }: {
+  slug: string;
   /** Data de referência (fallback quando não é edição nem slot clicado). */
   date: string;
   professionals: ProfessionalOption[];
@@ -307,15 +309,25 @@ export default function AppointmentModal({
 
         <div className="mt-5 flex items-center justify-end gap-2">
           {appointment && (
-            <button
-              onClick={confirmWhatsapp}
-              disabled={waBusy}
-              title="Enviar confirmação por WhatsApp"
-              className="mr-auto inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 px-3 py-2.5 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-500/10 disabled:opacity-40 dark:text-emerald-400"
-            >
-              {waBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
-              Confirmar por WhatsApp
-            </button>
+            <>
+              <button
+                onClick={confirmWhatsapp}
+                disabled={waBusy}
+                title="Enviar confirmação por WhatsApp"
+                className="mr-auto inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 px-3 py-2.5 text-sm font-semibold text-emerald-600 transition hover:bg-emerald-500/10 disabled:opacity-40 dark:text-emerald-400"
+              >
+                {waBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+                Confirmar por WhatsApp
+              </button>
+              <a
+                href={`/espaco/${slug}/agenda-ics/${appointment.id}`}
+                download
+                title="Baixar evento (.ics) para Google Agenda, Outlook ou Apple"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:text-slate-300"
+              >
+                <CalendarPlus className="h-4 w-4" /> Calendário
+              </a>
+            </>
           )}
           <button onClick={onClose} className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
             Cancelar

@@ -269,6 +269,7 @@ export default function AgendaView({
 
       {modal && (
         <AppointmentModal
+          slug={slug}
           date={date}
           professionals={professionals}
           appointment={modal.mode === "edit" ? modal.appointment : null}
