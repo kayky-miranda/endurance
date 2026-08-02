@@ -309,6 +309,27 @@ ESTILO: frases curtas e diretas, sem repetir o dossiê literalmente, sem enrola�
 
 PRIORIDADE: "alta" para sinais de gravidade/urgência ou risco relevante; "media" para acompanhamento que não pode esperar; "baixa" para rotina. Justifique em "prioridadeMotivo".`;
 
+/**
+ * O que cada especialidade quer ver primeiro. Sem isto a análise sai genérica —
+ * o nutricionista recebia os mesmos destaques do psicólogo. O foco entra no
+ * prompt junto do dossiê e muda o que a IA prioriza em cada lista.
+ */
+const SPECIALTY_FOCUS: Record<string, string> = {
+  nutricionista:
+    "Priorize peso, IMC, circunferências e sua TENDÊNCIA ao longo do tempo, hábitos e rotina alimentar, hidratação, adesão ao plano e metas. Relacione as medições com o que o paciente relata.",
+  psicologia:
+    "Priorize humor, ansiedade, sono, eventos de vida, temas recorrentes entre as sessões, evolução terapêutica e adesão. Trate sintomas físicos como contexto, não como foco.",
+  clinica:
+    "Priorize doenças crônicas, controle pressórico e metabólico, medicação em uso e adesão, histórico familiar e risco cardiovascular.",
+  academia:
+    "Priorize objetivo do aluno, evolução de carga/medidas, frequência, limitações e dores relatadas, e risco de lesão.",
+};
+
+function specialtyBlock(niche: string | undefined): string {
+  const focus = niche ? SPECIALTY_FOCUS[niche] : undefined;
+  return focus ? `\n\nFOCO DA ESPECIALIDADE: ${focus}` : "";
+}
+
 export type AnalysisSource = "ai" | "unavailable";
 
 /** Normaliza a saída do modelo — nunca confiamos cegamente no JSON recebido. */
@@ -391,7 +412,7 @@ const GEN_CONFIG = {
  */
 export async function* streamPatientAnalysis(
   ctx: PatientContext,
-  opts: { signal?: AbortSignal } = {},
+  opts: { signal?: AbortSignal; niche?: string } = {},
 ): AsyncGenerator<{ analysis: ClinicalAnalysis; done: boolean }> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey) return;
@@ -405,7 +426,7 @@ export async function* streamPatientAnalysis(
         model,
         contents: ctx.dossier,
         config: {
-          systemInstruction: SYSTEM,
+          systemInstruction: SYSTEM + specialtyBlock(opts.niche),
           ...GEN_CONFIG,
           ...(opts.signal ? { abortSignal: opts.signal } : {}),
         },
@@ -449,7 +470,7 @@ export async function* streamPatientAnalysis(
  */
 export async function analyzePatient(
   ctx: PatientContext,
-  opts: { signal?: AbortSignal } = {},
+  opts: { signal?: AbortSignal; niche?: string } = {},
 ): Promise<{ analysis: ClinicalAnalysis | null; source: AnalysisSource }> {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!apiKey) return { analysis: null, source: "unavailable" };
@@ -463,7 +484,7 @@ export async function analyzePatient(
           model,
           contents: ctx.dossier,
           config: {
-            systemInstruction: SYSTEM,
+            systemInstruction: SYSTEM + specialtyBlock(opts.niche),
             ...GEN_CONFIG,
             ...(opts.signal ? { abortSignal: opts.signal } : {}),
           },

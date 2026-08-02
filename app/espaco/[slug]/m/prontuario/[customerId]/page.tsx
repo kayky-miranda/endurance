@@ -6,8 +6,10 @@ import { listPrescriptions } from "@/lib/endurance/prescriptions";
 import { listCertificates } from "@/lib/endurance/certificates";
 import { listTemplates } from "@/lib/endurance/document-templates";
 import { listProfessionals } from "@/lib/endurance/agenda";
+import { getPatientBriefing } from "@/lib/endurance/patient-briefing";
 import { loadModule, DeniedModule } from "../../module-kit";
 import RecordClient from "./record-client";
+import BriefingPanel from "./briefing-panel";
 import ClinicalAnalysisPanel from "./clinical-analysis-panel";
 import PrescriptionsPanel from "./prescriptions-panel";
 import CertificatesPanel from "./certificates-panel";
@@ -27,14 +29,15 @@ export default async function PatientRecordPage({
     : null;
   if (!record) notFound();
 
-  const [prescriptions, certificates, noteTemplates, professionals] = session
+  const [prescriptions, certificates, noteTemplates, professionals, briefing] = session
     ? await Promise.all([
         listPrescriptions(session.org, customerId),
         listCertificates(session.org, customerId),
         listTemplates(session.org, { type: "nota" }),
         listProfessionals(session.org),
+        getPatientBriefing(session.org, customerId),
       ])
-    : [[], [], [], []];
+    : [[], [], [], [], null];
 
   return (
     <div className="space-y-6">
@@ -75,6 +78,8 @@ export default async function PatientRecordPage({
           )}
         </div>
       </div>
+
+      {briefing && <BriefingPanel briefing={briefing} />}
 
       <ClinicalAnalysisPanel slug={slug} customerId={record.id} />
 

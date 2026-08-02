@@ -71,8 +71,9 @@ export async function POST(
         }
         if (signal.aborted) return controller.close();
 
-        // A especialidade personaliza a leitura; recompomos o dossiê só se ela
-        // existir (o contexto pesado já foi montado uma única vez).
+        // A especialidade entra no dossiê (contexto) e também no prompt, que
+        // muda o QUE a IA prioriza — nutricionista e psicólogo não devem
+        // receber os mesmos destaques.
         const ctx = ws?.nicheLabel
           ? {
               ...ctxEarly,
@@ -99,7 +100,10 @@ export async function POST(
         let last: unknown = null;
         let sawContent = false;
         try {
-          for await (const ev of streamPatientAnalysis(ctx, { signal })) {
+          for await (const ev of streamPatientAnalysis(ctx, {
+            signal,
+            niche: ws?.niche,
+          })) {
             if (signal.aborted) break;
             if (!sawContent) {
               sawContent = true;
