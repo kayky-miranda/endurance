@@ -7,6 +7,12 @@ import {
   streamPatientAnalysis,
 } from "@/lib/endurance/clinical-analysis";
 import { isQuotaError } from "@/lib/endurance/gemini";
+import type { ClinicalAnalysis } from "@/lib/endurance/clinical-analysis-types";
+import {
+  computeFingerprint,
+  readAnalysisCache,
+  writeAnalysisCache,
+} from "@/lib/endurance/analysis-cache";
 
 /**
  * Análise clínica assistida, em STREAMING (NDJSON — um evento por linha).
@@ -45,6 +51,10 @@ export async function POST(
       status: 429,
     });
 
+  // "Refazer análise" ignora o cache de propósito — o profissional quer uma
+  // leitura nova, ainda que os dados não tenham mudado.
+  const force = new URL(request.url).searchParams.get("refazer") === "1";
+
   const encoder = new TextEncoder();
   const signal = request.signal;
 
@@ -80,6 +90,26 @@ export async function POST(
               dossier: `${ctxEarly.dossier}\n\n# ESPECIALIDADE DO PROFISSIONAL\n${ws.nicheLabel}`,
             }
           : ctxEarly;
+
+        // CACHE: se nada mudou no cadastro desde a última análise, devolvemos a
+        // guardada — resposta instantânea, sem pagar tempo nem cota do modelo.
+        const niche = ws?.niche ?? "";
+        const fingerprint = await computeFingerprint(session.org, customerId);
+        const cached = await readAnalysisCache(
+          session.org,
+          customerId,
+          fingerprint,
+          niche,
+        );
+        if (cached && !force) {
+          send({
+            type: "done",
+            analysis: cached.analysis,
+            cachedAt: cached.createdAt.toISOString(),
+          });
+          controller.close();
+          return;
+        }
 
         if (ctx.signals === 0) {
           send({
@@ -136,13 +166,23 @@ export async function POST(
               "A análise com IA não está disponível (configure a chave GEMINI_API_KEY).",
           });
         } else if (!signal.aborted) {
-          // Auditoria: registra o ACESSO, nunca o conteúdo clínico.
-          await logActivity(
-            session,
-            "prontuario.analysis",
-            "Gerou análise clínica assistida por IA",
-            customerId,
-          );
+          // Guarda para as próximas aberturas e registra o ACESSO na auditoria
+          // (nunca o conteúdo clínico).
+          await Promise.all([
+            writeAnalysisCache(
+              session.org,
+              customerId,
+              fingerprint,
+              niche,
+              last as ClinicalAnalysis,
+            ),
+            logActivity(
+              session,
+              "prontuario.analysis",
+              "Gerou análise clínica assistida por IA",
+              customerId,
+            ),
+          ]);
         }
       } catch (err) {
         console.error("[analise-clinica] falhou:", err);

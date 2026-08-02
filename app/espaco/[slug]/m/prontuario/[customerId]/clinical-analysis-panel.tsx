@@ -53,12 +53,14 @@ export default function ClinicalAnalysisPanel({
   const [stage, setStage] = useState("");
   const [analysis, setAnalysis] = useState<ClinicalAnalysis | null>(null);
   const [error, setError] = useState("");
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   // Se o usuário sair da tela no meio, não deixamos a geração rodando.
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  const run = useCallback(async () => {
+  const run = useCallback(
+    async (force = false) => {
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
@@ -66,13 +68,14 @@ export default function ClinicalAnalysisPanel({
     setPhase("running");
     setError("");
     setAnalysis(null);
+    setCachedAt(null);
     setStage("Iniciando análise");
 
     try {
-      const res = await fetch(`/espaco/${slug}/analise-clinica/${customerId}`, {
-        method: "POST",
-        signal: ctrl.signal,
-      });
+      const res = await fetch(
+        `/espaco/${slug}/analise-clinica/${customerId}${force ? "?refazer=1" : ""}`,
+        { method: "POST", signal: ctrl.signal },
+      );
       if (!res.ok || !res.body) {
         setError(
           res.status === 429
@@ -104,7 +107,10 @@ export default function ClinicalAnalysisPanel({
           if (ev.type === "stage") setStage(String(ev.label ?? ""));
           else if (ev.type === "partial" || ev.type === "done") {
             setAnalysis(ev.analysis as ClinicalAnalysis);
-            if (ev.type === "done") setPhase("done");
+            if (ev.type === "done") {
+              setPhase("done");
+              if (ev.cachedAt) setCachedAt(String(ev.cachedAt));
+            }
           } else if (ev.type === "error") {
             setError(String(ev.error ?? "Falha ao gerar a análise."));
             setPhase("error");
@@ -117,7 +123,9 @@ export default function ClinicalAnalysisPanel({
       setError("Falha de conexão ao gerar a análise.");
       setPhase("error");
     }
-  }, [slug, customerId]);
+  },
+    [slug, customerId],
+  );
 
   function cancel() {
     abortRef.current?.abort();
@@ -139,6 +147,20 @@ export default function ClinicalAnalysisPanel({
               Prioridade {PRIORITY_LABEL[analysis.prioridade]}
             </span>
           )}
+          {cachedAt && !running && (
+            <span
+              title="Os dados do paciente não mudaram desde esta análise. Use Refazer para gerar uma nova."
+              className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-normal text-slate-500 dark:bg-ink-800 dark:text-slate-400"
+            >
+              de{" "}
+              {new Date(cachedAt).toLocaleString("pt-BR", {
+                day: "2-digit",
+                month: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
         </h2>
         <div className="flex items-center gap-2">
           {running ? (
@@ -150,7 +172,7 @@ export default function ClinicalAnalysisPanel({
             </button>
           ) : (
             <button
-              onClick={run}
+              onClick={() => run(phase !== "idle")}
               className="inline-flex items-center gap-1.5 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:bg-brand-400"
             >
               {phase === "idle" ? (

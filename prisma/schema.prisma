@@ -77,6 +77,7 @@ model Organization {
   waitlist         WaitlistEntry[]
   prescriptions    Prescription[]
   certificates     Certificate[]
+  analysisCache    ClinicalAnalysisCache[]
   docTemplates     DocumentTemplate[]
   professionalProfiles ProfessionalProfile[]
 }
@@ -1728,4 +1729,27 @@ model StockCountItem {
 
   @@unique([stockCountId, productId])
   @@index([stockCountId])
+}
+
+/// Cache da análise clínica assistida por IA.
+/// Chave de invalidação = `fingerprint`, derivado do estado dos dados do
+/// paciente (contagens + últimas alterações). Enquanto nada muda no cadastro, a
+/// análise é reaproveitada e a tela abre instantânea, sem pagar de novo o custo
+/// (tempo e cota) da chamada ao modelo. Qualquer registro novo muda o
+/// fingerprint e a próxima análise é gerada do zero.
+model ClinicalAnalysisCache {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String
+  fingerprint    String
+  /// Payload completo da análise (ClinicalAnalysis serializado).
+  payload        String
+  /// Nicho usado na geração: muda o foco do prompt, então muda o resultado.
+  niche          String   @default("")
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, customerId])
+  @@index([organizationId, customerId])
 }
