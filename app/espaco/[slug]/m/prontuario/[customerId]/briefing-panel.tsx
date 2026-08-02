@@ -12,6 +12,7 @@ import {
   ClipboardList,
   XCircle,
   CalendarX,
+  FlaskConical,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type {
@@ -47,6 +48,7 @@ const EVENT_META: Record<EventKind, { icon: LucideIcon; cls: string }> = {
   anexo: { icon: Paperclip, cls: "bg-slate-100 text-slate-500 dark:bg-ink-800 dark:text-slate-400" },
   atestado: { icon: FileText, cls: "bg-slate-100 text-slate-500 dark:bg-ink-800 dark:text-slate-400" },
   anamnese: { icon: ClipboardList, cls: "bg-brand-500/10 text-brand-600 dark:text-brand-300" },
+  exame: { icon: FlaskConical, cls: "bg-rose-500/10 text-rose-600 dark:text-rose-300" },
 };
 
 const PENDING_STYLE: Record<PendingLevel, string> = {

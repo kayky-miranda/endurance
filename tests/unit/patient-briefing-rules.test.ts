@@ -107,6 +107,21 @@ describe("computePendencies", () => {
     expect(r.some((p) => p.title === "Tratamento sem reavaliação")).toBe(false);
   });
 
+  it("exames fora da referência viram pendência; desvio grande sobe a gravidade", () => {
+    const leve = computePendencies({ ...base, alteredExams: 2, severeExams: 0 });
+    const p = leve.find((x) => /fora da referência/.test(x.title));
+    expect(p?.level).toBe("media");
+    expect(p?.title).toContain("2 exame");
+
+    const grave = computePendencies({ ...base, alteredExams: 3, severeExams: 1 });
+    expect(grave.find((x) => /fora da referência/.test(x.title))?.level).toBe("alta");
+  });
+
+  it("sem exames alterados não cria pendência de exame", () => {
+    const r = computePendencies({ ...base, alteredExams: 0, severeExams: 0 });
+    expect(r.some((x) => /exame/.test(x.title))).toBe(false);
+  });
+
   it("ordena por gravidade", () => {
     const r = computePendencies({
       ...base,

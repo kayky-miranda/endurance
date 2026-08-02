@@ -5,6 +5,8 @@ import { money } from "./money";
 import { ageFromBirth } from "./patient";
 import { parsePartialJson } from "./partial-json";
 import { GEMINI_MODELS, isRetryableError } from "./gemini";
+import { getPatientExams } from "./lab-exams";
+import { EXAM_FLAG_LABEL } from "./lab-exam-rules";
 import {
   isValidPriority,
   type ClinicalAnalysis,
@@ -39,6 +41,7 @@ const MAX_NOTE_CHARS = 400;
 const MAX_APPOINTMENTS = 8;
 const MAX_PRESCRIPTIONS = 5;
 const MAX_METRIC_POINTS = 3;
+const MAX_EXAMS = 25;
 
 export interface PatientContext {
   name: string;
@@ -61,7 +64,7 @@ export async function buildPatientContext(
   customerId: string,
   opts: { specialty?: string } = {},
 ): Promise<PatientContext | null> {
-  const [customer, profile, anamnese, notes, metrics, appointments, prescriptions] =
+  const [customer, profile, anamnese, notes, metrics, appointments, prescriptions, exams] =
     await Promise.all([
       prisma.customer.findFirst({
         where: { id: customerId, organizationId: org },
@@ -132,6 +135,7 @@ export async function buildPatientContext(
           },
         },
       }),
+      getPatientExams(org, customerId, MAX_EXAMS),
     ]);
 
   if (!customer) return null;
@@ -196,6 +200,26 @@ export async function buildPatientContext(
               .join(" ← ");
             return `- ${label}: ${pts}`;
           })
+          .join("\n"),
+    );
+  }
+
+  // Exames: a situação (normal/alto/baixo) já vem CLASSIFICADA pela faixa de
+  // referência do laudo. Entregamos pronta para a IA não ter que julgar se um
+  // valor é anormal — isso é comparação, não opinião do modelo.
+  if (exams.exams.length > 0) {
+    signals++;
+    blocks.push(
+      `# EXAMES LABORATORIAIS (${exams.alteredCount} fora da referência)\n` +
+        exams.exams
+          .map(
+            (e) =>
+              `- [${d(new Date(e.collectedAt))}] ${e.name}: ${e.value}${e.unit}` +
+              ` (ref. ${e.rangeLabel}) — ${EXAM_FLAG_LABEL[e.flag]}${e.severe ? ", desvio grande" : ""}` +
+              (e.trend !== "primeiro" && e.delta !== 0
+                ? `; anterior ${e.trend} ${e.delta > 0 ? "+" : ""}${e.delta}`
+                : ""),
+          )
           .join("\n"),
     );
   }

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { money } from "./money";
 import { ageFromBirth } from "./patient";
 import { presetOf, seriesStats, type SeriesStats } from "./metrics";
+import { getPatientExams } from "./lab-exams";
 import {
   computePendencies,
   sortTimeline,
@@ -70,7 +71,7 @@ export async function getPatientBriefing(
   customerId: string,
   now = new Date(),
 ): Promise<PatientBriefing | null> {
-  const [customer, profile, anamnese, notes, metrics, appointments, prescriptions, attachments, certificates] =
+  const [customer, profile, anamnese, notes, metrics, appointments, prescriptions, attachments, exams, certificates] =
     await Promise.all([
       prisma.customer.findFirst({
         where: { id: customerId, organizationId: org },
@@ -120,6 +121,7 @@ export async function getPatientBriefing(
         take: 10,
         select: { createdAt: true, name: true, category: true },
       }),
+      getPatientExams(org, customerId, 40),
       prisma.certificate.findMany({
         where: { organizationId: org, customerId },
         orderBy: { issuedAt: "desc" },
@@ -200,6 +202,13 @@ export async function getPatientBriefing(
       title: at.name,
       detail: at.category || undefined,
     });
+  for (const e of exams.exams.slice(0, 12))
+    events.push({
+      kind: "exame",
+      at: e.collectedAt,
+      title: e.name,
+      detail: `${e.value}${e.unit} · ${e.rangeLabel}`,
+    });
   for (const c of certificates)
     events.push({ kind: "atestado", at: iso(c.issuedAt), title: "Atestado", detail: c.kind });
   if (anamnese)
@@ -236,6 +245,8 @@ export async function getPatientBriefing(
     anamneseComplete: anamnese?.status === "concluida",
     lastMetricAt: metrics[0]?.measuredAt ?? null,
     lastPrescriptionAt: prescriptions[0]?.issuedAt ?? null,
+    alteredExams: exams.alteredCount,
+    severeExams: exams.severeCount,
   });
 
   const signals = [
@@ -244,6 +255,7 @@ export async function getPatientBriefing(
     metrics.length > 0,
     appointments.length > 0,
     prescriptions.length > 0,
+    exams.exams.length > 0,
   ].filter(Boolean).length;
 
   return {

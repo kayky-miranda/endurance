@@ -7,9 +7,11 @@ import { listCertificates } from "@/lib/endurance/certificates";
 import { listTemplates } from "@/lib/endurance/document-templates";
 import { listProfessionals } from "@/lib/endurance/agenda";
 import { getPatientBriefing } from "@/lib/endurance/patient-briefing";
+import { getPatientExams } from "@/lib/endurance/lab-exams";
 import { loadModule, DeniedModule } from "../../module-kit";
 import RecordClient from "./record-client";
 import BriefingPanel from "./briefing-panel";
+import ExamsPanel from "./exams-panel";
 import ClinicalAnalysisPanel from "./clinical-analysis-panel";
 import PrescriptionsPanel from "./prescriptions-panel";
 import CertificatesPanel from "./certificates-panel";
@@ -29,15 +31,16 @@ export default async function PatientRecordPage({
     : null;
   if (!record) notFound();
 
-  const [prescriptions, certificates, noteTemplates, professionals, briefing] = session
+  const [prescriptions, certificates, noteTemplates, professionals, briefing, exams] = session
     ? await Promise.all([
         listPrescriptions(session.org, customerId),
         listCertificates(session.org, customerId),
         listTemplates(session.org, { type: "nota" }),
         listProfessionals(session.org),
         getPatientBriefing(session.org, customerId),
+        getPatientExams(session.org, customerId),
       ])
-    : [[], [], [], [], null];
+    : [[], [], [], [], null, null];
 
   return (
     <div className="space-y-6">
@@ -82,6 +85,8 @@ export default async function PatientRecordPage({
       {briefing && <BriefingPanel briefing={briefing} />}
 
       <ClinicalAnalysisPanel slug={slug} customerId={record.id} />
+
+      {exams && <ExamsPanel slug={slug} customerId={record.id} data={exams} />}
 
       <RecordClient slug={slug} customerId={record.id} notes={record.notes} templates={noteTemplates} />
 

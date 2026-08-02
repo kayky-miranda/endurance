@@ -18,7 +18,8 @@ export type EventKind =
   | "medicao"
   | "anexo"
   | "atestado"
-  | "anamnese";
+  | "anamnese"
+  | "exame";
 
 export interface TimelineEvent {
   kind: EventKind;
@@ -56,6 +57,10 @@ export interface PendencyInput {
   anamneseComplete: boolean;
   lastMetricAt: Date | null;
   lastPrescriptionAt: Date | null;
+  /** Resultados fora da faixa de referência do laudo (comparação, não opinião). */
+  alteredExams?: number;
+  /** Desses, quantos com desvio grande. */
+  severeExams?: number;
 }
 
 /** Sem retorno agendado após este tempo desde o último atendimento. */
@@ -105,6 +110,21 @@ export function computePendencies(input: PendencyInput): Pendency[] {
         detail: `Último atendimento há ${d} dias e nenhuma consulta futura marcada.`,
       });
     }
+  }
+
+  // Exames fora da referência do laudo. É comparação com a faixa registrada,
+  // não juízo clínico — por isso pode ser afirmado como fato.
+  const altered = input.alteredExams ?? 0;
+  if (altered > 0) {
+    const severe = input.severeExams ?? 0;
+    out.push({
+      level: severe > 0 ? "alta" : "media",
+      title: `${altered} exame(s) fora da referência`,
+      detail:
+        severe > 0
+          ? `${severe} com desvio grande em relação ao limite do laudo.`
+          : "Resultados fora da faixa informada no laudo.",
+    });
   }
 
   // Questionário inicial: base de quase toda a análise.

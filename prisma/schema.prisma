@@ -78,6 +78,7 @@ model Organization {
   prescriptions    Prescription[]
   certificates     Certificate[]
   analysisCache    ClinicalAnalysisCache[]
+  labExams         LabExam[]
   docTemplates     DocumentTemplate[]
   professionalProfiles ProfessionalProfile[]
 }
@@ -748,6 +749,7 @@ model Customer {
   patientFiles     PatientAttachment[]
   prescriptions    Prescription[]
   certificates     Certificate[]
+  labExams         LabExam[]
 
   @@index([organizationId, deletedAt])
 }
@@ -1752,4 +1754,35 @@ model ClinicalAnalysisCache {
 
   @@unique([organizationId, customerId])
   @@index([organizationId, customerId])
+}
+
+/// Resultado de exame laboratorial do paciente.
+/// A faixa de referência vem do PRÓPRIO LAUDO (refMin/refMax): é ela que
+/// permite sinalizar "alterado" sem o sistema embutir conhecimento médico nem
+/// depender de IA. Sem faixa registrada, o valor é exibido mas não classificado.
+model LabExam {
+  id             String   @id @default(cuid())
+  organizationId String
+  customerId     String
+  /// Nome do analito, ex.: "Hemoglobina glicada".
+  name           String
+  /// Agrupador opcional do laudo, ex.: "Hemograma".
+  panel          String   @default("")
+  value          Decimal  @db.Decimal(14, 4)
+  unit           String   @default("")
+  refMin         Decimal? @db.Decimal(14, 4)
+  refMax         Decimal? @db.Decimal(14, 4)
+  collectedAt    DateTime
+  notes          String   @default("")
+  createdById    String?
+  createdByName  String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, customerId, collectedAt])
+  @@index([organizationId, customerId, name])
 }

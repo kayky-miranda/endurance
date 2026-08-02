@@ -20,6 +20,7 @@ const SOFT_DELETE_MODELS = new Set([
   "Prescription",
   "Certificate",
   "DocumentTemplate",
+  "LabExam",
 ]);
 
 function makeClient() {
