@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { money } from "./money";
 import { ageFromBirth } from "./patient";
+import { presetOf, seriesStats, type SeriesStats } from "./metrics";
 import {
   computePendencies,
   sortTimeline,
@@ -33,13 +34,33 @@ export interface BriefingSummary {
   missedVisits: number;
 }
 
+/**
+ * Série de um indicador acompanhado (peso, PA, escalas…) já com a tendência
+ * calculada. Fica no briefing para o profissional ver a evolução SEM sair do
+ * prontuário — reaproveita os mesmos helpers do módulo de Evolução.
+ */
+export interface MetricTrend {
+  metric: string;
+  label: string;
+  unit: string;
+  decimals: number;
+  /** Cronológico (antigo → recente). */
+  values: number[];
+  lastAt: string;
+  stats: SeriesStats;
+}
+
 export interface PatientBriefing {
   summary: BriefingSummary;
   timeline: TimelineEvent[];
   pendencies: Pendency[];
+  trends: MetricTrend[];
   /** Quantidade de blocos de informação — base do "dados insuficientes". */
   signals: number;
 }
+
+/** Pontos por indicador: o bastante para ver a tendência, sem inflar a página. */
+const MAX_TREND_POINTS = 8;
 
 const MAX_TIMELINE = 40;
 const iso = (d: Date) => d.toISOString();
@@ -72,7 +93,9 @@ export async function getPatientBriefing(
       prisma.patientMetric.findMany({
         where: { organizationId: org, customerId },
         orderBy: { measuredAt: "desc" },
-        take: 15,
+        // Mais linhas do que a timeline usa: são várias séries (peso, PA…) e
+        // cada uma precisa de pontos suficientes para a tendência.
+        take: 60,
         select: { label: true, metric: true, value: true, unit: true, measuredAt: true },
       }),
       prisma.appointment.findMany({
@@ -134,13 +157,42 @@ export async function getPatientBriefing(
       detail: p.items.map((i) => i.medication).filter(Boolean).join(", ") || undefined,
       cid: p.cid || undefined,
     });
-  for (const m of metrics)
+  // A timeline mostra só as medições recentes; a tendência usa a série inteira.
+  for (const m of metrics.slice(0, 15))
     events.push({
       kind: "medicao",
       at: iso(m.measuredAt),
       title: m.label || m.metric,
       detail: `${money(m.value)}${m.unit}`,
     });
+
+  // Agrupa por indicador (vêm em ordem decrescente) e inverte para cronológico.
+  const byMetric = new Map<string, typeof metrics>();
+  for (const m of metrics) {
+    const list = byMetric.get(m.metric) ?? [];
+    if (list.length < MAX_TREND_POINTS) list.push(m);
+    byMetric.set(m.metric, list);
+  }
+  const trends: MetricTrend[] = [];
+  for (const [metric, list] of byMetric) {
+    const chrono = [...list].reverse();
+    const values = chrono.map((x) => money(x.value));
+    const preset = presetOf(metric);
+    const higherIsBetter = preset?.higherIsBetter ?? false;
+    const stats = seriesStats(values, higherIsBetter);
+    if (!stats) continue;
+    trends.push({
+      metric,
+      label: preset?.label || chrono[chrono.length - 1].label || metric,
+      unit: chrono[chrono.length - 1].unit || preset?.unit || "",
+      decimals: preset?.decimals ?? 1,
+      values,
+      lastAt: iso(chrono[chrono.length - 1].measuredAt),
+      stats,
+    });
+  }
+  // Indicador com medição mais recente primeiro.
+  trends.sort((a, b) => b.lastAt.localeCompare(a.lastAt));
   for (const at of attachments)
     events.push({
       kind: "anexo",
@@ -207,6 +259,7 @@ export async function getPatientBriefing(
       missedVisits: missed.length,
     },
     timeline: sortTimeline(events).slice(0, MAX_TIMELINE),
+    trends,
     pendencies,
     signals,
   };

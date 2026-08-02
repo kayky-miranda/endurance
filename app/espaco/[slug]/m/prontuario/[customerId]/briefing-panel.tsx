@@ -16,7 +16,9 @@ import {
 import type { LucideIcon } from "lucide-react";
 import type {
   PatientBriefing,
+  MetricTrend,
 } from "@/lib/endurance/patient-briefing";
+import { formatMetric, sparklinePoints } from "@/lib/endurance/metrics";
 import type {
   EventKind,
   PendingLevel,
@@ -53,8 +55,81 @@ const PENDING_STYLE: Record<PendingLevel, string> = {
   baixa: "border-slate-200 bg-slate-50 text-slate-600 dark:border-ink-700 dark:bg-ink-900 dark:text-slate-300",
 };
 
+const SPARK_W = 120;
+const SPARK_H = 28;
+
+/**
+ * Comparação temporal dos indicadores, ao lado do prontuário — o profissional vê
+ * a evolução sem trocar de módulo. Reaproveita `seriesStats`/`sparklinePoints`
+ * do módulo de Evolução em vez de recalcular tendência aqui.
+ */
+function TrendStrip({ trends }: { trends: MetricTrend[] }) {
+  if (trends.length === 0) return null;
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {trends.slice(0, 6).map((t) => {
+        const { stats } = t;
+        // "Melhor" depende do indicador: perder peso melhora, ganhar força
+        // também — quem sabe disso é o preset, já refletido em `improving`.
+        const tone =
+          stats.direction === "flat"
+            ? "text-slate-400"
+            : stats.improving
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-amber-600 dark:text-amber-400";
+        const arrow = stats.direction === "up" ? "↑" : stats.direction === "down" ? "↓" : "→";
+        return (
+          <div
+            key={t.metric}
+            className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-ink-700 dark:bg-ink-900"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  {t.label}
+                </p>
+                <p className="mt-0.5 text-lg font-bold leading-none text-slate-800 dark:text-slate-100">
+                  {formatMetric(stats.last, t.decimals)}
+                  <span className="ml-1 text-xs font-normal text-slate-400">{t.unit}</span>
+                </p>
+                <p className={`mt-1 text-[11px] font-medium ${tone}`}>
+                  {arrow} {stats.delta > 0 ? "+" : ""}
+                  {formatMetric(stats.delta, t.decimals)} {t.unit}
+                  <span className="font-normal text-slate-400">
+                    {" "}· desde {dt(t.lastAt)}
+                  </span>
+                </p>
+              </div>
+              {t.values.length > 1 && (
+                <svg
+                  width={SPARK_W}
+                  height={SPARK_H}
+                  viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
+                  className="shrink-0"
+                  role="img"
+                  aria-label={`Evolução de ${t.label}: ${t.values.map((v) => formatMetric(v, t.decimals)).join(", ")} ${t.unit}`}
+                >
+                  <polyline
+                    points={sparklinePoints(t.values, SPARK_W, SPARK_H)}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-brand-500"
+                  />
+                </svg>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function BriefingPanel({ briefing }: { briefing: PatientBriefing }) {
-  const { summary, timeline, pendencies } = briefing;
+  const { summary, timeline, pendencies, trends } = briefing;
 
   return (
     <section className="space-y-3">
@@ -91,6 +166,9 @@ export default function BriefingPanel({ briefing }: { briefing: PatientBriefing 
           value={summary.nextVisitAt ? dt(summary.nextVisitAt) : "não agendada"}
         />
       </div>
+
+      {/* Comparação temporal dos indicadores acompanhados. */}
+      <TrendStrip trends={trends} />
 
       {/* Pendências: o que exige ação, antes de qualquer outra coisa. */}
       {pendencies.length > 0 && (
