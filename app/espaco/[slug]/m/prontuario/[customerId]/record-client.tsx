@@ -14,6 +14,7 @@ import {
   Sparkles,
   SpellCheck,
   Undo2,
+  PenLine,
 } from "lucide-react";
 import { useModalA11y } from "../../../use-modal-a11y";
 import type { ClinicalNoteRow } from "@/lib/endurance/prontuario";
@@ -27,6 +28,7 @@ import {
   summarizeRecordAction,
   suggestConductAction,
   proofreadNoteAction,
+  draftEvolutionAction,
 } from "../prontuario-actions";
 
 /** Timeline do prontuário + editor de anotações (criar/editar/excluir). */
@@ -257,6 +259,8 @@ function NoteModal({
   const [proof, setProof] = useState<
     { source: "ai" | "unchanged" | "unavailable"; previous?: string } | null
   >(null);
+  const [evoBusy, startEvo] = useTransition();
+  const [evoPrevious, setEvoPrevious] = useState<string | null>(null);
 
   function insertTemplate(id: string) {
     const t = templates.find((x) => x.id === id);
@@ -291,6 +295,29 @@ function NoteModal({
         setProof({ source: res.source });
       }
     });
+  }
+
+  /**
+   * Transforma as anotações cruas em evolução técnica. O texto atual vira a
+   * base (e fica guardado para desfazer) — o profissional revisa antes de salvar.
+   */
+  function draftEvo() {
+    setError("");
+    startEvo(async () => {
+      const res = await draftEvolutionAction({ customerId, notes: content });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setEvoPrevious(content);
+      setProof(null);
+      setContent(res.text);
+    });
+  }
+
+  function undoEvo() {
+    if (evoPrevious !== null) setContent(evoPrevious);
+    setEvoPrevious(null);
   }
 
   function undoProof() {
@@ -350,6 +377,20 @@ function NoteModal({
               <span className="flex items-center gap-1.5">
                 <button
                   type="button"
+                  onClick={draftEvo}
+                  disabled={evoBusy}
+                  title="Transforma suas anotações em texto técnico de evolução"
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-normal text-slate-600 hover:border-brand-400 hover:text-brand-500 disabled:opacity-40 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-300"
+                >
+                  {evoBusy ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <PenLine className="h-3 w-3" />
+                  )}
+                  Redigir evolução
+                </button>
+                <button
+                  type="button"
                   onClick={proofread}
                   disabled={proofBusy || !content.trim()}
                   className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-normal text-slate-600 hover:border-brand-400 hover:text-brand-500 disabled:opacity-40 dark:border-ink-600 dark:bg-ink-950 dark:text-slate-300"
@@ -384,11 +425,27 @@ function NoteModal({
               onChange={(e) => {
                 setContent(e.target.value);
                 if (proof) setProof(null);
+                if (evoPrevious !== null) setEvoPrevious(null);
               }}
               rows={8}
               placeholder="Evolução, conduta, queixas, orientações…"
               className="mt-1 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm dark:border-ink-600 dark:bg-ink-950 dark:text-slate-100"
             />
+            {evoPrevious !== null && (
+              <span className="mt-1 flex items-center gap-2 text-[11px] font-normal">
+                <span className="inline-flex items-center gap-1 text-brand-600 dark:text-brand-300">
+                  <PenLine className="h-3 w-3" /> Rascunho de evolução — revise e
+                  ajuste antes de registrar.
+                </span>
+                <button
+                  type="button"
+                  onClick={undoEvo}
+                  className="inline-flex items-center gap-1 text-slate-500 hover:text-brand-500 dark:text-slate-400"
+                >
+                  <Undo2 className="h-3 w-3" /> desfazer
+                </button>
+              </span>
+            )}
             {proof && (
               <span className="mt-1 flex items-center gap-2 text-[11px] font-normal">
                 {proof.source === "ai" ? (

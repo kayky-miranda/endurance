@@ -14,6 +14,8 @@ import {
 import { summarizeClinicalNotes } from "@/lib/endurance/clinical-summary";
 import { suggestConduct } from "@/lib/endurance/clinical-suggestions";
 import { proofreadText, type ProofreadSource } from "@/lib/endurance/text-proofreading";
+import { buildPatientContext } from "@/lib/endurance/clinical-analysis";
+import { draftEvolution, type EvolutionSource } from "@/lib/endurance/clinical-evolution";
 
 /**
  * Ações do Prontuário clínico. Tudo abre com o gate `prontuario.manage` — é
@@ -187,6 +189,43 @@ export async function suggestConductAction(input: {
     cidDescription: (input.cidDescription ?? "").trim(),
   });
   await logActivity(s, "prontuario.suggest", "Solicitou sugestão de conduta (IA)");
+  return { ok: true, text: res.text, source: res.source };
+}
+
+export type EvolutionResult =
+  | { ok: true; text: string; source: EvolutionSource }
+  | { ok: false; error: string };
+
+/**
+ * Redige a evolução clínica a partir das anotações cruas do profissional, com o
+ * histórico do paciente como contexto. Gate prontuario.manage + rate limit.
+ * NADA é gravado: o texto volta para o editor, o profissional revisa e salva.
+ */
+export async function draftEvolutionAction(input: {
+  customerId: string;
+  notes: string;
+}): Promise<EvolutionResult> {
+  const gate = await requirePermission("prontuario.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+  if (!(await hit(`prontuario:evolution:${s.sub}`, 15, 60_000)).ok)
+    return { ok: false, error: "Muitas gerações seguidas. Aguarde um instante." };
+
+  const ctx = await buildPatientContext(s.org, input.customerId);
+  if (!ctx) return { ok: false, error: "Paciente não encontrado." };
+
+  const res = await draftEvolution({ notes: input.notes ?? "", ctx });
+  if (res.source === "unavailable")
+    return {
+      ok: false,
+      error: "A redação com IA não está disponível (configure a chave GEMINI_API_KEY).",
+    };
+  await logActivity(
+    s,
+    "prontuario.evolution_draft",
+    "Gerou rascunho de evolução clínica com IA",
+    input.customerId,
+  );
   return { ok: true, text: res.text, source: res.source };
 }
 
