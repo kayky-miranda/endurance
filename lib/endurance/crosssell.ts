@@ -2,6 +2,7 @@ import "server-only";
 import { GoogleGenAI, Type } from "@google/genai";
 import { prisma } from "@/lib/db";
 import { money } from "./money";
+import { GEMINI_MODELS, isRetryableError } from "./gemini";
 
 export interface Suggestion {
   id: string;
@@ -9,15 +10,6 @@ export interface Suggestion {
   price: number;
   reason: string;
 }
-
-const GEMINI_MODELS = process.env.GEMINI_MODEL
-  ? [process.env.GEMINI_MODEL]
-  : [
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash-lite",
-      "gemini-flash-latest",
-    ];
 
 /**
  * Sugere produtos complementares (cross-sell/upsell) para a venda atual.
@@ -95,8 +87,7 @@ export async function suggestCrossSell(
           if (out.length) return out;
           break;
         } catch (e) {
-          const st = (e as { status?: number })?.status;
-          if ([404, 429, 500, 503].includes(st ?? 0)) continue;
+          if (isRetryableError(e)) continue;
           throw e;
         }
       }

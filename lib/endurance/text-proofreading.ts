@@ -1,5 +1,6 @@
 import "server-only";
 import { GoogleGenAI } from "@google/genai";
+import { GEMINI_MODELS, isRetryableError } from "./gemini";
 
 /**
  * Correção ortográfica/gramatical de texto livre (PT-BR). A IA corrige APENAS
@@ -11,15 +12,6 @@ import { GoogleGenAI } from "@google/genai";
  * Requer GEMINI_API_KEY; sem chave, é reportada como indisponível (não temos um
  * corretor local confiável para PT-BR e não vale entregar correção duvidosa).
  */
-
-const GEMINI_MODELS = process.env.GEMINI_MODEL
-  ? [process.env.GEMINI_MODEL]
-  : [
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash-lite",
-      "gemini-flash-latest",
-    ];
 
 export type ProofreadSource = "ai" | "unchanged" | "unavailable";
 
@@ -51,7 +43,14 @@ export async function proofreadText(input: string): Promise<ProofreadResult> {
         const resp = await ai.models.generateContent({
           model,
           contents: input.slice(0, 6000),
-          config: { systemInstruction: sys, temperature: 0, maxOutputTokens: 2000 },
+          config: {
+            systemInstruction: sys,
+            temperature: 0,
+            maxOutputTokens: 2000,
+            // Correção ortográfica é mecânica: o "pensamento" só adicionaria
+            // latência (e disputaria o orçamento de saída em textos longos).
+            thinkingConfig: { thinkingBudget: 0 },
+          },
         });
         const text = (resp.text || "").trim();
         if (!text) break;
@@ -60,8 +59,7 @@ export async function proofreadText(input: string): Promise<ProofreadResult> {
           source: text === original ? "unchanged" : "ai",
         };
       } catch (e) {
-        const st = (e as { status?: number })?.status;
-        if ([404, 429, 500, 503].includes(st ?? 0)) continue;
+        if (isRetryableError(e)) continue;
         throw e;
       }
     }

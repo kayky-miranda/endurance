@@ -1,5 +1,6 @@
 import "server-only";
 import { GoogleGenAI } from "@google/genai";
+import { GEMINI_MODELS, isRetryableError } from "./gemini";
 
 /**
  * Apoio à decisão clínica: a partir do quadro descrito + CID, a IA RASCUNHA
@@ -8,15 +9,6 @@ import { GoogleGenAI } from "@google/genai";
  * a feature é reportada como indisponível (NÃO fabricamos recomendação clínica
  * localmente — isso seria conteúdo médico não confiável).
  */
-
-const GEMINI_MODELS = process.env.GEMINI_MODEL
-  ? [process.env.GEMINI_MODEL]
-  : [
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash-lite",
-      "gemini-flash-latest",
-    ];
 
 export type SuggestionSource = "ai" | "unavailable";
 
@@ -49,14 +41,19 @@ export async function suggestConduct(input: {
         const resp = await ai.models.generateContent({
           model,
           contents: `Quadro clínico: ${quadro || "(não descrito)"}${cidPart}`,
-          config: { systemInstruction: sys, temperature: 0.4, maxOutputTokens: 450 },
+          config: {
+            systemInstruction: sys,
+            temperature: 0.4,
+            maxOutputTokens: 700,
+            // Ver anamnese-summary: thinking ligado truncava a resposta.
+            thinkingConfig: { thinkingBudget: 0 },
+          },
         });
         const text = (resp.text || "").trim();
         if (text) return { text, source: "ai" };
         break;
       } catch (e) {
-        const st = (e as { status?: number })?.status;
-        if ([404, 429, 500, 503].includes(st ?? 0)) continue;
+        if (isRetryableError(e)) continue;
         throw e;
       }
     }

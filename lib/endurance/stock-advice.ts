@@ -1,15 +1,7 @@
 import "server-only";
 import { GoogleGenAI } from "@google/genai";
 import type { StockAlert } from "./stock-alerts";
-
-const GEMINI_MODELS = process.env.GEMINI_MODEL
-  ? [process.env.GEMINI_MODEL]
-  : [
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash-lite",
-      "gemini-flash-latest",
-    ];
+import { GEMINI_MODELS, isRetryableError } from "./gemini";
 
 /** Recomendação em linguagem natural sobre reposição (IA + heurística). */
 export async function generateStockAdvice(
@@ -43,15 +35,17 @@ export async function generateStockAdvice(
             config: {
               systemInstruction: sys,
               temperature: 0.5,
-              maxOutputTokens: 300,
+              maxOutputTokens: 500,
+              // Ver anamnese-summary: thinking ligado consumia o orçamento de
+              // saída e truncava a recomendação.
+              thinkingConfig: { thinkingBudget: 0 },
             },
           });
           const text = (resp.text || "").trim();
           if (text) return { text, source: "ai" };
           break;
         } catch (e) {
-          const st = (e as { status?: number })?.status;
-          if ([404, 429, 500, 503].includes(st ?? 0)) continue;
+          if (isRetryableError(e)) continue;
           throw e;
         }
       }

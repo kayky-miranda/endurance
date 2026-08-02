@@ -2,6 +2,7 @@ import "server-only";
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Insight, InsightKind } from "./sales-insights";
 import type { ProductivityReport } from "./productivity";
+import { GEMINI_MODELS, isRetryableError } from "./gemini";
 
 /**
  * Insights gerenciais da clínica (IA + heurística) a partir do relatório de
@@ -10,15 +11,6 @@ import type { ProductivityReport } from "./productivity";
  * conselho médico; é gestão do consultório. Sempre entrega algo: sem chave de
  * IA, cai numa heurística determinística sobre os próprios números.
  */
-
-const GEMINI_MODELS = process.env.GEMINI_MODEL
-  ? [process.env.GEMINI_MODEL]
-  : [
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash-lite",
-      "gemini-flash-latest",
-    ];
 
 function brl(n: number) {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -130,8 +122,7 @@ export async function generateClinicInsights(
           if (out.length) return { insights: out, source: "ai" };
           break;
         } catch (e) {
-          const st = (e as { status?: number })?.status;
-          if ([404, 429, 500, 503].includes(st ?? 0)) continue;
+          if (isRetryableError(e)) continue;
           throw e;
         }
       }

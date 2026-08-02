@@ -2,15 +2,7 @@ import "server-only";
 import { GoogleGenAI, Type } from "@google/genai";
 import type { PricingAnalysis } from "./pricing";
 import type { Insight, InsightKind } from "./sales-insights";
-
-const GEMINI_MODELS = process.env.GEMINI_MODEL
-  ? [process.env.GEMINI_MODEL]
-  : [
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash-lite",
-      "gemini-flash-latest",
-    ];
+import { GEMINI_MODELS, isRetryableError } from "./gemini";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -92,8 +84,7 @@ export async function generatePricingAdvice(
           if (out.length) return { tips: out, source: "ai" };
           break;
         } catch (e) {
-          const st = (e as { status?: number })?.status;
-          if ([404, 429, 500, 503].includes(st ?? 0)) continue;
+          if (isRetryableError(e)) continue;
           throw e;
         }
       }

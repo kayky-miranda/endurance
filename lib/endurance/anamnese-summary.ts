@@ -1,5 +1,6 @@
 import "server-only";
 import { GoogleGenAI } from "@google/genai";
+import { GEMINI_MODELS, isRetryableError } from "./gemini";
 
 /**
  * Resumo da anamnese (questionário inicial). Segue o padrão do projeto: Gemini
@@ -8,15 +9,6 @@ import { GoogleGenAI } from "@google/genai";
  * pontos de atenção citados; NÃO diagnostica nem inventa. É apoio à leitura, não
  * conclusão clínica.
  */
-
-const GEMINI_MODELS = process.env.GEMINI_MODEL
-  ? [process.env.GEMINI_MODEL]
-  : [
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash-lite",
-      "gemini-flash-latest",
-    ];
 
 export interface AnamneseQA {
   question: string;
@@ -57,14 +49,21 @@ export async function summarizeAnamnese(
           const resp = await ai.models.generateContent({
             model,
             contents: `Paciente: ${patientName}\nRespostas:\n${corpus}`,
-            config: { systemInstruction: sys, temperature: 0.3, maxOutputTokens: 400 },
+            config: {
+              systemInstruction: sys,
+              temperature: 0.3,
+              maxOutputTokens: 600,
+              // Sem isto o "pensamento" dos modelos 2.5 come o orçamento de
+              // saída e a resposta chega CORTADA no meio da frase (além de
+              // levar ~2,5x mais tempo). Resumir é extração, não raciocínio.
+              thinkingConfig: { thinkingBudget: 0 },
+            },
           });
           const text = (resp.text || "").trim();
           if (text) return { text, source: "ai" };
           break;
         } catch (e) {
-          const st = (e as { status?: number })?.status;
-          if ([404, 429, 500, 503].includes(st ?? 0)) continue;
+          if (isRetryableError(e)) continue;
           throw e;
         }
       }

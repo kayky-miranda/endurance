@@ -8,6 +8,7 @@ import { listTemplates } from "@/lib/endurance/document-templates";
 import { listProfessionals } from "@/lib/endurance/agenda";
 import { loadModule, DeniedModule } from "../../module-kit";
 import RecordClient from "./record-client";
+import ClinicalAnalysisPanel from "./clinical-analysis-panel";
 import PrescriptionsPanel from "./prescriptions-panel";
 import CertificatesPanel from "./certificates-panel";
 
@@ -74,6 +75,8 @@ export default async function PatientRecordPage({
           )}
         </div>
       </div>
+
+      <ClinicalAnalysisPanel slug={slug} customerId={record.id} />
 
       <RecordClient slug={slug} customerId={record.id} notes={record.notes} templates={noteTemplates} />
 

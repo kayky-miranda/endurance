@@ -12,15 +12,7 @@ import { money } from "./money";
 import { getStockAlerts } from "./stock-alerts";
 import { getFinanceOverview } from "./finance";
 import { recordAiUsage } from "./ai-telemetry";
-
-const GEMINI_MODELS = process.env.GEMINI_MODEL
-  ? [process.env.GEMINI_MODEL]
-  : [
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash-lite",
-      "gemini-flash-latest",
-    ];
+import { GEMINI_MODELS } from "./gemini";
 
 export interface ChatMsg {
   role: "user" | "assistant";
@@ -667,6 +659,9 @@ async function* streamTurn(
       systemInstruction,
       temperature: 0.3,
       maxOutputTokens: 1200,
+      // Chat do operador: resposta rápida importa mais que raciocínio longo —
+      // e o "pensamento" ainda disputaria o orçamento de saída.
+      thinkingConfig: { thinkingBudget: 0 },
       tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
     },
   });

@@ -1,5 +1,6 @@
 import "server-only";
 import { GoogleGenAI } from "@google/genai";
+import { GEMINI_MODELS, isRetryableError } from "./gemini";
 
 /**
  * Resumo das anotações clínicas do paciente. Segue o padrão do projeto: usa o
@@ -7,15 +8,6 @@ import { GoogleGenAI } from "@google/genai";
  * clínico sai do servidor sem chave configurada). Sempre factual — o prompt
  * instrui a NÃO inventar; o resumo só condensa o que já está escrito.
  */
-
-const GEMINI_MODELS = process.env.GEMINI_MODEL
-  ? [process.env.GEMINI_MODEL]
-  : [
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash-lite",
-      "gemini-flash-latest",
-    ];
 
 export interface NoteForSummary {
   createdAt: string; // ISO
@@ -58,14 +50,19 @@ export async function summarizeClinicalNotes(
           const resp = await ai.models.generateContent({
             model,
             contents: `Paciente: ${patientName}\nAnotações:\n${corpus}`,
-            config: { systemInstruction: sys, temperature: 0.3, maxOutputTokens: 400 },
+            config: {
+              systemInstruction: sys,
+              temperature: 0.3,
+              maxOutputTokens: 600,
+              // Ver anamnese-summary: thinking ligado truncava o resumo.
+              thinkingConfig: { thinkingBudget: 0 },
+            },
           });
           const text = (resp.text || "").trim();
           if (text) return { text, source: "ai" };
           break;
         } catch (e) {
-          const st = (e as { status?: number })?.status;
-          if ([404, 429, 500, 503].includes(st ?? 0)) continue;
+          if (isRetryableError(e)) continue;
           throw e;
         }
       }

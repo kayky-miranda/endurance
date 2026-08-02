@@ -13,19 +13,11 @@ import {
 } from "./catalog";
 import type { OnboardingResult } from "./types";
 import { recordAiUsage } from "./ai-telemetry";
+import { GEMINI_MODELS } from "./gemini";
 
 const MODEL = "claude-opus-4-8";
 // Modelos Gemini Flash a tentar em ordem (a cota gratuita varia por modelo).
 // GEMINI_MODEL no .env força um específico.
-const GEMINI_MODELS = process.env.GEMINI_MODEL
-  ? [process.env.GEMINI_MODEL]
-  : [
-      "gemini-2.5-flash",
-      "gemini-2.0-flash",
-      "gemini-2.5-flash-lite",
-      "gemini-flash-latest",
-    ];
-
 // ---------------------------------------------------------------------------
 // Schema de saída estruturada (JSON Schema nativo).
 // Não dependemos do helper de Zod do SDK — JSON Schema puro é estável entre
