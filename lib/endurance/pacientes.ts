@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { parsePage, pageMeta, PAGE_SIZE, type PageMeta } from "./pagination";
 import { isValidCpf, onlyDigits } from "./patient";
+import { isValidEmail } from "./validation";
 
 /**
  * Cadastro de pacientes (nichos de saúde). O paciente é um Customer (a pessoa,
@@ -73,19 +74,24 @@ export async function listPatients(
   const page = parsePage(opts.pagina);
   const term = (opts.term ?? "").trim();
 
+  // A busca é feita no PatientProfile, que não é um modelo de exclusão lógica —
+  // o filtro global do Prisma só alcança operações de topo, então o
+  // `deletedAt: null` do paciente precisa ser explícito aqui. Sem isso, uma
+  // ficha excluída voltaria a aparecer na listagem.
   const where = {
     organizationId: org,
-    ...(term
-      ? {
-          customer: {
+    customer: {
+      deletedAt: null,
+      ...(term
+        ? {
             OR: [
               { name: { contains: term, mode: "insensitive" as const } },
               { phone: { contains: term } },
               { document: { contains: onlyDigits(term) || term } },
             ],
-          },
-        }
-      : {}),
+          }
+        : {}),
+    },
   };
 
   const [total, rows] = await Promise.all([
@@ -210,7 +216,33 @@ function validate(input: PatientInput): string | null {
   // CPF é opcional, mas se informado precisa ser válido (dígitos verificadores).
   if (input.cpf && input.cpf.trim() && !isValidCpf(input.cpf))
     return "CPF inválido.";
+  if (input.email && input.email.trim() && !isValidEmail(input.email))
+    return "E-mail inválido.";
   return null;
+}
+
+/**
+ * O CPF identifica a pessoa: dois pacientes com o mesmo CPF na mesma clínica são
+ * o mesmo paciente cadastrado em duplicidade — o que espalha o histórico clínico
+ * em duas fichas. Barramos na origem (`exceptCustomerId` libera a própria ficha
+ * na edição). Continua opcional: sem CPF informado, nada a checar.
+ */
+async function cpfTaken(
+  org: string,
+  cpf: string,
+  exceptCustomerId?: string,
+): Promise<boolean> {
+  const document = onlyDigits(cpf);
+  if (!document) return false;
+  const clash = await prisma.customer.findFirst({
+    where: {
+      organizationId: org,
+      document,
+      ...(exceptCustomerId ? { id: { not: exceptCustomerId } } : {}),
+    },
+    select: { id: true },
+  });
+  return clash !== null;
 }
 
 function profileData(input: PatientInput) {
@@ -252,6 +284,8 @@ export async function createPatient(
 ): Promise<PatientResult> {
   const invalid = validate(input);
   if (invalid) return { ok: false, error: invalid };
+  if (input.cpf && (await cpfTaken(org, input.cpf)))
+    return { ok: false, error: "Já existe um paciente com este CPF." };
 
   const id = await prisma.$transaction(async (tx) => {
     const customer = await tx.customer.create({
@@ -273,6 +307,8 @@ export async function updatePatient(
 ): Promise<PatientResult> {
   const invalid = validate(input);
   if (invalid) return { ok: false, error: invalid };
+  if (input.cpf && (await cpfTaken(org, input.cpf, customerId)))
+    return { ok: false, error: "Já existe um paciente com este CPF." };
 
   const profile = await prisma.patientProfile.findFirst({
     where: { organizationId: org, customerId },
@@ -285,6 +321,29 @@ export async function updatePatient(
     prisma.patientProfile.update({ where: { id: profile.id }, data: profileData(input) }),
   ]);
   return { ok: true, id: customerId };
+}
+
+/**
+ * Exclusão LÓGICA do paciente (marca `deletedAt` no Customer). Nunca apagamos de
+ * verdade: consultas, prontuário e lançamentos financeiros apontam para esta
+ * pessoa e o histórico clínico precisa continuar íntegro e auditável. A ficha
+ * some das listagens e da busca; o passado permanece.
+ */
+export async function deletePatient(
+  org: string,
+  customerId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const customer = await prisma.customer.findFirst({
+    where: { id: customerId, organizationId: org },
+    select: { id: true },
+  });
+  if (!customer) return { ok: false, error: "Paciente não encontrado." };
+
+  await prisma.customer.update({
+    where: { id: customerId },
+    data: { deletedAt: new Date() },
+  });
+  return { ok: true };
 }
 
 // ---- Anexos (referências/links) ----

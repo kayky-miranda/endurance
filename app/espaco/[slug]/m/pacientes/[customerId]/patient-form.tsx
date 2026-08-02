@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, AlertCircle, CheckCircle2, Save } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, Save, Trash2 } from "lucide-react";
 import type { PatientDetail } from "@/lib/endurance/pacientes";
 import {
   SEX_OPTIONS,
@@ -12,7 +12,7 @@ import {
   ageFromBirth,
 } from "@/lib/endurance/patient";
 import { lookupCepAction } from "../../lookup-actions";
-import { savePatientAction } from "../pacientes-actions";
+import { savePatientAction, deletePatientAction } from "../pacientes-actions";
 
 type FormState = Omit<PatientDetail, "id" | "attachments">;
 
@@ -64,6 +64,23 @@ export default function PatientForm({
         street: p.street || res.data.address,
       }));
     }
+  }
+
+  function remove() {
+    if (!patient) return;
+    if (
+      !confirm(
+        `Excluir a ficha de ${patient.name}? O histórico de consultas, prontuário e financeiro é preservado.`,
+      )
+    )
+      return;
+    setError("");
+    setOk("");
+    startTransition(async () => {
+      const res = await deletePatientAction(patient.id);
+      if (res.ok) router.push(`/espaco/${slug}/m/pacientes`);
+      else setError(res.error);
+    });
   }
 
   function submit() {
@@ -225,6 +242,15 @@ export default function PatientForm({
       )}
 
       <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-slate-100 bg-white/80 py-3 backdrop-blur dark:border-ink-800 dark:bg-ink-950/70">
+        {patient && (
+          <button
+            onClick={remove}
+            disabled={busy}
+            className="mr-auto inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-400 transition hover:bg-rose-50 hover:text-rose-500 disabled:opacity-40 dark:hover:bg-rose-500/10"
+          >
+            <Trash2 className="h-4 w-4" /> Excluir ficha
+          </button>
+        )}
         <button
           onClick={submit}
           disabled={busy}

@@ -4,6 +4,7 @@ import {
   MODULES,
   NICHES,
   MODULE_CATEGORIES,
+  activeModuleIds,
   moduleCategory,
   moduleById,
   modulesForNiche,
@@ -67,8 +68,13 @@ export async function getModulesConfig(org: string): Promise<ModulesConfig> {
     }),
     prisma.orgModule.findMany({ where: { organizationId: org } }),
   ]);
-  const enabledSet = new Set(rows.filter((r) => r.enabled).map((r) => r.moduleId));
   const niche = orgRow?.niche ?? "";
+  // Mesma fonte da verdade da navegação: sem linha = padrão do catálogo, não
+  // "desligado" (senão a tela de Configurações discordaria da sidebar).
+  const enabledSet = activeModuleIds(
+    niche,
+    new Map(rows.map((r) => [r.moduleId, r.enabled])),
+  );
   const recommended = new Set(
     VALID_NICHES.has(niche) ? modulesForNiche(niche as NicheId).map((m) => m.id) : [],
   );

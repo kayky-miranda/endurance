@@ -6,6 +6,7 @@ import { logActivity } from "@/lib/endurance/activity-log";
 import {
   createPatient,
   updatePatient,
+  deletePatient,
   getPatient,
   addAttachment,
   deleteAttachment,
@@ -43,6 +44,23 @@ export async function savePatientAction(
   );
   revalidate(s.slug, res.id);
   return { ok: true, id: res.id };
+}
+
+/**
+ * Exclusão (lógica) da ficha do paciente. O histórico — consultas, prontuário e
+ * financeiro — continua íntegro; só a ficha sai das listagens.
+ */
+export async function deletePatientAction(
+  customerId: string,
+): Promise<PatientActionResult> {
+  const gate = await requirePermission("pacientes.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+  const res = await deletePatient(s.org, customerId);
+  if (!res.ok) return { ok: false, error: res.error ?? "Falha ao excluir." };
+  await logActivity(s, "patient.delete", "Excluiu a ficha de um paciente", customerId);
+  revalidate(s.slug, customerId);
+  return { ok: true };
 }
 
 export async function getPatientAction(

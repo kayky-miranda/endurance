@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { money } from "./money";
 import { onlyDigits, isValidCnpj } from "./cnpj";
+import { isValidEmail } from "./validation";
 import { PAGE_SIZE, clampPage, pageMeta, type PageMeta } from "./pagination";
 
 // ---------------------------------------------------------------------------
@@ -91,7 +92,7 @@ function normalizeInput(
     return { ok: false, error: "CNPJ inválido. Confira os dígitos." };
 
   const email = str(input.email, 120);
-  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+  if (email && !isValidEmail(email))
     return { ok: false, error: "E-mail inválido." };
 
   const rating = Math.min(5, Math.max(0, Number(input.rating) || 0));

@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { EMAIL_RE } from "./endurance/validation";
 
 /**
  * Schemas Zod compartilhados — fonte única de validação para o que entra
@@ -20,7 +21,7 @@ export const emailField = z
   .toLowerCase()
   .min(3, "E-mail muito curto.")
   .max(120, "E-mail muito longo.")
-  .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "E-mail inválido.");
+  .regex(EMAIL_RE, "E-mail inválido.");
 
 export const strongPasswordField = z
   .string({ message: "Senha é obrigatória." })

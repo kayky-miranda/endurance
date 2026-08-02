@@ -2,10 +2,11 @@ import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/db";
 import {
+  MODULES,
   NICHES,
   type NicheId,
+  activeModuleIds,
   coreModules,
-  moduleById,
   modulesForNiche,
   nicheLabel,
 } from "./catalog";
@@ -138,6 +139,20 @@ export interface WorkspaceView {
  * Carrega um espaço pelo slug, já mapeando os ids para rótulos do catálogo.
  * Deduplicado por request com React cache() — layout e página do módulo
  * compartilham a mesma consulta no mesmo render.
+ *
+ * PROVISIONAMENTO AUTO-CURÁVEL: a lista de módulos NÃO sai só das linhas de
+ * OrgModule. Um módulo do catálogo que é core ou pertence ao ramo da empresa e
+ * que NUNCA foi configurado (não tem linha nenhuma) conta como disponível.
+ *
+ * A distinção é o ponto central: **ausência de linha ≠ desligado**.
+ *  - linha `enabled: true`  → ligado;
+ *  - linha `enabled: false` → o usuário desligou de propósito (respeitamos);
+ *  - sem linha              → o catálogo cresceu depois que o espaço nasceu.
+ *
+ * Sem isso, todo módulo novo ficava invisível para as empresas já existentes
+ * (sidebar sem o item e a rota caindo em 404 no `loadModule`) até alguém rodar
+ * um script de backfill à mão — exatamente o que aconteceu com o Cadastro de
+ * pacientes.
  */
 export const getWorkspace = cache(async function getWorkspace(
   slug: string,
@@ -148,20 +163,18 @@ export const getWorkspace = cache(async function getWorkspace(
   });
   if (!org) return null;
 
-  const modules = org.modules
-    // Módulo desligado nas Configurações some da navegação e do gate de acesso.
-    .filter((om) => om.enabled)
-    .map((om) => {
-      const def = moduleById(om.moduleId);
-      if (!def) return null;
-      return {
-        id: def.id,
-        label: def.label,
-        description: def.description,
-        core: def.scope === "core",
-      };
-    })
-    .filter((m): m is NonNullable<typeof m> => m !== null);
+  const activeIds = activeModuleIds(
+    org.niche,
+    new Map(org.modules.map((om) => [om.moduleId, om.enabled])),
+  );
+
+  // Percorre o CATÁLOGO (e não as linhas) para a ordem ficar estável.
+  const modules = MODULES.filter((def) => activeIds.has(def.id)).map((def) => ({
+    id: def.id,
+    label: def.label,
+    description: def.description,
+    core: def.scope === "core",
+  }));
 
   return {
     slug: org.slug,

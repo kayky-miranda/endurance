@@ -549,6 +549,37 @@ export function allModuleIds(): string[] {
   return MODULES.map((m) => m.id);
 }
 
+/**
+ * Módulos ativos de um espaço — FONTE DA VERDADE única, usada tanto pela
+ * navegação (`getWorkspace`) quanto pela tela de Configurações
+ * (`getModulesConfig`), para as duas nunca discordarem.
+ *
+ * `configured` traz o que existe na tabela OrgModule (id → enabled). A regra:
+ *  - tem linha  → vale o que a linha diz (o usuário decidiu);
+ *  - sem linha  → vale o padrão do catálogo (core + módulos do ramo).
+ *
+ * Ausência de linha significa "nunca provisionado" (o catálogo ganhou um módulo
+ * novo depois que o espaço foi criado), e NÃO "desligado". Sem essa distinção,
+ * módulos novos ficavam invisíveis para empresas antigas até um backfill manual.
+ */
+export function activeModuleIds(
+  niche: string,
+  configured: ReadonlyMap<string, boolean>,
+): Set<string> {
+  const known = NICHES.some((n) => n.id === niche);
+  const byDefault = new Set([
+    ...coreModules().map((m) => m.id),
+    ...(known ? modulesForNiche(niche as NicheId).map((m) => m.id) : []),
+  ]);
+
+  const active = new Set<string>();
+  for (const def of MODULES) {
+    const row = configured.get(def.id);
+    if (row === undefined ? byDefault.has(def.id) : row) active.add(def.id);
+  }
+  return active;
+}
+
 export function nicheLabel(id: NicheOrOther): string {
   if (id === "outro") return "Outro / não identificado";
   return NICHES.find((n) => n.id === id)?.label ?? id;
