@@ -8,10 +8,13 @@ import { listTemplates } from "@/lib/endurance/document-templates";
 import { listProfessionals } from "@/lib/endurance/agenda";
 import { getPatientBriefing } from "@/lib/endurance/patient-briefing";
 import { getPatientExams } from "@/lib/endurance/lab-exams";
+import { DOCUMENTS } from "@/lib/endurance/document-catalog";
+import { canAccessModule } from "@/lib/endurance/permissions";
 import { loadModule, DeniedModule } from "../../module-kit";
 import RecordClient from "./record-client";
 import BriefingPanel from "./briefing-panel";
 import ExamsPanel from "./exams-panel";
+import DocumentsPanel from "./documents-panel";
 import ClinicalAnalysisPanel from "./clinical-analysis-panel";
 import PrescriptionsPanel from "./prescriptions-panel";
 import CertificatesPanel from "./certificates-panel";
@@ -41,6 +44,13 @@ export default async function PatientRecordPage({
         getPatientExams(session.org, customerId),
       ])
     : [[], [], [], [], null, null];
+
+  // Só oferece o documento cujo módulo o perfil pode acessar.
+  const availableDocs = session
+    ? DOCUMENTS.filter((d) =>
+        canAccessModule(session.role, session.permissions, d.module),
+      ).map((d) => d.id)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -87,6 +97,8 @@ export default async function PatientRecordPage({
       <ClinicalAnalysisPanel slug={slug} customerId={record.id} />
 
       {exams && <ExamsPanel slug={slug} customerId={record.id} data={exams} />}
+
+      <DocumentsPanel slug={slug} customerId={record.id} available={availableDocs} />
 
       <RecordClient slug={slug} customerId={record.id} notes={record.notes} templates={noteTemplates} />
 

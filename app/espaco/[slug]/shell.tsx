@@ -193,7 +193,8 @@ export default function Shell({
     pathname.startsWith(`${base}/receita/`) ||
     pathname.startsWith(`${base}/atestado/`) ||
     pathname.startsWith(`${base}/paciente-resumo/`) ||
-    pathname.startsWith(`${base}/etiquetas`)
+    pathname.startsWith(`${base}/etiquetas`) ||
+    pathname.startsWith(`${base}/documento/`)
   ) {
     return (
       <div className={dark ? "dark" : ""}>

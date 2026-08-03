@@ -79,6 +79,7 @@ model Organization {
   certificates     Certificate[]
   analysisCache    ClinicalAnalysisCache[]
   labExams         LabExam[]
+  documentSettings DocumentSettings?
   docTemplates     DocumentTemplate[]
   professionalProfiles ProfessionalProfile[]
 }
@@ -91,6 +92,8 @@ model ProfessionalProfile {
   userId            String   @unique
   commissionPercent Float    @default(0) // % sobre a receita de consultas atendidas
   council           String   @default("") // registro (CRM/CRN/CRP)
+  /// Assinatura digitalizada (data URL). Aparece nos documentos impressos.
+  signatureDataUrl  String?  @db.Text
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -1785,4 +1788,30 @@ model LabExam {
 
   @@index([organizationId, customerId, collectedAt])
   @@index([organizationId, customerId, name])
+}
+
+
+/// Papel timbrado dos documentos impressos (receita, atestado, laudo…).
+/// Uma linha por organização. Existe para a clínica configurar cabeçalho,
+/// rodapé e identidade visual SEM tocar em código — e para todos os documentos
+/// saírem iguais, em vez de cada tela montar o seu próprio cabeçalho.
+model DocumentSettings {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  /// Nome exibido no topo; vazio usa o nome da organização.
+  displayName    String   @default("")
+  address        String   @default("")
+  phone          String   @default("")
+  email          String   @default("")
+  website        String   @default("")
+  /// Linha livre no cabeçalho (ex.: "Especializada em nutrição esportiva").
+  headerNote     String   @default("")
+  footerText     String   @default("")
+  showLogo       Boolean  @default(true)
+  showCnpj       Boolean  @default(true)
+  /// Cor de destaque (filetes e títulos). Hex.
+  accentColor    String   @default("#0EA5E9")
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
