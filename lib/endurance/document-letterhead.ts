@@ -107,6 +107,55 @@ export async function getSignature(
   };
 }
 
+/**
+ * Valores atuais para preencher o formulário de configuração. Diferente de
+ * `getLetterhead`, que já resolve os fallbacks (cidade/UF no lugar do endereço,
+ * por exemplo): aqui devolvemos o que está REALMENTE salvo, senão o usuário
+ * salvaria um fallback como se fosse escolha dele.
+ */
+export interface DocumentSettingsView {
+  displayName: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  headerNote: string;
+  footerText: string;
+  showLogo: boolean;
+  showCnpj: boolean;
+  accentColor: string;
+  /** Só para a pré-visualização. */
+  orgName: string;
+  logoDataUrl: string | null;
+}
+
+export async function getDocumentSettings(
+  org: string,
+): Promise<DocumentSettingsView> {
+  const [row, organization, theme] = await Promise.all([
+    prisma.documentSettings.findUnique({ where: { organizationId: org } }),
+    prisma.organization.findUnique({ where: { id: org }, select: { name: true } }),
+    prisma.themeSettings.findFirst({
+      where: { organizationId: org },
+      select: { logoDataUrl: true },
+    }),
+  ]);
+  return {
+    displayName: row?.displayName ?? "",
+    address: row?.address ?? "",
+    phone: row?.phone ?? "",
+    email: row?.email ?? "",
+    website: row?.website ?? "",
+    headerNote: row?.headerNote ?? "",
+    footerText: row?.footerText ?? "",
+    showLogo: row?.showLogo ?? true,
+    showCnpj: row?.showCnpj ?? true,
+    accentColor: row?.accentColor ?? ACCENT_FALLBACK,
+    orgName: organization?.name ?? "",
+    logoDataUrl: theme?.logoDataUrl ?? null,
+  };
+}
+
 export interface DocumentSettingsInput {
   displayName?: string;
   address?: string;

@@ -6,11 +6,13 @@ import { listApiKeys } from "@/lib/endurance/api-keys";
 import { listLocations } from "@/lib/endurance/locations";
 import { getReceiptConfig } from "@/lib/endurance/receipt-settings";
 import { getModulesConfig } from "@/lib/endurance/modules-admin";
+import { getDocumentSettings, getSignature } from "@/lib/endurance/document-letterhead";
 import ConfiguracoesClient from "./configuracoes-client";
 import ModulesSection from "./modules-section";
 import ApiKeysSection, { type ApiKeyRow } from "./api-keys-section";
 import LocationsSection from "./locations-section";
 import ReceiptSection from "./receipt-section";
+import DocumentsSection from "./documents-section";
 
 export default async function ConfiguracoesPage({
   params,
@@ -24,6 +26,11 @@ export default async function ConfiguracoesPage({
   const locations = canSettings ? await listLocations(session.org) : [];
   const receiptConfig = canSettings ? await getReceiptConfig(session.org) : null;
   const modulesConfig = canSettings ? await getModulesConfig(session.org) : null;
+  const [docSettings, mySignature] = await Promise.all([
+    getDocumentSettings(session.org),
+    getSignature(session.org, session.sub, session.name),
+  ]);
+
   const canApi = hasPermission(session.role, session.permissions, "integrations.config");
   const apiKeys: ApiKeyRow[] = canApi
     ? (await listApiKeys(session.org)).map((k) => ({
@@ -50,6 +57,12 @@ export default async function ConfiguracoesPage({
       {canSettings && <LocationsSection locations={locations} />}
 
       {receiptConfig && <ReceiptSection config={receiptConfig} />}
+
+      <DocumentsSection
+        settings={docSettings}
+        signature={mySignature}
+        canEditLetterhead={canSettings}
+      />
 
       {canApi && <ApiKeysSection keys={apiKeys} />}
 
