@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requirePlanFeature } from "@/lib/endurance/plan-limits";
 import { getSession, canManageTeam } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
@@ -27,6 +28,10 @@ export async function GET(
     return new NextResponse("Não autorizado.", { status: 401 });
   if (!canManageTeam(session.role))
     return new NextResponse("Acesso restrito.", { status: 403 });
+
+  // Levar o dado para fora do sistema é capacidade de plano, não só de perfil.
+  const plan = await requirePlanFeature(session.org, "data.export");
+  if (!plan.ok) return new NextResponse(plan.error, { status: 402 });
 
   const entries = await prisma.financialEntry.findMany({
     where: { organizationId: session.org },

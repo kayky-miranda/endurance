@@ -13,6 +13,88 @@
 export type PlanId = "starter" | "professional" | "business" | "enterprise";
 export type SubStatus = "trialing" | "active" | "past_due" | "canceled";
 
+/**
+ * CAPACIDADES COBRÁVEIS — o que o plano libera além dos assentos.
+ *
+ * Só entra aqui o que separa planos de verdade. A operação do ramo (agenda,
+ * prontuário, PDV, fiscal, documentos, relatórios) fica FORA de propósito: é o
+ * motivo de o cliente abrir o sistema todo dia, e restringir isso gera
+ * cancelamento em vez de upgrade. O que separa planos é o que só passa a
+ * importar quando a empresa cresce — equipe, integração, filial, holding.
+ *
+ * A IA também não está aqui: ela é medida por CRÉDITO, não bloqueada por plano.
+ * Esconder o principal diferencial no topo faria a maioria dos clientes nunca
+ * experimentar aquilo que justificaria pagar mais.
+ */
+export const PLAN_FEATURES = [
+  "permissions.advanced",
+  "audit.log",
+  "api.access",
+  "multi.location",
+  "purchasing.workflow",
+  "data.export",
+  "multi.company",
+  "white.label",
+  "priority.processing",
+] as const;
+
+export type PlanFeature = (typeof PLAN_FEATURES)[number];
+
+export interface PlanFeatureDef {
+  id: PlanFeature;
+  label: string;
+  /** Frase curta mostrada na tela de bloqueio — diz o ganho, não o recurso. */
+  pitch: string;
+}
+
+export const PLAN_FEATURE_CATALOG: Record<PlanFeature, PlanFeatureDef> = {
+  "permissions.advanced": {
+    id: "permissions.advanced",
+    label: "Perfis e permissões",
+    pitch: "Separe o que cada pessoa da equipe pode ver e fazer.",
+  },
+  "audit.log": {
+    id: "audit.log",
+    label: "Auditoria",
+    pitch: "Acompanhe quem alterou o quê, e quando.",
+  },
+  "api.access": {
+    id: "api.access",
+    label: "API e integrações",
+    pitch: "Conecte o ENDURANCE aos outros sistemas que você usa.",
+  },
+  "multi.location": {
+    id: "multi.location",
+    label: "Multi-local",
+    pitch: "Controle estoque e transferências entre unidades.",
+  },
+  "purchasing.workflow": {
+    id: "purchasing.workflow",
+    label: "Fluxo de compras",
+    pitch: "Solicitação, aprovação e cotação com alçada definida.",
+  },
+  "data.export": {
+    id: "data.export",
+    label: "Exportações",
+    pitch: "Leve seus dados para planilha e ferramentas de BI.",
+  },
+  "multi.company": {
+    id: "multi.company",
+    label: "Multiempresa",
+    pitch: "Administre várias empresas com visão consolidada.",
+  },
+  "white.label": {
+    id: "white.label",
+    label: "Marca própria",
+    pitch: "Documentos e portal com a identidade da sua marca.",
+  },
+  "priority.processing": {
+    id: "priority.processing",
+    label: "Processamento prioritário",
+    pitch: "Sua fila de IA e relatórios na frente.",
+  },
+};
+
 export interface PlanDef {
   id: PlanId;
   name: string;
@@ -26,23 +108,48 @@ export interface PlanDef {
   featured: boolean;
   /** Planos sob consulta não são auto-contratáveis (fale com vendas). */
   contactSales: boolean;
+  /**
+   * Capacidades que ESTE nível acrescenta. A liberação é CUMULATIVA
+   * (`planAllows` percorre a hierarquia), então não se repete o que o plano
+   * anterior já dá — evita listas divergirem quando um recurso muda de nível.
+   */
+  adds: PlanFeature[];
+  /** Créditos de IA incluídos por ciclo. 0 = sem IA; -1 = sem teto. */
+  aiCredits: number;
+  /** Valor por usuário adicional, em BRL. `null` = não vende avulso. */
+  extraSeatPrice: number | null;
 }
+
+/**
+ * Ordem de poder dos planos. É o que torna a liberação cumulativa: quem está no
+ * Business tem tudo que o Professional libera, sem precisar duplicar a lista.
+ */
+export const PLAN_ORDER: PlanId[] = [
+  "starter",
+  "professional",
+  "business",
+  "enterprise",
+];
 
 /** Catálogo de planos. A ordem define a ordem de exibição na interface. */
 export const PLAN_CATALOG: PlanDef[] = [
   {
     id: "starter",
-    name: "Starter",
+    name: "Teste",
     priceMonthly: 0,
     seats: 2,
-    description: "Para começar a organizar a operação.",
+    description: "14 dias com o Professional completo.",
     featured: false,
     contactSales: false,
+    // O teste dá a experiência inteira do Professional de propósito: o cliente
+    // precisa ver o produto funcionando com os dados dele para decidir.
+    adds: [],
+    aiCredits: 60,
+    extraSeatPrice: null,
     features: [
-      "Até 2 usuários",
-      "Dashboard e financeiro básico",
-      "Vendas e estoque",
-      "Relatórios essenciais",
+      "14 dias, sem cartão",
+      "Professional completo liberado",
+      "60 créditos de IA",
       "Suporte por e-mail",
     ],
   },
@@ -50,51 +157,69 @@ export const PLAN_CATALOG: PlanDef[] = [
     id: "professional",
     name: "Professional",
     priceMonthly: 149,
-    seats: 10,
-    description: "Para equipes que querem crescer com controle.",
+    seats: 3,
+    description: "Para o profissional autônomo e o consultório pequeno.",
     featured: true,
     contactSales: false,
+    adds: [],
+    aiCredits: 150,
+    extraSeatPrice: 45,
     features: [
-      "Até 10 usuários",
-      "Todos os módulos operacionais",
-      "Assistente e insights de IA",
+      "3 usuários (+R$45 por usuário extra)",
+      "Todos os módulos do seu ramo",
+      "Documentos e impressão",
       "Fiscal (NF-e / NFC-e)",
-      "Integrações (WhatsApp, Excel)",
-      "Suporte prioritário",
+      "150 créditos de IA por mês",
+      "Suporte por e-mail",
     ],
   },
   {
     id: "business",
     name: "Business",
     priceMonthly: 349,
-    seats: 30,
-    description: "Para empresas com operação intensa.",
+    seats: 10,
+    description: "Para a clínica ou loja com equipe e processo.",
     featured: false,
     contactSales: false,
+    adds: [
+      "permissions.advanced",
+      "audit.log",
+      "api.access",
+      "multi.location",
+      "purchasing.workflow",
+      "data.export",
+    ],
+    aiCredits: 800,
+    extraSeatPrice: 35,
     features: [
-      "Até 30 usuários",
-      "IA avançada e previsões",
-      "Produção e logística",
-      "Power BI e APIs externas",
-      "Permissões avançadas",
-      "Gerente de conta",
+      "10 usuários (+R$35 por usuário extra)",
+      "Tudo do Professional",
+      "Perfis, permissões e auditoria",
+      "API, integrações e exportações",
+      "Multi-local e fluxo de compras",
+      "800 créditos de IA por mês",
+      "Suporte prioritário",
     ],
   },
   {
     id: "enterprise",
     name: "Enterprise",
-    priceMonthly: null,
-    seats: 0,
-    description: "Para grandes operações e múltiplas filiais.",
+    priceMonthly: 899,
+    seats: 30,
+    description: "Para redes, franquias e operação multiempresa.",
     featured: false,
     contactSales: true,
+    adds: ["multi.company", "white.label", "priority.processing"],
+    aiCredits: -1,
+    extraSeatPrice: 25,
     features: [
-      "Usuários ilimitados",
-      "Multi-filial e multiempresa",
-      "SLA e segurança dedicados",
-      "Integrações personalizadas",
-      "Implantação assistida",
-      "Suporte 24/7",
+      "30 usuários (+R$25 por usuário extra)",
+      "Tudo do Business",
+      "Multiempresa e consolidação",
+      "Marca própria nos documentos",
+      "IA sem teto e fila prioritária",
+      "Implantação assistida e SLA",
+      "Gerente de conta",
     ],
   },
 ];
@@ -134,6 +259,72 @@ export function planById(id: string): PlanDef | undefined {
 /** Garante um PlanId válido (fallback no Starter para dados inesperados). */
 export function asPlanId(id: string): PlanId {
   return PLAN_BY_ID.has(id as PlanId) ? (id as PlanId) : "starter";
+}
+
+/**
+ * Data em que as capacidades por plano passaram a valer.
+ *
+ * A assinatura só é materializada no checkout, então "não tem assinatura" é
+ * ambíguo: pode ser cliente antigo que nunca mexeu em cobrança ou empresa
+ * recém-criada. A data de criação da organização desfaz a ambiguidade — quem
+ * nasceu antes desta data é legado, sem depender de haver linha de assinatura.
+ */
+export const PLAN_ENFORCEMENT_SINCE = new Date("2026-08-05T00:00:00.000Z");
+
+export function isLegacyOrg(createdAt: Date | null | undefined): boolean {
+  return !!createdAt && createdAt.getTime() < PLAN_ENFORCEMENT_SINCE.getTime();
+}
+
+/**
+ * O plano libera a capacidade?
+ *
+ * CUMULATIVO: percorre a hierarquia até o plano do cliente, então o Business
+ * recebe tudo que o Professional dá sem repetir a lista.
+ *
+ * DIREITO ADQUIRIDO (`legacyFullAccess`): quem já usava o sistema antes de os
+ * planos passarem a valer mantém tudo liberado. Tirar uma função de quem já
+ * trabalha com ela é a forma mais rápida de perder o cliente — e a receita de
+ * um upgrade forçado não paga o cancelamento que ele provoca. Contrato novo
+ * nasce com a regra nova.
+ */
+export function planAllows(
+  plan: string,
+  feature: PlanFeature,
+  opts: { legacyFullAccess?: boolean } = {},
+): boolean {
+  if (opts.legacyFullAccess) return true;
+  const target = asPlanId(plan);
+  for (const id of PLAN_ORDER) {
+    const def = planById(id);
+    if (def?.adds.includes(feature)) return true;
+    if (id === target) return false; // chegou ao plano do cliente sem encontrar
+  }
+  return false;
+}
+
+/** Todas as capacidades liberadas por um plano — para telas de comparação. */
+export function planCapabilities(plan: string): PlanFeature[] {
+  const target = asPlanId(plan);
+  const out: PlanFeature[] = [];
+  for (const id of PLAN_ORDER) {
+    const def = planById(id);
+    if (def) out.push(...def.adds);
+    if (id === target) break;
+  }
+  return out;
+}
+
+/** Menor plano que libera a capacidade — é o que a tela de bloqueio oferece. */
+export function planRequiredFor(feature: PlanFeature): PlanId | null {
+  for (const id of PLAN_ORDER) {
+    if (planById(id)?.adds.includes(feature)) return id;
+  }
+  return null;
+}
+
+/** Créditos de IA do ciclo. -1 = sem teto. */
+export function planAiCredits(plan: string): number {
+  return planById(asPlanId(plan))?.aiCredits ?? 0;
 }
 
 export function planLabel(id: string): string {

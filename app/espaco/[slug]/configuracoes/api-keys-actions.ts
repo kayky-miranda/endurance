@@ -2,14 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth";
+import { requirePlanFeature } from "@/lib/endurance/plan-limits";
 import { createApiKey, revokeApiKey } from "@/lib/endurance/api-keys";
 import { logActivity } from "@/lib/endurance/activity-log";
 
+// Criar chave é o ponto de entrada da integração — é aqui que o plano decide.
+// Revogar continua liberado: um cliente que baixou de plano precisa poder
+// desligar as chaves que já existem.
 export async function createApiKeyAction(
   name: string,
 ): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
   const gate = await requirePermission("integrations.config");
-  if (!gate.ok) return { ok: false, error: gate.error };
+  if (!gate.ok) return gate;
+  const plan = await requirePlanFeature(gate.session.org, "api.access");
+  if (!plan.ok) return plan;
   const s = gate.session;
 
   const { token, prefix } = await createApiKey(s.org, name, {

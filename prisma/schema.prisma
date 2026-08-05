@@ -353,6 +353,10 @@ model Subscription {
   currentPeriodStart DateTime  @default(now())
   currentPeriodEnd   DateTime
   cancelAtPeriodEnd  Boolean   @default(false)
+  /// Contrato anterior à vigência das capacidades por plano: mantém TUDO
+  /// liberado. Tirar função de quem já trabalha com ela custa mais em
+  /// cancelamento do que rende em upgrade — a regra nova vale para contrato novo.
+  legacyFullAccess   Boolean   @default(false)
   trialEndsAt        DateTime?
   // Referências do gateway de cobrança recorrente (Asaas). Null no modo manual.
   asaasCustomerId     String?

@@ -1,6 +1,13 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { PLAN_CATALOG, type PlanId } from "@/lib/endurance/billing";
+import {
+  PLAN_CATALOG,
+  isLegacyOrg,
+  planAllows,
+  planRequiredFor,
+  type PlanFeature,
+  type PlanId,
+} from "@/lib/endurance/billing";
 
 /**
  * Enforcement em runtime dos limites de cada plano. A UI esconde o botão de
@@ -16,13 +23,30 @@ export interface PlanContext {
   seats: number; // 0 = ilimitado
   trialEndsAt: Date | null;
   trialExpired: boolean;
+  /** Contrato anterior à vigência das capacidades: mantém tudo liberado. */
+  legacyFullAccess: boolean;
 }
 
 export async function resolvePlanContext(orgId: string): Promise<PlanContext> {
-  const sub = await prisma.subscription.findUnique({
-    where: { organizationId: orgId },
-    select: { plan: true, status: true, seats: true, trialEndsAt: true },
-  });
+  // As duas leituras são independentes: a organização diz se o contrato é
+  // anterior à vigência das capacidades, a assinatura diz o plano atual.
+  const [sub, org] = await Promise.all([
+    prisma.subscription.findUnique({
+      where: { organizationId: orgId },
+      select: {
+        plan: true,
+        status: true,
+        seats: true,
+        trialEndsAt: true,
+        legacyFullAccess: true,
+      },
+    }),
+    prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { createdAt: true },
+    }),
+  ]);
+  const legacyByAge = isLegacyOrg(org?.createdAt);
   if (!sub) {
     return {
       plan: "starter",
@@ -30,6 +54,7 @@ export async function resolvePlanContext(orgId: string): Promise<PlanContext> {
       seats: 2,
       trialEndsAt: null,
       trialExpired: false,
+      legacyFullAccess: legacyByAge,
     };
   }
   const trialExpired =
@@ -42,6 +67,7 @@ export async function resolvePlanContext(orgId: string): Promise<PlanContext> {
     seats: sub.seats,
     trialEndsAt: sub.trialEndsAt,
     trialExpired,
+    legacyFullAccess: sub.legacyFullAccess || legacyByAge,
   };
 }
 
@@ -99,4 +125,56 @@ export async function assertSubscriptionActive(
   if (ctx.trialExpired)
     return { ok: false, status: ctx.status, error: "Período de teste encerrado. Escolha um plano para continuar." };
   return { ok: true, status: ctx.status };
+}
+
+// ---------------------------------------------------------------------------
+// Capacidades do plano
+// ---------------------------------------------------------------------------
+
+export interface FeatureVerdict {
+  ok: boolean;
+  /** Menor plano que resolve — o que a tela de bloqueio deve oferecer. */
+  requiredPlan: PlanId | null;
+  error?: string;
+}
+
+/**
+ * A organização pode usar a capacidade?
+ *
+ * Espelha `canAccessModule` (RBAC) de propósito: são duas perguntas diferentes
+ * sobre o mesmo clique — "o seu PERFIL permite?" e "o seu PLANO inclui?" — e
+ * manter o formato de resposta igual deixa as duas checagens intercambiáveis
+ * nas telas.
+ */
+export async function checkPlanFeature(
+  orgId: string,
+  feature: PlanFeature,
+): Promise<FeatureVerdict> {
+  const ctx = await resolvePlanContext(orgId);
+  if (planAllows(ctx.plan, feature, { legacyFullAccess: ctx.legacyFullAccess }))
+    return { ok: true, requiredPlan: null };
+
+  const required = planRequiredFor(feature);
+  return {
+    ok: false,
+    requiredPlan: required,
+    error: `Disponível no plano ${PLAN_CATALOG.find((p) => p.id === required)?.name ?? "superior"}.`,
+  };
+}
+
+/**
+ * Gate para server actions e rotas. Devolve o mesmo formato de
+ * `requirePermission`, então o call-site trata os dois do mesmo jeito:
+ *
+ *   const gate = await requirePlanFeature(session.org, "api.access");
+ *   if (!gate.ok) return gate;
+ */
+export async function requirePlanFeature(
+  orgId: string,
+  feature: PlanFeature,
+): Promise<{ ok: true } | { ok: false; error: string; requiredPlan: PlanId | null }> {
+  const v = await checkPlanFeature(orgId, feature);
+  return v.ok
+    ? { ok: true }
+    : { ok: false, error: v.error ?? "Recurso indisponível no seu plano.", requiredPlan: v.requiredPlan };
 }

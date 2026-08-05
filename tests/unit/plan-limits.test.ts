@@ -2,24 +2,34 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // `vi.mock` é hoisted — precisamos criar os mocks via `vi.hoisted` pra
 // estarem disponíveis na fábrica do mock.
-const { mockSubscription, mockUser } = vi.hoisted(() => ({
+const { mockSubscription, mockUser, mockOrg } = vi.hoisted(() => ({
   mockSubscription: { findUnique: vi.fn() },
   mockUser: { count: vi.fn() },
+  mockOrg: { findUnique: vi.fn() },
 }));
 
 vi.mock("@/lib/db", () => ({
-  prisma: { subscription: mockSubscription, user: mockUser },
+  prisma: {
+    subscription: mockSubscription,
+    user: mockUser,
+    organization: mockOrg,
+  },
 }));
 
 import {
   resolvePlanContext,
   checkSeatAvailability,
   assertSubscriptionActive,
+  checkPlanFeature,
 } from "@/lib/endurance/plan-limits";
 
 beforeEach(() => {
   mockSubscription.findUnique.mockReset();
   mockUser.count.mockReset();
+  mockOrg.findUnique.mockReset();
+  // Por padrão a org é NOVA (posterior à vigência das capacidades) — assim os
+  // testes existentes medem a regra atual, não o direito adquirido.
+  mockOrg.findUnique.mockResolvedValue({ createdAt: new Date("2030-01-01") });
 });
 
 describe("resolvePlanContext", () => {
@@ -94,8 +104,10 @@ describe("checkSeatAvailability", () => {
     expect(res.ok).toBe(false);
     expect(res.used).toBe(2);
     expect(res.limit).toBe(2);
-    expect(res.error).toMatch(/Starter/);
+    // Asserta o COMPORTAMENTO (uso/limite e caminho de saída), não o rótulo
+    // comercial do plano — que muda com a estratégia de preço.
     expect(res.error).toMatch(/2\/2/);
+    expect(res.error).toMatch(/upgrade/i);
   });
 
   it("conta só usuários ativos (exclui blocked/deleted)", async () => {
@@ -169,5 +181,60 @@ describe("assertSubscriptionActive", () => {
     });
     const res = await assertSubscriptionActive("org1");
     expect(res.ok).toBe(true);
+  });
+});
+
+describe("checkPlanFeature", () => {
+  it("plano sem a capacidade bloqueia e aponta o plano necessário", async () => {
+    mockSubscription.findUnique.mockResolvedValue({
+      plan: "professional",
+      status: "active",
+      seats: 3,
+      trialEndsAt: null,
+      legacyFullAccess: false,
+    });
+    const v = await checkPlanFeature("org1", "api.access");
+    expect(v.ok).toBe(false);
+    expect(v.requiredPlan).toBe("business");
+    expect(v.error).toMatch(/Business/);
+  });
+
+  it("plano com a capacidade libera", async () => {
+    mockSubscription.findUnique.mockResolvedValue({
+      plan: "business",
+      status: "active",
+      seats: 10,
+      trialEndsAt: null,
+      legacyFullAccess: false,
+    });
+    const v = await checkPlanFeature("org1", "api.access");
+    expect(v.ok).toBe(true);
+  });
+
+  it("DIREITO ADQUIRIDO pela flag: contrato antigo mantém tudo", async () => {
+    mockSubscription.findUnique.mockResolvedValue({
+      plan: "starter",
+      status: "active",
+      seats: 2,
+      trialEndsAt: null,
+      legacyFullAccess: true,
+    });
+    for (const f of ["api.access", "multi.company", "white.label"] as const) {
+      expect((await checkPlanFeature("org1", f)).ok, f).toBe(true);
+    }
+  });
+
+  it("DIREITO ADQUIRIDO pela idade: org anterior à vigência mantém tudo", async () => {
+    // Cliente que nunca materializou assinatura (sem linha) mas já usava o
+    // sistema — não pode perder acesso por causa da mudança de estratégia.
+    mockSubscription.findUnique.mockResolvedValue(null);
+    mockOrg.findUnique.mockResolvedValue({ createdAt: new Date("2026-01-01") });
+    expect((await checkPlanFeature("org1", "multi.company")).ok).toBe(true);
+  });
+
+  it("org NOVA sem assinatura NÃO recebe direito adquirido", async () => {
+    mockSubscription.findUnique.mockResolvedValue(null);
+    mockOrg.findUnique.mockResolvedValue({ createdAt: new Date("2030-06-01") });
+    expect((await checkPlanFeature("org1", "api.access")).ok).toBe(false);
   });
 });
