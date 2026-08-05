@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
 import { hit } from "@/lib/rate-limit";
+import { consumeAiCredit, refundAiCredit } from "@/lib/endurance/ai-credits";
 import { logActivity } from "@/lib/endurance/activity-log";
 import {
   createNote,
@@ -146,6 +147,9 @@ export async function summarizeRecordAction(
   if (!(await hit(`prontuario:summary:${s.sub}`, 12, 60_000)).ok)
     return { ok: false, error: "Muitos resumos seguidos. Aguarde um instante." };
 
+  const credit = await consumeAiCredit(s.org, "clinical_summary");
+  if (!credit.ok) return { ok: false, error: credit.error! };
+
   const record = await getPatientRecord(s.org, customerId);
   if (!record) return { ok: false, error: "Paciente não encontrado." };
 
@@ -183,11 +187,17 @@ export async function suggestConductAction(input: {
   if (!(await hit(`prontuario:suggest:${s.sub}`, 15, 60_000)).ok)
     return { ok: false, error: "Muitas sugestões seguidas. Aguarde um instante." };
 
+  const credit = await consumeAiCredit(s.org, "clinical_suggestions");
+  if (!credit.ok) return { ok: false, error: credit.error! };
+
   const res = await suggestConduct({
     text: (input.text ?? "").slice(0, 4000),
     cid: (input.cid ?? "").trim(),
     cidDescription: (input.cidDescription ?? "").trim(),
   });
+  // Sem chave ou com cota estourada a IA não devolve nada — o cliente não pode
+  // pagar por uma resposta que não recebeu.
+  if (res.source === "unavailable") await refundAiCredit(s.org, "clinical_suggestions");
   await logActivity(s, "prontuario.suggest", "Solicitou sugestão de conduta (IA)");
   return { ok: true, text: res.text, source: res.source };
 }
@@ -211,15 +221,20 @@ export async function draftEvolutionAction(input: {
   if (!(await hit(`prontuario:evolution:${s.sub}`, 15, 60_000)).ok)
     return { ok: false, error: "Muitas gerações seguidas. Aguarde um instante." };
 
+  const credit = await consumeAiCredit(s.org, "clinical_evolution");
+  if (!credit.ok) return { ok: false, error: credit.error! };
+
   const ctx = await buildPatientContext(s.org, input.customerId);
   if (!ctx) return { ok: false, error: "Paciente não encontrado." };
 
   const res = await draftEvolution({ notes: input.notes ?? "", ctx });
-  if (res.source === "unavailable")
+  if (res.source === "unavailable") {
+    await refundAiCredit(s.org, "clinical_evolution");
     return {
       ok: false,
       error: "A redação com IA não está disponível (configure a chave GEMINI_API_KEY).",
     };
+  }
   await logActivity(
     s,
     "prontuario.evolution_draft",
@@ -247,6 +262,10 @@ export async function proofreadNoteAction(
   if (!(await hit(`prontuario:proofread:${s.sub}`, 20, 60_000)).ok)
     return { ok: false, error: "Muitas correções seguidas. Aguarde um instante." };
 
+  const credit = await consumeAiCredit(s.org, "text_proofread");
+  if (!credit.ok) return { ok: false, error: credit.error! };
+
   const res = await proofreadText((text ?? "").slice(0, 6000));
+  if (res.source === "unavailable") await refundAiCredit(s.org, "text_proofread");
   return { ok: true, text: res.text, source: res.source };
 }

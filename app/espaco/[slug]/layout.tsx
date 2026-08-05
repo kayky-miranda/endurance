@@ -9,6 +9,7 @@ import { resolveTheme, themeToCss } from "@/lib/theme";
 import { modulePlanFeature, planAllows } from "@/lib/endurance/billing";
 import { resolvePlanContext } from "@/lib/endurance/plan-limits";
 import Shell from "./shell";
+import AiMeter from "./ai-meter";
 
 export default async function EspacoLayout({
   children,
@@ -62,6 +63,7 @@ export default async function EspacoLayout({
         nicheLabel={ws.nicheLabel}
         slug={slug}
         modules={modules}
+        aiMeter={<AiMeter slug={slug} orgId={session.org} />}
         userName={session.name}
         userEmail={session.email}
         emailVerified={session.emailVerified ?? false}

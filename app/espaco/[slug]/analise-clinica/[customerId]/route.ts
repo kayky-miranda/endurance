@@ -7,6 +7,7 @@ import {
   streamPatientAnalysis,
 } from "@/lib/endurance/clinical-analysis";
 import { isQuotaError } from "@/lib/endurance/gemini";
+import { consumeAiCredit, refundAiCredit } from "@/lib/endurance/ai-credits";
 import type { ClinicalAnalysis } from "@/lib/endurance/clinical-analysis-types";
 import {
   computeFingerprint,
@@ -111,12 +112,23 @@ export async function POST(
           return;
         }
 
+        // Sem dado nenhum não há o que analisar — sai ANTES de cobrar, senão o
+        // cliente pagaria 3 créditos para receber uma mensagem de erro.
         if (ctx.signals === 0) {
           send({
             type: "error",
             error:
               "Este paciente ainda não tem anamnese, prontuário, evolução ou histórico para analisar.",
           });
+          controller.close();
+          return;
+        }
+
+        // Só cobra quando o modelo VAI ser chamado: o acerto de cache acima não
+        // custa nada, então cobrar por ele seria vender o mesmo texto duas vezes.
+        const credit = await consumeAiCredit(session.org, "clinical_analysis");
+        if (!credit.ok) {
+          send({ type: "error", error: credit.error });
           controller.close();
           return;
         }
@@ -147,6 +159,8 @@ export async function POST(
             send({ type: ev.done ? "done" : "partial", analysis: ev.analysis });
           }
         } catch (e) {
+          // A geração não aconteceu: devolve o crédito reservado.
+          await refundAiCredit(session.org, "clinical_analysis");
           // Cota da chave de IA é o erro mais comum na prática — merece uma
           // mensagem que diga o que fazer, não um "falhou" genérico.
           send({
@@ -160,6 +174,7 @@ export async function POST(
         }
 
         if (!signal.aborted && !last) {
+          await refundAiCredit(session.org, "clinical_analysis");
           send({
             type: "error",
             error:

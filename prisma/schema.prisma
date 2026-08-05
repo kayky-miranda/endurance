@@ -357,6 +357,12 @@ model Subscription {
   /// liberado. Tirar função de quem já trabalha com ela custa mais em
   /// cancelamento do que rende em upgrade — a regra nova vale para contrato novo.
   legacyFullAccess   Boolean   @default(false)
+  /// Créditos de IA consumidos na janela corrente. O teto vem do plano
+  /// (PlanDef.aiCredits); o histórico auditável fica em AiUsage.
+  aiCreditsUsed      Int       @default(0)
+  /// Início da janela de créditos. Quando vence, o contador zera na primeira
+  /// chamada — sem job agendado, que seria mais uma peça para manter no ar.
+  aiCreditsSince     DateTime  @default(now())
   trialEndsAt        DateTime?
   // Referências do gateway de cobrança recorrente (Asaas). Null no modo manual.
   asaasCustomerId     String?

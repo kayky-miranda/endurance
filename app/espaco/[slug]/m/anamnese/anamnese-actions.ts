@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
 import { logActivity } from "@/lib/endurance/activity-log";
 import { hit } from "@/lib/rate-limit";
+import { consumeAiCredit } from "@/lib/endurance/ai-credits";
 import { saveAnamnese, deleteAnamnese } from "@/lib/endurance/anamnese";
 import { summarizeAnamnese } from "@/lib/endurance/anamnese-summary";
 
@@ -74,6 +75,9 @@ export async function summarizeAnamneseAction(payload: {
   const s = gate.session;
   if (!(await hit(`anamnese:summary:${s.sub}`, 12, 60_000)).ok)
     return { ok: false, error: "Muitos resumos seguidos. Aguarde um instante." };
+
+  const credit = await consumeAiCredit(s.org, "anamnese_summary");
+  if (!credit.ok) return { ok: false, error: credit.error! };
 
   const customer = await prisma.customer.findFirst({
     where: { id: payload.customerId, organizationId: s.org },

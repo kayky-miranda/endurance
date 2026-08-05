@@ -132,6 +132,7 @@ export default function Shell({
   canManageBilling = false,
   canViewDashboard = true,
   logoDataUrl = null,
+  aiMeter = null,
   children,
 }: {
   orgName: string;
@@ -145,6 +146,8 @@ export default function Shell({
   canManageBilling?: boolean;
   canViewDashboard?: boolean;
   logoDataUrl?: string | null;
+  /** Medidor de créditos de IA (Server Component vindo do layout). */
+  aiMeter?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -425,6 +428,7 @@ export default function Shell({
             <GlobalSearch />
 
             <div className="ml-auto flex items-center gap-2">
+              {aiMeter}
               <button
                 onClick={() => setDark((d) => !d)}
                 className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:text-brand-500 dark:border-ink-700 dark:text-slate-400"
