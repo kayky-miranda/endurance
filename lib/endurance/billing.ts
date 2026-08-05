@@ -262,6 +262,27 @@ export function asPlanId(id: string): PlanId {
 }
 
 /**
+ * Módulos que exigem capacidade de plano. O que não está aqui é liberado em
+ * qualquer plano — a lista é curta de propósito.
+ *
+ * Fica de fora o núcleo de compras (fornecedores, pedido, recebimento): a loja
+ * pequena precisa comprar e receber mercadoria para operar. O que é cobrado é o
+ * FLUXO COM ALÇADA (solicitar → aprovar → cotar), que só existe onde há
+ * hierarquia — e onde há hierarquia já há equipe pagando por assentos.
+ */
+export const MODULE_PLAN_FEATURE: Record<string, PlanFeature> = {
+  solicitacoes: "purchasing.workflow",
+  aprovacoes: "purchasing.workflow",
+  cotacoes: "purchasing.workflow",
+  transferencias: "multi.location",
+  conferencia: "multi.location",
+};
+
+export function modulePlanFeature(moduleId: string): PlanFeature | null {
+  return MODULE_PLAN_FEATURE[moduleId] ?? null;
+}
+
+/**
  * Data em que as capacidades por plano passaram a valer.
  *
  * A assinatura só é materializada no checkout, então "não tem assinatura" é

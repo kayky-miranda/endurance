@@ -6,6 +6,8 @@ import {
   modulePermission,
 } from "@/lib/endurance/permissions";
 import { resolveTheme, themeToCss } from "@/lib/theme";
+import { modulePlanFeature, planAllows } from "@/lib/endurance/billing";
+import { resolvePlanContext } from "@/lib/endurance/plan-limits";
 import Shell from "./shell";
 
 export default async function EspacoLayout({
@@ -29,12 +31,27 @@ export default async function EspacoLayout({
   const perms = new Set(effectivePermissions(session.role, session.permissions));
   const canViewDashboard = perms.has("dashboard.view");
 
+  // O plano é resolvido UMA vez para toda a navegação (o gate por módulo em
+  // loadModule repete a checagem na página, mas ali é por request de rota).
+  const planCtx = await resolvePlanContext(session.org);
+
+  // Módulo sem permissão SOME (o perfil não pode resolver isso sozinho).
+  // Módulo sem plano FICA, com cadeado: é vitrine de upgrade — esconder faria o
+  // cliente nunca descobrir o que ganharia ao subir de plano.
   const modules = ws.modules
     .filter((m) => {
       const required = modulePermission(m.id);
       return required ? perms.has(required) : true;
     })
-    .map((m) => ({ id: m.id, label: m.label, core: m.core }));
+    .map((m) => {
+      const feature = modulePlanFeature(m.id);
+      const locked =
+        !!feature &&
+        !planAllows(planCtx.plan, feature, {
+          legacyFullAccess: planCtx.legacyFullAccess,
+        });
+      return { id: m.id, label: m.label, core: m.core, locked };
+    });
 
   return (
     <>

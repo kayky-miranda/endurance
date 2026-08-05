@@ -48,6 +48,7 @@ import {
   ShoppingCart,
   PackageCheck,
   Palette,
+  Lock,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { BrandMark } from "@/app/components/BrandMark";
@@ -62,7 +63,13 @@ import AssistantWidget from "./assistant-widget";
 import VerifyEmailBanner from "./verify-email-banner";
 import UserMenu from "./user-menu";
 
-export type ShellModule = { id: string; label: string; core: boolean };
+export type ShellModule = {
+  id: string;
+  label: string;
+  core: boolean;
+  /** Disponível em plano superior — some para quem já tem. */
+  locked?: boolean;
+};
 
 const MODULE_ICONS: Record<string, LucideIcon> = {
   acesso: Shield,
@@ -268,6 +275,8 @@ export default function Shell({
     href: string;
     icon: LucideIcon;
     label: string;
+    /** Só os módulos travados por plano marcam; os itens fixos nunca. */
+    locked?: boolean;
   };
   const entries: NavEntry[] = [];
   if (canViewDashboard)
@@ -289,6 +298,7 @@ export default function Shell({
       href: `${base}/m/${m.id}`,
       icon: MODULE_ICONS[m.id] ?? Box,
       label: m.label,
+      locked: m.locked,
     });
   if (canManage)
     entries.push({
@@ -375,6 +385,7 @@ export default function Shell({
                   {items.map((e) => (
                     <NavItem
                       key={e.href}
+                      locked={e.locked}
                       href={e.href}
                       icon={e.icon}
                       label={e.label}
@@ -467,16 +478,19 @@ function NavItem({
   icon: Icon,
   label,
   active,
+  locked = false,
 }: {
   href: string;
   icon: LucideIcon;
   label: string;
   active: boolean;
+  /** Disponível em plano superior: fica visível como vitrine de upgrade. */
+  locked?: boolean;
 }) {
   return (
     <Link
       href={href}
-      title={label}
+      title={locked ? `${label} — disponível em plano superior` : label}
       className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-colors duration-150 ${
         active
           ? "bg-brand-500/15 font-medium text-brand-300"
@@ -496,6 +510,9 @@ function NavItem({
         }`}
       />
       <span className="truncate">{label}</span>
+      {locked && (
+        <Lock className="ml-auto h-3 w-3 shrink-0 text-slate-500" aria-label="Disponível em plano superior" />
+      )}
     </Link>
   );
 }

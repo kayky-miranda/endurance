@@ -7,7 +7,7 @@ import {
   CircleDollarSign,
   Target,
 } from "lucide-react";
-import { loadModule, DeniedModule, ModuleHeader, KpiCard } from "../module-kit";
+import { loadModule, DeniedModule, PlanLocked, ModuleHeader, KpiCard } from "../module-kit";
 import { hasPermission } from "@/lib/endurance/permissions";
 import { countDashboard } from "@/lib/endurance/stock-count";
 import { activeLocations } from "@/lib/endurance/locations";
@@ -25,8 +25,17 @@ export default async function ConferenciaPage({
 }) {
   const { slug } = await params;
   const sp = await searchParams;
-  const { mod, session, denied } = await loadModule(slug, "conferencia");
+  const { mod, session, denied, planLocked, planFeature, requiredPlan } = await loadModule(slug, "conferencia");
   if (denied) return <DeniedModule slug={slug} mod={mod} />;
+  if (planLocked && planFeature)
+    return (
+      <PlanLocked
+        slug={slug}
+        mod={mod}
+        feature={planFeature}
+        requiredPlan={requiredPlan}
+      />
+    );
   const org = session?.org ?? "";
 
   const filters = {

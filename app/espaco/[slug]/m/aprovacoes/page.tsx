@@ -5,6 +5,7 @@ import ApprovalsClient from "../approvals-client";
 import {
   loadModule,
   DeniedModule,
+  PlanLocked,
   ModuleHeader,
   EmptyCard,
   KpiCard,
@@ -21,8 +22,17 @@ export default async function AprovacoesPage({
 }) {
   const { slug } = await params;
   const sp = await searchParams;
-  const { mod, session, denied } = await loadModule(slug, "aprovacoes");
+  const { mod, session, denied, planLocked, planFeature, requiredPlan } = await loadModule(slug, "aprovacoes");
   if (denied) return <DeniedModule slug={slug} mod={mod} />;
+  if (planLocked && planFeature)
+    return (
+      <PlanLocked
+        slug={slug}
+        mod={mod}
+        feature={planFeature}
+        requiredPlan={requiredPlan}
+      />
+    );
   if (!session) {
     return (
       <div className="space-y-6">

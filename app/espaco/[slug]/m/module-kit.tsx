@@ -9,11 +9,19 @@
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Lock, Download } from "lucide-react";
+import { ArrowLeft, Lock, Download, Sparkles, Check } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getSession, type SessionPayload } from "@/lib/auth";
 import { getWorkspace } from "@/lib/endurance/workspace";
 import { canAccessModule } from "@/lib/endurance/permissions";
+import {
+  PLAN_FEATURE_CATALOG,
+  modulePlanFeature,
+  planById,
+  type PlanFeature,
+  type PlanId,
+} from "@/lib/endurance/billing";
+import { checkPlanFeature } from "@/lib/endurance/plan-limits";
 
 export const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -21,7 +29,12 @@ export const brl = (n: number) =>
 export interface ModuleContext {
   mod: { id: string; label: string; description: string; core: boolean };
   session: SessionPayload | null;
+  /** O PERFIL não permite (beco sem saída — só explica). */
   denied: boolean;
+  /** O PLANO não inclui (decisão comercial — oferece upgrade). */
+  planLocked: boolean;
+  planFeature: PlanFeature | null;
+  requiredPlan: PlanId | null;
 }
 
 /**
@@ -41,7 +54,19 @@ export async function loadModule(
   const denied = Boolean(
     session && !canAccessModule(session.role, session.permissions, moduleId),
   );
-  return { mod, session, denied };
+
+  // Só consulta o plano quando o módulo realmente depende de uma capacidade —
+  // a maioria não depende, e essa checagem custa uma consulta a mais.
+  const feature = modulePlanFeature(moduleId);
+  let planLocked = false;
+  let requiredPlan: PlanId | null = null;
+  if (feature && session && !denied) {
+    const verdict = await checkPlanFeature(session.org, feature);
+    planLocked = !verdict.ok;
+    requiredPlan = verdict.requiredPlan;
+  }
+
+  return { mod, session, denied, planLocked, planFeature: feature, requiredPlan };
 }
 
 export function ModuleHeader({
@@ -114,6 +139,114 @@ export function DeniedModule({
         </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * Bloqueio por PLANO — irmão do `DeniedModule`, mas com intenção oposta.
+ *
+ * Falta de permissão é um beco sem saída: o usuário não pode resolver sozinho,
+ * então a tela só explica. Falta de plano é uma decisão comercial que ele PODE
+ * tomar agora — então a tela mostra o que se ganha e leva ao upgrade. Bloquear
+ * sem oferecer o caminho seria transformar uma oportunidade de receita em
+ * frustração.
+ */
+export function PlanLocked({
+  slug,
+  feature,
+  requiredPlan,
+  /** Cabeçalho de módulo, quando o bloqueio ocupa a página inteira. */
+  mod,
+}: {
+  slug: string;
+  feature: PlanFeature;
+  requiredPlan: PlanId | null;
+  mod?: ModuleContext["mod"];
+}) {
+  const def = PLAN_FEATURE_CATALOG[feature];
+  const plan = requiredPlan ? planById(requiredPlan) : null;
+  // Mostra o que MAIS vem junto — o valor está no conjunto, não no item isolado.
+  const alsoIncluded = (plan?.adds ?? [])
+    .filter((f) => f !== feature)
+    .slice(0, 4)
+    .map((f) => PLAN_FEATURE_CATALOG[f].label);
+
+  return (
+    <div className="space-y-6">
+      {mod && (
+        <ModuleHeader slug={slug} label={mod.label} description={mod.description} />
+      )}
+      <div className="rounded-2xl border border-brand-500/30 bg-brand-500/5 p-8 text-center">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-brand-500/15 text-brand-500">
+          <Sparkles className="h-7 w-7" />
+        </div>
+        <h2 className="mt-4 text-lg font-semibold text-slate-800 dark:text-slate-100">
+          {def.label} está no plano {plan?.name ?? "superior"}
+        </h2>
+        <p className="mx-auto mt-1.5 max-w-md text-sm text-slate-600 dark:text-slate-300">
+          {def.pitch}
+        </p>
+
+        {alsoIncluded.length > 0 && (
+          <div className="mx-auto mt-5 max-w-md rounded-xl border border-slate-200 bg-white p-4 text-left dark:border-ink-700 dark:bg-ink-900">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+              No {plan?.name} também entram
+            </p>
+            <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+              {alsoIncluded.map((label) => (
+                <li
+                  key={label}
+                  className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300"
+                >
+                  <Check className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                  {label}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <Link
+          href={`/espaco/${slug}/assinatura`}
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-ink-950 transition hover:bg-brand-400"
+        >
+          Ver planos
+          {plan?.priceMonthly ? (
+            <span className="font-normal opacity-80">
+              · a partir de R${plan.priceMonthly}/mês
+            </span>
+          ) : null}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Aviso compacto para bloquear um BOTÃO sem tomar a página — ex.: exportar CSV
+ * dentro de uma tela que o cliente pode usar normalmente.
+ */
+export function PlanLockedInline({
+  slug,
+  feature,
+  requiredPlan,
+}: {
+  slug: string;
+  feature: PlanFeature;
+  requiredPlan: PlanId | null;
+}) {
+  const def = PLAN_FEATURE_CATALOG[feature];
+  const plan = requiredPlan ? planById(requiredPlan) : null;
+  return (
+    <Link
+      href={`/espaco/${slug}/assinatura`}
+      title={def.pitch}
+      className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-brand-500/50 px-3.5 py-2 text-sm font-semibold text-brand-600 transition hover:bg-brand-500/10 dark:text-brand-300"
+    >
+      <Sparkles className="h-3.5 w-3.5" />
+      {def.label}
+      <span className="font-normal opacity-70">· {plan?.name ?? "upgrade"}</span>
+    </Link>
   );
 }
 

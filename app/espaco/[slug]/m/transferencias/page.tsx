@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { activeLocations } from "@/lib/endurance/locations";
 import { stockReasonLabel } from "@/lib/endurance/stock-ledger";
 import TransfersClient from "../transfers-client";
-import { loadModule, DeniedModule, ModuleHeader } from "../module-kit";
+import { loadModule, DeniedModule, PlanLocked, ModuleHeader } from "../module-kit";
 
 // Transferências de estoque entre locais (matriz, filiais, depósitos).
 export default async function TransferenciasPage({
@@ -11,8 +11,17 @@ export default async function TransferenciasPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { mod, session, denied } = await loadModule(slug, "transferencias");
+  const { mod, session, denied, planLocked, planFeature, requiredPlan } = await loadModule(slug, "transferencias");
   if (denied) return <DeniedModule slug={slug} mod={mod} />;
+  if (planLocked && planFeature)
+    return (
+      <PlanLocked
+        slug={slug}
+        mod={mod}
+        feature={planFeature}
+        requiredPlan={requiredPlan}
+      />
+    );
 
   const locations = session ? await activeLocations(session.org) : [];
   // Histórico: a "perna" de saída de cada transferência (refType transfer).
