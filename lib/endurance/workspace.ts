@@ -10,6 +10,7 @@ import {
   modulesForNiche,
   nicheLabel,
 } from "./catalog";
+import { planById } from "./billing";
 
 export interface CreateWorkspaceInput {
   name?: string;
@@ -89,6 +90,11 @@ export async function createWorkspace(
     slug = `${base}-${randomSuffix()}`;
   }
 
+  // Duração do teste: tempo suficiente para o cliente rodar um ciclo real de
+  // trabalho (uma semana de agenda cheia, um fechamento) antes de decidir.
+  const TRIAL_DAYS = 14;
+  const trialEnd = new Date(Date.now() + TRIAL_DAYS * 86_400_000);
+
   const org = await prisma.organization.create({
     data: {
       slug,
@@ -113,6 +119,23 @@ export async function createWorkspace(
           passwordHash: input.owner.passwordHash,
           name: input.owner.name.trim() || name,
           role: "OWNER",
+        },
+      },
+      // TESTE de 14 dias com o Professional COMPLETO, criado junto com a
+      // organização (mesma transação) — assim nenhuma empresa existe sem
+      // assinatura, o que antes tornava ambíguo distinguir cliente antigo de
+      // empresa nova no controle de capacidades.
+      //
+      // O teste entrega o plano inteiro de propósito: o cliente precisa ver o
+      // produto funcionando com os dados dele para decidir. Um teste capado
+      // demonstra a versão limitada, não o produto.
+      subscription: {
+        create: {
+          plan: "professional",
+          status: "trialing",
+          seats: planById("professional")?.seats ?? 3,
+          currentPeriodEnd: trialEnd,
+          trialEndsAt: trialEnd,
         },
       },
     },

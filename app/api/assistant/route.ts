@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/auth";
+import { consumeAiCredit } from "@/lib/endurance/ai-credits";
 import { prisma } from "@/lib/db";
 import {
   askAssistantStream,
@@ -17,6 +18,12 @@ export const runtime = "nodejs";
 export async function POST(req: Request): Promise<Response> {
   const session = await getSession();
   if (!session) return new Response("Não autorizado.", { status: 401 });
+
+  // O assistente é multi-turno e carrega contexto grande — é a segunda chamada
+  // mais cara do sistema. Sem crédito, responde com o motivo em vez de falhar
+  // em silêncio no meio do chat.
+  const credit = await consumeAiCredit(session.org, "assistant");
+  if (!credit.ok) return new Response(credit.error, { status: 402 });
 
   let messages: ChatMsg[] = [];
   try {

@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import type { AiFeatureId } from "./ai-features";
 
 /**
  * Telemetria de IA por organização.
@@ -9,14 +10,12 @@ import { prisma } from "@/lib/db";
  * para acompanhar custo e confiabilidade por tenant — e dimensionar cota.
  */
 
-export type AiFeature =
-  | "assistant"
-  | "onboarding"
-  | "sales_insights"
-  | "stock_advice"
-  | "crm_campaigns"
-  | "pricing_advice"
-  | "marketing_carousel";
+/**
+ * O universo da telemetria é TUDO que chama o modelo — inclusive o que não é
+ * cobrado. Vem da fonte única para não voltar a divergir da lista de créditos:
+ * recurso cobrado sem ser medido foi exatamente o problema anterior.
+ */
+export type AiFeature = AiFeatureId;
 
 export interface AiUsageEvent {
   /** Nulo nas chamadas pré-tenant (onboarding antes do signup). */

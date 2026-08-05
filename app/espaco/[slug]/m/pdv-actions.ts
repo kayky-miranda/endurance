@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { withAiCredit } from "@/lib/endurance/ai-credits";
 import { prisma } from "@/lib/db";
 import { getSession, requirePermission } from "@/lib/auth";
 import { FinalizeSaleSchema, CustomerSchema, ProductSchema, firstError } from "@/lib/validation";
@@ -344,10 +345,14 @@ export async function suggestCrossSellAction(
 ): Promise<{ ok: true; suggestions: Suggestion[] } | { ok: false }> {
   const s = await getSession();
   if (!s) return { ok: false };
-  const suggestions = await suggestCrossSell(
-    s.org,
-    (cartProductIds ?? []).filter((x) => typeof x === "string"),
-  );
+  const ids = (cartProductIds ?? []).filter((x) => typeof x === "string");
+  const out = await withAiCredit(s.org, "crosssell", async () => {
+    const r = await suggestCrossSell(s.org, ids);
+    // A heurística por categoria é local e não custa chamada ao modelo.
+    return { value: r, delivered: r.length > 0, fallback: false };
+  });
+  // Sem crédito, o caixa segue funcionando sem sugestão — nunca trava a venda.
+  const suggestions = out.ok ? out.value : [];
   return { ok: true, suggestions };
 }
 

@@ -2,6 +2,12 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { planAiCredits } from "./billing";
 import { resolvePlanContext } from "./plan-limits";
+import { recordAiUsage } from "./ai-telemetry";
+import {
+  AI_FEATURE_COST,
+  BILLED_AI_FEATURES,
+  type BilledAiFeature,
+} from "./ai-features";
 
 /**
  * Créditos de IA do plano principal.
@@ -21,48 +27,12 @@ import { resolvePlanContext } from "./plan-limits";
  * para manter no ar e falhar em silêncio.
  */
 
-/** Recursos que consomem crédito. Espelha os módulos que chamam o modelo. */
-export const AI_FEATURES = [
-  "clinical_analysis",
-  "clinical_evolution",
-  "clinical_summary",
-  "clinical_suggestions",
-  "anamnese_summary",
-  "text_proofread",
-  "assistant",
-  "sales_insights",
-  "clinic_insights",
-  "stock_advice",
-  "pricing_advice",
-  "crosssell",
-  "crm_campaigns",
-] as const;
-
-export type AiFeature = (typeof AI_FEATURES)[number];
-
-/**
- * Custo em créditos. Proporcional ao trabalho REAL do modelo, medido pela
- * telemetria: o que gera texto longo e estruturado custa mais que o que devolve
- * três frases.
- *
- * O onboarding NÃO está aqui de propósito — roda antes de a empresa existir,
- * durante o cadastro. Cobrar ali bloquearia a entrada de um cliente novo.
- */
-export const AI_FEATURE_COST: Record<AiFeature, number> = {
-  clinical_analysis: 3, // ~1.200 tokens de saída estruturada, o mais pesado
-  assistant: 2, // contexto grande (~2.900 tokens de entrada) e multi-turno
-  clinical_evolution: 1,
-  clinical_summary: 1,
-  clinical_suggestions: 1,
-  anamnese_summary: 1,
-  text_proofread: 1,
-  sales_insights: 1,
-  clinic_insights: 1,
-  stock_advice: 1,
-  pricing_advice: 1,
-  crosssell: 1,
-  crm_campaigns: 1,
-};
+// A lista de recursos e os custos vivem em `./ai-features`, compartilhados com
+// a telemetria — antes cada um tinha a sua e um recurso podia ser cobrado sem
+// ser medido. Reexportados para não quebrar os call-sites existentes.
+export const AI_FEATURES = BILLED_AI_FEATURES;
+export type AiFeature = BilledAiFeature;
+export { AI_FEATURE_COST };
 
 export interface AiBalance {
   /** Teto do ciclo. -1 = sem teto. */
@@ -172,4 +142,51 @@ export async function refundAiCredit(
     where: { organizationId: orgId, aiCreditsUsed: { gte: cost } },
     data: { aiCreditsUsed: { decrement: cost } },
   });
+}
+
+/**
+ * Envelope padrão de uma chamada de IA: cobra, executa, mede e devolve o
+ * crédito se nada foi entregue.
+ *
+ * Existe para os call-sites pararem de repetir — antes cada recurso escrevia à
+ * mão o débito, o reembolso e (quando lembrava) a telemetria. Foi assim que 13
+ * recursos passaram a ser cobrados sem nunca serem medidos.
+ *
+ * `run` deve devolver `delivered: false` quando a IA não produziu resultado
+ * (sem chave, cota do provedor, resposta vazia) — aí o crédito volta.
+ */
+export async function withAiCredit<T>(
+  orgId: string,
+  feature: AiFeature,
+  run: () => Promise<{ value: T; delivered: boolean; fallback?: boolean }>,
+): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+  const credit = await consumeAiCredit(orgId, feature);
+  if (!credit.ok) return { ok: false, error: credit.error! };
+
+  const started = Date.now();
+  try {
+    const out = await run();
+    if (!out.delivered) await refundAiCredit(orgId, feature);
+    void recordAiUsage({
+      organizationId: orgId,
+      feature,
+      provider: out.delivered ? "gemini" : "offline",
+      latencyMs: Date.now() - started,
+      ok: out.delivered,
+      fallback: out.fallback ?? !out.delivered,
+    });
+    return { ok: true, value: out.value };
+  } catch (err) {
+    // A chamada falhou: o cliente não recebeu nada, então não paga.
+    await refundAiCredit(orgId, feature);
+    void recordAiUsage({
+      organizationId: orgId,
+      feature,
+      provider: "gemini",
+      latencyMs: Date.now() - started,
+      ok: false,
+      error: (err as Error)?.message?.slice(0, 200) ?? "erro",
+    });
+    throw err;
+  }
 }

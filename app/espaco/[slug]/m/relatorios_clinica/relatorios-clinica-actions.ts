@@ -2,6 +2,7 @@
 
 import { requirePermission } from "@/lib/auth";
 import { hit } from "@/lib/rate-limit";
+import { withAiCredit } from "@/lib/endurance/ai-credits";
 import { parsePeriod } from "@/lib/endurance/period";
 import { periodLabel } from "@/lib/endurance/period";
 import { getProductivityReport } from "@/lib/endurance/productivity";
@@ -37,10 +38,16 @@ export async function clinicInsightsAction(
     getCommissionReport(s.org, from, to),
   ]);
 
-  const res = await generateClinicInsights({
+  const input = {
     periodLabel: periodLabel(days),
     report,
     totalCommission: commissions.totalCommission,
+  };
+  const out = await withAiCredit(s.org, "clinic_insights", async () => {
+    const r = await generateClinicInsights(input);
+    return { value: r, delivered: r.source === "ai", fallback: r.source !== "ai" };
   });
+  // Sem crédito o recurso NÃO some: entrega a leitura determinística.
+  const res = out.ok ? out.value : await generateClinicInsights(input);
   return { ok: true, insights: res.insights, source: res.source };
 }
