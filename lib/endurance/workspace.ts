@@ -10,7 +10,7 @@ import {
   modulesForNiche,
   nicheLabel,
 } from "./catalog";
-import { planById } from "./billing";
+import { TRIAL_DAYS, TRIAL_PLAN, planById } from "./billing";
 
 export interface CreateWorkspaceInput {
   name?: string;
@@ -92,7 +92,7 @@ export async function createWorkspace(
 
   // Duração do teste: tempo suficiente para o cliente rodar um ciclo real de
   // trabalho (uma semana de agenda cheia, um fechamento) antes de decidir.
-  const TRIAL_DAYS = 14;
+  // A constante vive no catálogo — é a mesma que o card do teste anuncia.
   const trialEnd = new Date(Date.now() + TRIAL_DAYS * 86_400_000);
 
   const org = await prisma.organization.create({
@@ -131,9 +131,9 @@ export async function createWorkspace(
       // demonstra a versão limitada, não o produto.
       subscription: {
         create: {
-          plan: "professional",
+          plan: TRIAL_PLAN,
           status: "trialing",
-          seats: planById("professional")?.seats ?? 3,
+          seats: planById(TRIAL_PLAN)?.seats ?? 3,
           currentPeriodEnd: trialEnd,
           trialEndsAt: trialEnd,
         },

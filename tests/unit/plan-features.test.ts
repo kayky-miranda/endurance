@@ -9,6 +9,7 @@ import {
   PLAN_FEATURES,
   PLAN_FEATURE_CATALOG,
   PLAN_ORDER,
+  TRIAL_PLAN,
 } from "@/lib/endurance/billing";
 
 /**
@@ -114,10 +115,20 @@ describe("integridade do catálogo", () => {
     expect(ent).toBeLessThan(biz);
   });
 
-  it("créditos de IA crescem com o plano e o topo não tem teto", () => {
-    expect(planAiCredits("professional")).toBeGreaterThan(planAiCredits("starter"));
+  it("créditos de IA crescem entre os planos pagos e o topo não tem teto", () => {
     expect(planAiCredits("business")).toBeGreaterThan(planAiCredits("professional"));
     expect(planAiCredits("enterprise")).toBe(-1);
+  });
+
+  it("o teste espelha exatamente o plano que ele entrega", () => {
+    // O card do teste é derivado, não digitado: quando os dois divergiram, a
+    // página anunciava 2 usuários e 60 créditos enquanto a assinatura de teste
+    // nascia com 3 e 150. Este teste é o que impede a divergência de voltar.
+    const teste = planById("starter")!;
+    const origem = planById(TRIAL_PLAN)!;
+    expect(teste.aiCredits).toBe(origem.aiCredits);
+    expect(teste.seats).toBe(origem.seats);
+    expect(teste.features.join(" ")).toContain(String(origem.aiCredits));
   });
 
   it("todo plano dá algum crédito de IA — ninguém fica sem experimentar", () => {

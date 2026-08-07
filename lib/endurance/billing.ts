@@ -27,7 +27,6 @@ export type SubStatus = "trialing" | "active" | "past_due" | "canceled";
  * experimentar aquilo que justificaria pagar mais.
  */
 export const PLAN_FEATURES = [
-  "permissions.advanced",
   "audit.log",
   "api.access",
   "multi.location",
@@ -48,11 +47,6 @@ export interface PlanFeatureDef {
 }
 
 export const PLAN_FEATURE_CATALOG: Record<PlanFeature, PlanFeatureDef> = {
-  "permissions.advanced": {
-    id: "permissions.advanced",
-    label: "Perfis e permissões",
-    pitch: "Separe o que cada pessoa da equipe pode ver e fazer.",
-  },
   "audit.log": {
     id: "audit.log",
     label: "Auditoria",
@@ -86,12 +80,15 @@ export const PLAN_FEATURE_CATALOG: Record<PlanFeature, PlanFeatureDef> = {
   "white.label": {
     id: "white.label",
     label: "Marca própria",
-    pitch: "Documentos e portal com a identidade da sua marca.",
+    pitch: "Portal e mensagens ao cliente sem nenhuma marca do ENDURANCE.",
   },
   "priority.processing": {
     id: "priority.processing",
     label: "Processamento prioritário",
-    pitch: "Sua fila de IA e relatórios na frente.",
+    // Dizia "sua fila de IA e relatórios na frente" — e não existe fila
+    // nenhuma: as chamadas vão direto ao provedor. A frase agora descreve o que
+    // o sistema realmente faz (ver ai-throttle.ts).
+    pitch: "Limites de uso mais altos nas análises e na geração com IA.",
   },
 };
 
@@ -131,28 +128,14 @@ export const PLAN_ORDER: PlanId[] = [
   "enterprise",
 ];
 
-/** Catálogo de planos. A ordem define a ordem de exibição na interface. */
-export const PLAN_CATALOG: PlanDef[] = [
-  {
-    id: "starter",
-    name: "Teste",
-    priceMonthly: 0,
-    seats: 2,
-    description: "14 dias com o Professional completo.",
-    featured: false,
-    contactSales: false,
-    // O teste dá a experiência inteira do Professional de propósito: o cliente
-    // precisa ver o produto funcionando com os dados dele para decidir.
-    adds: [],
-    aiCredits: 60,
-    extraSeatPrice: null,
-    features: [
-      "14 dias, sem cartão",
-      "Professional completo liberado",
-      "60 créditos de IA",
-      "Suporte por e-mail",
-    ],
-  },
+/** Duração do teste. `createWorkspace` usa a mesma constante. */
+export const TRIAL_DAYS = 14;
+
+/** Plano que o teste entrega por inteiro — ver `TRIAL_CARD`. */
+export const TRIAL_PLAN: PlanId = "professional";
+
+/** Planos pagos, na ordem de exibição. O card do teste é derivado abaixo. */
+const PAID_PLANS: PlanDef[] = [
   {
     id: "professional",
     name: "Professional",
@@ -161,14 +144,26 @@ export const PLAN_CATALOG: PlanDef[] = [
     description: "Para o profissional autônomo e o consultório pequeno.",
     featured: true,
     contactSales: false,
-    adds: [],
+    // EXPORTAÇÃO desce para cá: exportar os próprios dados atrás de um plano
+    // 2,3x mais caro é a barreira que mais gera ressentimento, e o dado é do
+    // cliente. O gancho comercial real é automação (API, exportação agendada),
+    // que continua no Business.
+    //
+    // PERMISSÕES saíram da lista de capacidades cobráveis (ver PLAN_FEATURES):
+    // vender assento sem vender o controle do que o assento faz significa que a
+    // recepcionista enxerga faturamento, prontuário e CPF de todo mundo. É o
+    // mínimo para operar com mais de uma pessoa, e com dado clínico é questão
+    // de LGPD — virou parte do produto, não degrau de plano.
+    adds: ["data.export"],
     aiCredits: 150,
     extraSeatPrice: 45,
     features: [
       "3 usuários (+R$45 por usuário extra)",
       "Todos os módulos do seu ramo",
+      "Perfis e permissões da equipe",
       "Documentos e impressão",
       "Fiscal (NF-e / NFC-e)",
+      "Exportação para planilha",
       "150 créditos de IA por mês",
       "Suporte por e-mail",
     ],
@@ -181,21 +176,24 @@ export const PLAN_CATALOG: PlanDef[] = [
     description: "Para a clínica ou loja com equipe e processo.",
     featured: false,
     contactSales: false,
+    // A separação com o Professional fica limpa: lá se CONTROLA o acesso, aqui
+    // se PROVA o que aconteceu (auditoria) e se AUTOMATIZA (API, integrações).
     adds: [
-      "permissions.advanced",
       "audit.log",
       "api.access",
       "multi.location",
       "purchasing.workflow",
-      "data.export",
     ],
     aiCredits: 800,
     extraSeatPrice: 35,
+    // A auditoria só voltou a ser anunciada depois que a CONSULTA existiu
+    // (/auditoria). A gravação já rodava em todo plano; sem tela para lê-la, o
+    // bullet vendia um registro que ninguém conseguia abrir.
     features: [
       "10 usuários (+R$35 por usuário extra)",
       "Tudo do Professional",
-      "Perfis, permissões e auditoria",
-      "API, integrações e exportações",
+      "Auditoria: quem alterou o quê, e quando",
+      "API e integrações",
       "Multi-local e fluxo de compras",
       "800 créditos de IA por mês",
       "Suporte prioritário",
@@ -208,7 +206,11 @@ export const PLAN_CATALOG: PlanDef[] = [
     seats: 30,
     description: "Para redes, franquias e operação multiempresa.",
     featured: false,
-    contactSales: true,
+    // Preço publicado E auto-contratável. Mostrar R$899 e ainda assim obrigar a
+    // falar com alguém não protege margem — só adiciona atrito para quem já
+    // decidiu. A conversa com vendas passa a ser sobre implantação, migração e
+    // SLA, que é onde ela realmente agrega.
+    contactSales: false,
     adds: ["multi.company", "white.label", "priority.processing"],
     aiCredits: -1,
     extraSeatPrice: 25,
@@ -216,13 +218,51 @@ export const PLAN_CATALOG: PlanDef[] = [
       "30 usuários (+R$25 por usuário extra)",
       "Tudo do Business",
       "Multiempresa e consolidação",
-      "Marca própria nos documentos",
-      "IA sem teto e fila prioritária",
+      "Marca própria no portal do cliente",
+      "IA sem teto e limites de uso ampliados",
       "Implantação assistida e SLA",
       "Gerente de conta",
     ],
   },
 ];
+
+/**
+ * Card do teste — DERIVADO do plano que ele entrega, nunca digitado à mão.
+ *
+ * O teste dá a experiência inteira do Professional de propósito: o cliente
+ * precisa ver o produto funcionando com os dados DELE para decidir. Um teste
+ * capado demonstra a versão limitada, não o produto.
+ *
+ * Os números eram digitados aqui e divergiram do que `createWorkspace` cria de
+ * fato: o card anunciava 2 usuários e 60 créditos enquanto a assinatura de teste
+ * nascia com os 3 assentos e os 150 créditos do Professional. Anunciar menos do
+ * que se entrega ainda é anunciar errado — e a causa era o dado duplicado.
+ */
+const TRIAL_SOURCE = PAID_PLANS.find((p) => p.id === TRIAL_PLAN)!;
+
+const TRIAL_CARD: PlanDef = {
+  id: "starter",
+  name: "Teste",
+  priceMonthly: 0,
+  seats: TRIAL_SOURCE.seats,
+  description: `${TRIAL_DAYS} dias com o ${TRIAL_SOURCE.name} completo.`,
+  featured: false,
+  contactSales: false,
+  // Vazio de propósito: quem está em teste tem a assinatura no plano do teste,
+  // então as capacidades vêm de lá. Repetir aqui criaria duas verdades.
+  adds: [],
+  aiCredits: TRIAL_SOURCE.aiCredits,
+  extraSeatPrice: null,
+  features: [
+    `${TRIAL_DAYS} dias, sem cartão`,
+    `${TRIAL_SOURCE.name} completo liberado`,
+    `${TRIAL_SOURCE.aiCredits} créditos de IA`,
+    "Suporte por e-mail",
+  ],
+};
+
+/** Catálogo de planos. A ordem define a ordem de exibição na interface. */
+export const PLAN_CATALOG: PlanDef[] = [TRIAL_CARD, ...PAID_PLANS];
 
 /** Visão de uma fatura para as telas (datas em ISO, valor em number). */
 export interface InvoiceView {

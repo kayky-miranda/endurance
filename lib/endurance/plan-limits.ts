@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import {
   PLAN_CATALOG,
@@ -27,7 +28,16 @@ export interface PlanContext {
   legacyFullAccess: boolean;
 }
 
-export async function resolvePlanContext(orgId: string): Promise<PlanContext> {
+/**
+ * Deduplicado por request com React cache(), como `getWorkspace`.
+ *
+ * Sem isso o mesmo par de consultas rodava 3+ vezes por render: o layout resolve
+ * o plano para desenhar os cadeados do menu, `loadModule` repete na página e o
+ * medidor de IA repete de novo dentro de `getAiBalance`.
+ */
+export const resolvePlanContext = cache(async function resolvePlanContext(
+  orgId: string,
+): Promise<PlanContext> {
   // As duas leituras são independentes: a organização diz se o contrato é
   // anterior à vigência das capacidades, a assinatura diz o plano atual.
   const [sub, org] = await Promise.all([
@@ -69,7 +79,7 @@ export async function resolvePlanContext(orgId: string): Promise<PlanContext> {
     trialExpired,
     legacyFullAccess: sub.legacyFullAccess || legacyByAge,
   };
-}
+});
 
 export interface SeatVerdict {
   ok: boolean;
