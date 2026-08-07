@@ -5,9 +5,17 @@ import {
   getCertificate,
   certificateKindLabel,
 } from "@/lib/endurance/certificates";
+import {
+  getLetterhead,
+  getRecordedSignature,
+} from "@/lib/endurance/document-letterhead";
+import { DocumentShell, DocSection, DocField } from "../../components/DocumentShell";
 import PrintActions from "../../receita/[id]/print-actions";
 
-/** Atestado imprimível (layout limpo, fora do shell). */
+/**
+ * Atestado imprimível. Ver a nota em `receita/[id]/page.tsx`: usava cabeçalho
+ * próprio e agora sai no mesmo papel timbrado dos demais documentos.
+ */
 export default async function AtestadoPage({
   params,
 }: {
@@ -19,10 +27,11 @@ export default async function AtestadoPage({
   const c = await getCertificate(session.org, id);
   if (!c) notFound();
 
-  const [org, customer] = await Promise.all([
-    prisma.organization.findUnique({
-      where: { id: session.org },
-      select: { name: true, city: true, state: true },
+  const [letterhead, signature, customer] = await Promise.all([
+    getLetterhead(session.org),
+    getRecordedSignature(session.org, session.sub, {
+      name: c.professional ?? "",
+      council: c.professionalCouncil ?? "",
     }),
     prisma.customer.findFirst({
       where: { id: c.customerId, organizationId: session.org },
@@ -30,55 +39,38 @@ export default async function AtestadoPage({
     }),
   ]);
 
-  const issued = new Date(c.issuedAt);
-  const longDate = (s: string) =>
-    new Date(s).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-
   // Texto padrão quando o profissional não escreveu um corpo.
   const body =
     c.text ||
     defaultBody(c.kind, customer?.name ?? "o(a) paciente", c.days, c.startDate);
 
   return (
-    <div className="mx-auto max-w-[640px] px-4 py-6 text-slate-900">
+    <div>
       <PrintActions backHref={`/espaco/${slug}/m/prontuario/${c.customerId}`} />
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 print:border-0 print:p-0">
-        <header className="border-b border-slate-200 pb-4 text-center">
-          <h1 className="text-lg font-bold">{org?.name ?? "Clínica"}</h1>
-          {(org?.city || org?.state) && (
-            <p className="text-xs text-slate-500">
-              {[org?.city, org?.state].filter(Boolean).join(" / ")}
-            </p>
-          )}
-          <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-700">
-            Atestado {certificateKindLabel(c.kind)}
-          </p>
-        </header>
+      <DocumentShell
+        letterhead={letterhead}
+        title={`Atestado ${certificateKindLabel(c.kind)}`}
+        subtitle={customer?.name ?? undefined}
+        signature={signature}
+        issuedAt={new Date(c.issuedAt)}
+      >
+        <p className="doc-paragraph doc-prewrap">{body}</p>
 
-        <div className="mt-6 text-sm leading-relaxed">
-          <p className="whitespace-pre-wrap">{body}</p>
-          {c.cid && (
-            <p className="mt-4 text-slate-600">
-              CID: {c.cid}
-              {c.cidDescription ? ` — ${c.cidDescription}` : ""}
-            </p>
-          )}
-          {customer?.document && (
-            <p className="mt-1 text-slate-500">CPF: {customer.document}</p>
-          )}
-        </div>
-
-        <div className="mt-12 text-center text-sm">
-          <div className="mx-auto w-64 border-t border-slate-400 pt-1">
-            <p className="font-semibold">{c.professional || "Profissional responsável"}</p>
-            {c.professionalCouncil && (
-              <p className="text-xs text-slate-500">{c.professionalCouncil}</p>
+        {(c.cid || customer?.document) && (
+          <DocSection>
+            {c.cid && (
+              <DocField
+                label="CID"
+                value={`${c.cid}${c.cidDescription ? ` — ${c.cidDescription}` : ""}`}
+              />
             )}
-          </div>
-          <p className="mt-4 text-xs text-slate-400">Emitido em {longDate(issued.toISOString())}</p>
-        </div>
-      </div>
+            {customer?.document && (
+              <DocField label="CPF" value={customer.document} />
+            )}
+          </DocSection>
+        )}
+      </DocumentShell>
     </div>
   );
 }

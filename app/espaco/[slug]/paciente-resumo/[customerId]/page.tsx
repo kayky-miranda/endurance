@@ -9,6 +9,8 @@ import { listPrescriptions } from "@/lib/endurance/prescriptions";
 import { listCertificates } from "@/lib/endurance/certificates";
 import { certificateKindLabel } from "@/lib/endurance/certificate";
 import { ageFromBirth } from "@/lib/endurance/patient";
+import { getLetterhead } from "@/lib/endurance/document-letterhead";
+import { DocumentShell, DocSection, DocField } from "../../components/DocumentShell";
 import PrintActions from "../../receita/[id]/print-actions";
 
 /**
@@ -26,12 +28,9 @@ export default async function PatientSummaryPage({
   const session = await requireOrgAccess(slug);
   if (!sessionHasPermission(session, "prontuario.manage")) notFound();
 
-  const [org, record, profile, evolution, plans, prescriptions, certificates] =
+  const [letterhead, record, profile, evolution, plans, prescriptions, certificates] =
     await Promise.all([
-      prisma.organization.findUnique({
-        where: { id: session.org },
-        select: { name: true, city: true, state: true },
-      }),
+      getLetterhead(session.org),
       getPatientRecord(session.org, customerId),
       getPatient(session.org, customerId),
       getPatientEvolution(session.org, customerId),
@@ -58,100 +57,80 @@ export default async function PatientSummaryPage({
     n.toLocaleString("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
 
   return (
-    <div className="mx-auto max-w-[720px] px-4 py-6 text-slate-900">
+    <div>
       <PrintActions backHref={`/espaco/${slug}/m/prontuario/${customerId}`} />
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-8 print:border-0 print:p-0">
-        <header className="border-b border-slate-200 pb-4 text-center">
-          <h1 className="text-lg font-bold">{org?.name ?? "Clínica"}</h1>
-          {(org?.city || org?.state) && (
-            <p className="text-xs text-slate-500">{[org?.city, org?.state].filter(Boolean).join(" / ")}</p>
+      <DocumentShell
+        letterhead={letterhead}
+        title="Resumo do paciente"
+        subtitle={record.name}
+        signature={null}
+      >
+        <DocSection title="Identificação">
+          <DocField label="Nome" value={record.name} />
+          {record.document && <DocField label="CPF" value={record.document} />}
+          {age !== null && <DocField label="Idade" value={`${age} anos`} />}
+          {record.phone && <DocField label="Telefone" value={record.phone} />}
+          {profile?.insuranceName && (
+            <DocField label="Convênio" value={profile.insuranceName} />
           )}
-          <p className="mt-2 text-sm font-semibold uppercase tracking-wide text-slate-700">
-            Resumo do paciente
-          </p>
-        </header>
+        </DocSection>
 
-        {/* Identificação */}
-        <section className="mt-4 grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
-          <p className="col-span-2"><span className="text-slate-500">Nome:</span> <strong>{record.name}</strong></p>
-          {record.document && <p><span className="text-slate-500">CPF:</span> {record.document}</p>}
-          {age !== null && <p><span className="text-slate-500">Idade:</span> {age} anos</p>}
-          {record.phone && <p><span className="text-slate-500">Telefone:</span> {record.phone}</p>}
-          {profile?.insuranceName && <p><span className="text-slate-500">Convênio:</span> {profile.insuranceName}</p>}
-        </section>
-
-        {/* Medições recentes */}
         {latestMetrics.length > 0 && (
-          <SummarySection title="Medições recentes">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3">
-              {latestMetrics.map((m) => (
-                <p key={m.label}>
-                  <span className="text-slate-500">{m.label}:</span> {num(m.value, m.decimals)} {m.unit}
-                </p>
-              ))}
-            </div>
-          </SummarySection>
+          <DocSection title="Medições recentes">
+            {latestMetrics.map((m) => (
+              <DocField
+                key={m.label}
+                label={m.label}
+                value={`${num(m.value, m.decimals)} ${m.unit}`}
+              />
+            ))}
+          </DocSection>
         )}
 
-        {/* Últimas anotações */}
         {record.notes.length > 0 && (
-          <SummarySection title="Últimas anotações clínicas">
-            <ul className="space-y-2 text-sm">
-              {record.notes.slice(0, 5).map((n) => (
-                <li key={n.id} className="border-b border-dashed border-slate-200 pb-2">
-                  <p className="text-xs text-slate-500">
-                    {dt(n.createdAt)}
-                    {n.title ? ` · ${n.title}` : ""}
-                    {n.cid ? ` · CID ${n.cid}` : ""}
-                  </p>
-                  <p className="whitespace-pre-wrap text-slate-700">{n.content}</p>
-                </li>
-              ))}
-            </ul>
-          </SummarySection>
+          <DocSection title="Últimas anotações clínicas">
+            {record.notes.slice(0, 5).map((n) => (
+              <div key={n.id} className="doc-qa-item">
+                <p className="doc-qa-q">
+                  {dt(n.createdAt)}
+                  {n.title ? ` · ${n.title}` : ""}
+                  {n.cid ? ` · CID ${n.cid}` : ""}
+                </p>
+                <p className="doc-qa-a">{n.content}</p>
+              </div>
+            ))}
+          </DocSection>
         )}
 
-        {/* Planos ativos */}
         {activePlans.length > 0 && (
-          <SummarySection title="Planos ativos">
-            <ul className="list-inside list-disc text-sm text-slate-700">
-              {activePlans.map((p) => (
-                <li key={p.id}>{p.title}{p.goal ? ` — ${p.goal}` : ""}</li>
-              ))}
-            </ul>
-          </SummarySection>
+          <DocSection title="Planos ativos">
+            {activePlans.map((p) => (
+              <p key={p.id} className="doc-qa-a">
+                {p.title}
+                {p.goal ? ` — ${p.goal}` : ""}
+              </p>
+            ))}
+          </DocSection>
         )}
 
-        {/* Documentos recentes */}
         {(prescriptions.length > 0 || certificates.length > 0) && (
-          <SummarySection title="Documentos recentes">
-            <ul className="space-y-1 text-sm text-slate-700">
-              {prescriptions.slice(0, 3).map((p) => (
-                <li key={p.id}>Receita · {dt(p.issuedAt)} · {p.itemsCount} medicamento(s){p.cid ? ` · CID ${p.cid}` : ""}</li>
-              ))}
-              {certificates.slice(0, 3).map((c) => (
-                <li key={c.id}>Atestado ({certificateKindLabel(c.kind)}) · {dt(c.issuedAt)}{c.days ? ` · ${c.days} dia(s)` : ""}</li>
-              ))}
-            </ul>
-          </SummarySection>
+          <DocSection title="Documentos recentes">
+            {prescriptions.slice(0, 3).map((p) => (
+              <p key={p.id} className="doc-qa-a">
+                Receita · {dt(p.issuedAt)} · {p.itemsCount} medicamento(s)
+                {p.cid ? ` · CID ${p.cid}` : ""}
+              </p>
+            ))}
+            {certificates.slice(0, 3).map((c) => (
+              <p key={c.id} className="doc-qa-a">
+                Atestado ({certificateKindLabel(c.kind)}) · {dt(c.issuedAt)}
+                {c.days ? ` · ${c.days} dia(s)` : ""}
+              </p>
+            ))}
+          </DocSection>
         )}
-
-        <p className="mt-8 text-center text-xs text-slate-400">
-          Gerado em {new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}
-        </p>
-      </div>
+      </DocumentShell>
     </div>
-  );
-}
-
-function SummarySection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-5">
-      <h2 className="mb-1.5 border-b border-slate-200 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {title}
-      </h2>
-      {children}
-    </section>
   );
 }

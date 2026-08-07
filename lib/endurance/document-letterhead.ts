@@ -108,6 +108,33 @@ export async function getSignature(
 }
 
 /**
+ * Assinatura de um documento que JÁ registrou quem o emitiu (receita, atestado).
+ *
+ * O nome e o conselho vêm do próprio documento, não do usuário logado: quem
+ * assinou a receita na terça continua sendo o autor quando a secretária
+ * reimprime na quinta. Trocar pelo nome de quem imprime falsificaria a autoria.
+ *
+ * A imagem da assinatura só entra quando quem imprime É o autor — ela é um
+ * arquivo pessoal, e estampá-la sob o nome de outro profissional seria pior do
+ * que não ter imagem nenhuma. Nos demais casos sai a linha para assinar à mão.
+ */
+export async function getRecordedSignature(
+  org: string,
+  printerUserId: string,
+  recorded: { name: string; council: string },
+): Promise<SignatureBlock> {
+  const mine = await getSignature(org, printerUserId);
+  const isAuthor =
+    !!recorded.name &&
+    mine.name.trim().toLowerCase() === recorded.name.trim().toLowerCase();
+  return {
+    name: recorded.name || mine.name || "Profissional responsável",
+    council: recorded.council || (isAuthor ? mine.council : ""),
+    signatureDataUrl: isAuthor ? mine.signatureDataUrl : null,
+  };
+}
+
+/**
  * Valores atuais para preencher o formulário de configuração. Diferente de
  * `getLetterhead`, que já resolve os fallbacks (cidade/UF no lugar do endereço,
  * por exemplo): aqui devolvemos o que está REALMENTE salvo, senão o usuário
