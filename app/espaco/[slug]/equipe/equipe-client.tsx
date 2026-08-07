@@ -447,7 +447,7 @@ export default function EquipeClient({
       ) : tab === "invites" ? (
         <InviteList invites={invites} profiles={profiles} />
       ) : (
-        <AuditList activity={activity} />
+        <AuditList activity={activity} slug={slug} />
       )}
 
       {showCreate && (
@@ -1188,11 +1188,22 @@ function ResetPasswordModal({
 // --------------------------------------------------------------------------
 // Auditoria
 // --------------------------------------------------------------------------
-function AuditList({ activity }: { activity: ActivityView[] }) {
+function AuditList({ activity, slug }: { activity: ActivityView[]; slug: string }) {
   return (
     <div className="mt-5">
-      <p className="mb-3 text-sm text-slate-500 dark:text-slate-400">
-        Histórico das últimas {activity.length} ações na gestão de usuários.
+      {/* O título dizia "ações na gestão de usuários", mas a consulta que
+          alimenta esta lista nunca filtrou por domínio: emissão fiscal,
+          prontuário e caixa apareciam aqui sob um rótulo que dizia outra coisa.
+          Agora o texto descreve o que a lista realmente é, e quem precisa
+          investigar vai para a trilha completa, que tem filtro e período. */}
+      <p className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
+        <span>Últimas {activity.length} ações registradas no espaço.</span>
+        <a
+          href={`/espaco/${slug}/auditoria`}
+          className="font-semibold text-brand-500 hover:underline"
+        >
+          Ver trilha completa
+        </a>
       </p>
       {activity.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500 dark:border-ink-700">
