@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getOrInitAnamnese } from "@/lib/endurance/anamnese";
 import { prisma } from "@/lib/db";
+import { canAccessModule } from "@/lib/endurance/permissions";
+import { documentsFor } from "@/lib/endurance/document-catalog";
 import { loadModule, DeniedModule } from "../../module-kit";
+import PrintMenu from "../../../components/PrintMenu";
 import AnamneseClient from "./anamnese-client";
 
 /** Anamnese de um paciente: preenchimento/edição do questionário. */
@@ -38,12 +41,28 @@ export default async function PatientAnamnesePage({
           <ArrowLeft className="h-4 w-4" />
           Anamnese
         </Link>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight">
-          {customer?.name ?? "Paciente"}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Questionário inicial do paciente.
-        </p>
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {customer?.name ?? "Paciente"}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Questionário inicial do paciente.
+            </p>
+          </div>
+          <PrintMenu
+            slug={slug}
+            customerId={customerId}
+            available={
+              session
+                ? documentsFor((m) =>
+                    canAccessModule(session.role, session.permissions, m),
+                  )
+                : []
+            }
+            ownerModule="anamnese"
+          />
+        </div>
       </div>
 
       <AnamneseClient slug={slug} customerId={customerId} data={data} />

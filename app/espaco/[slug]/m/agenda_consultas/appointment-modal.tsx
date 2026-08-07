@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef, useEffect } from "react";
-import { Loader2, AlertCircle, Search, X, Repeat, CheckCircle2, MessageCircle, CalendarPlus } from "lucide-react";
+import { Loader2, AlertCircle, Search, X, Repeat, CheckCircle2, MessageCircle, CalendarPlus, Printer } from "lucide-react";
 import { useModalA11y } from "../../use-modal-a11y";
 import { DURATION_OPTIONS, RECURRENCE_FREQUENCIES } from "@/lib/endurance/scheduling";
 import type { AppointmentRow, ProfessionalOption } from "@/lib/endurance/agenda";
@@ -319,6 +319,21 @@ export default function AppointmentModal({
                 {waBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
                 Confirmar por WhatsApp
               </button>
+              {/* Declaração de comparecimento: é o documento que o paciente
+                  pede na hora, no balcão, e até aqui só existia no prontuário —
+                  longe de quem atende a agenda. Só aparece com paciente
+                  vinculado ao cadastro, porque o documento sai em nome dele. */}
+              {customerId && (
+                <a
+                  href={`/espaco/${slug}/documento/declaracao-comparecimento/${customerId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Imprimir declaração de comparecimento"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-brand-500 hover:text-brand-500 dark:border-ink-600 dark:text-slate-300"
+                >
+                  <Printer className="h-4 w-4" /> Declaração
+                </a>
+              )}
               <a
                 href={`/espaco/${slug}/agenda-ics/${appointment.id}`}
                 download

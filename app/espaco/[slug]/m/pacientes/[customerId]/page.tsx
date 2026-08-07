@@ -12,8 +12,10 @@ import type { LucideIcon } from "lucide-react";
 import { getPatient } from "@/lib/endurance/pacientes";
 import { getWorkspace } from "@/lib/endurance/workspace";
 import { canAccessModule } from "@/lib/endurance/permissions";
+import { documentsFor } from "@/lib/endurance/document-catalog";
 import { sessionHasPermission } from "@/lib/auth";
 import { loadModule, DeniedModule } from "../../module-kit";
+import PrintMenu from "../../../components/PrintMenu";
 import PatientForm from "./patient-form";
 import AttachmentsPanel from "./attachments-panel";
 
@@ -61,6 +63,11 @@ export default async function PatientDetailPage({
   const canSummary = session
     ? sessionHasPermission(session, "prontuario.manage")
     : false;
+  const availableDocs = session
+    ? documentsFor((m) =>
+        canAccessModule(session.role, session.permissions, m),
+      )
+    : [];
 
   return (
     <div className="space-y-6">
@@ -72,12 +79,27 @@ export default async function PatientDetailPage({
           <ArrowLeft className="h-4 w-4" />
           Pacientes
         </Link>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight">
-          {isNew ? "Novo paciente" : patient!.name}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          {isNew ? "Cadastre a ficha completa do paciente." : "Ficha do paciente."}
-        </p>
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {isNew ? "Novo paciente" : patient!.name}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {isNew
+                ? "Cadastre a ficha completa do paciente."
+                : "Ficha do paciente."}
+            </p>
+          </div>
+          {/* Só depois de existir: não há o que imprimir de um cadastro em branco. */}
+          {!isNew && patient && (
+            <PrintMenu
+              slug={slug}
+              customerId={patient.id}
+              available={availableDocs}
+              ownerModule="pacientes"
+            />
+          )}
+        </div>
       </div>
 
       {!isNew && patient && related.length > 0 && (
