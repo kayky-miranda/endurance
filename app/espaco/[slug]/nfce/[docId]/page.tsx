@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { prisma } from "@/lib/db";
+import { vendorFooter } from "@/lib/endurance/white-label";
 import { requireOrgAccess } from "@/lib/auth";
 import { formatChave } from "@/lib/endurance/fiscal";
 import { PAY_LABEL } from "@/lib/endurance/fiscal-service";
@@ -17,6 +18,8 @@ export default async function DanfePage({
 }) {
   const { slug, docId } = await params;
   const session = await requireOrgAccess(slug);
+  // Marca do fornecedor: some para quem tem marca própria (Enterprise).
+  const marca = await vendorFooter(session.org, "Emitido por ENDURANCE");
 
   const doc = await prisma.fiscalDocument.findUnique({
     where: { id: docId },
@@ -162,7 +165,7 @@ export default async function DanfePage({
         </div>
 
         <p className="mt-3 text-center text-[10px] text-slate-400">
-          Emitido por ENDURANCE · Sistema Fiscal
+          {[marca, "Sistema Fiscal"].filter(Boolean).join(" · ")}
         </p>
       </div>
     </div>

@@ -4,8 +4,8 @@ import { prisma } from "@/lib/db";
 import { generateCarousel } from "@/lib/endurance/marketing/carousel-generator";
 import { renderCarouselToPNGs } from "@/lib/endurance/marketing/carousel-renderer";
 import { debitCredits, refundCredits } from "@/lib/endurance/marketing/credits";
-import { hit } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { hitAi } from "@/lib/endurance/ai-throttle";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     );
 
   // Rate limit por organização — geração custa crédito + chamada de IA.
-  if (!(await hit(`ai:carousel:${session.org}`, 10, 60_000)).ok) {
+  if (!(await hitAi(session.org, `ai:carousel:${session.org}`, 10, 60_000)).ok) {
     return NextResponse.json(
       { error: "Muitas gerações seguidas. Aguarde um instante." },
       { status: 429 },

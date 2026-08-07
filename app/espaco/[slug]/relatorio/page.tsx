@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { vendorFooter } from "@/lib/endurance/white-label";
 import { requireOrgAccess, sessionHasPermission } from "@/lib/auth";
 import { getWorkspace } from "@/lib/endurance/workspace";
 import { getSalesSummary } from "@/lib/endurance/sales-analytics";
@@ -15,6 +16,8 @@ export default async function RelatorioPage({
 }) {
   const { slug } = await params;
   const session = await requireOrgAccess(slug);
+  // Marca do fornecedor: some para quem tem marca própria (Enterprise).
+  const marca = await vendorFooter(session.org, "Gerado por ENDURANCE");
   // Relatório executivo exige a mesma permissão do módulo de relatórios.
   if (!sessionHasPermission(session, "finance.reports")) notFound();
 
@@ -118,7 +121,7 @@ export default async function RelatorioPage({
         </Section>
 
         <p className="mt-8 border-t border-slate-200 pt-3 text-center text-[11px] text-slate-400">
-          Gerado por ENDURANCE — relatório gerencial sem valor fiscal.
+          {[marca, "relatório gerencial sem valor fiscal."].filter(Boolean).join(" — ")}
         </p>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { vendorFooter } from "@/lib/endurance/white-label";
 import { requireOrgAccess, sessionHasPermission } from "@/lib/auth";
 import { getPurchaseOrderDetail } from "@/lib/endurance/purchasing";
 import PedidoShare from "./pedido-share";
@@ -13,6 +14,8 @@ export default async function PedidoPage({
 }) {
   const { slug, orderId } = await params;
   const session = await requireOrgAccess(slug);
+  // Marca do fornecedor: some para quem tem marca própria (Enterprise).
+  const marca = await vendorFooter(session.org, "Gerado por ENDURANCE");
   if (!sessionHasPermission(session, "suppliers.manage")) notFound();
 
   const o = await getPurchaseOrderDetail(session.org, orderId);
@@ -110,7 +113,7 @@ export default async function PedidoPage({
         )}
 
         <p className="mt-8 border-t border-slate-200 pt-3 text-center text-[11px] text-slate-400">
-          Gerado por ENDURANCE — pedido de compra ao fornecedor.
+          {[marca, "pedido de compra ao fornecedor."].filter(Boolean).join(" — ")}
         </p>
       </div>
     </div>

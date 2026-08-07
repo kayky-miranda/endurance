@@ -1,5 +1,4 @@
 import { getSession, sessionHasPermission } from "@/lib/auth";
-import { hit } from "@/lib/rate-limit";
 import { getWorkspace } from "@/lib/endurance/workspace";
 import { logActivity } from "@/lib/endurance/activity-log";
 import {
@@ -14,6 +13,7 @@ import {
   readAnalysisCache,
   writeAnalysisCache,
 } from "@/lib/endurance/analysis-cache";
+import { hitAi } from "@/lib/endurance/ai-throttle";
 
 /**
  * Análise clínica assistida, em STREAMING (NDJSON — um evento por linha).
@@ -47,7 +47,7 @@ export async function POST(
   // Análise sobre dado clínico: mesma permissão do prontuário.
   if (!sessionHasPermission(session, "prontuario.manage"))
     return new Response("Acesso restrito.", { status: 403 });
-  if (!(await hit(`clinical:analysis:${session.sub}`, 10, 60_000)).ok)
+  if (!(await hitAi(session.org, `clinical:analysis:${session.sub}`, 10, 60_000)).ok)
     return new Response("Muitas análises seguidas. Aguarde um instante.", {
       status: 429,
     });

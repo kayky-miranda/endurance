@@ -1,7 +1,6 @@
 "use server";
 
 import { requirePermission } from "@/lib/auth";
-import { hit } from "@/lib/rate-limit";
 import { withAiCredit } from "@/lib/endurance/ai-credits";
 import { parsePeriod } from "@/lib/endurance/period";
 import { periodLabel } from "@/lib/endurance/period";
@@ -9,6 +8,7 @@ import { getProductivityReport } from "@/lib/endurance/productivity";
 import { getCommissionReport } from "@/lib/endurance/commissions";
 import { generateClinicInsights } from "@/lib/endurance/clinic-insights";
 import type { Insight } from "@/lib/endurance/sales-insights";
+import { hitAi } from "@/lib/endurance/ai-throttle";
 
 /**
  * Insights gerenciais dos Relatórios da clínica (IA opcional + fallback). Gate
@@ -26,7 +26,7 @@ export async function clinicInsightsAction(
   const gate = await requirePermission("finance.reports");
   if (!gate.ok) return gate;
   const s = gate.session;
-  if (!(await hit(`clinic:insights:${s.sub}`, 12, 60_000)).ok)
+  if (!(await hitAi(s.org, `clinic:insights:${s.sub}`, 12, 60_000)).ok)
     return { ok: false, error: "Muitas análises seguidas. Aguarde um instante." };
 
   const days = parsePeriod({ dias }, 30);

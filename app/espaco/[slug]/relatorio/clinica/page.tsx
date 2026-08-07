@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { vendorFooter } from "@/lib/endurance/white-label";
 import { requireOrgAccess, sessionHasPermission } from "@/lib/auth";
 import { getWorkspace } from "@/lib/endurance/workspace";
 import { getProductivityReport } from "@/lib/endurance/productivity";
@@ -24,6 +25,8 @@ export default async function RelatorioClinicaPage({
   const { slug } = await params;
   const sp = await searchParams;
   const session = await requireOrgAccess(slug);
+  // Marca do fornecedor: some para quem tem marca própria (Enterprise).
+  const marca = await vendorFooter(session.org, "Gerado por ENDURANCE");
   if (!sessionHasPermission(session, "finance.reports")) notFound();
 
   const days = parsePeriod(sp, 30);
@@ -169,7 +172,7 @@ export default async function RelatorioClinicaPage({
         </Section>
 
         <p className="mt-8 border-t border-slate-200 pt-3 text-center text-[11px] text-slate-400">
-          Gerado por ENDURANCE — relatório gerencial sem valor fiscal.
+          {[marca, "relatório gerencial sem valor fiscal."].filter(Boolean).join(" — ")}
         </p>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { vendorFooter } from "@/lib/endurance/white-label";
 import { requireOrgAccess, sessionHasPermission } from "@/lib/auth";
 import { getWorkspace } from "@/lib/endurance/workspace";
 import { getFinanceOverview } from "@/lib/endurance/finance";
@@ -15,6 +16,8 @@ export default async function RelatorioFinanceiroPage({
 }) {
   const { slug } = await params;
   const session = await requireOrgAccess(slug);
+  // Marca do fornecedor: some para quem tem marca própria (Enterprise).
+  const marca = await vendorFooter(session.org, "Gerado por ENDURANCE");
   if (!sessionHasPermission(session, "finance.reports")) notFound();
 
   const ws = await getWorkspace(slug);
@@ -77,7 +80,7 @@ export default async function RelatorioFinanceiroPage({
         </Section>
 
         <p className="mt-8 border-t border-slate-200 pt-3 text-center text-[11px] text-slate-400">
-          Gerado por ENDURANCE — relatório financeiro gerencial sem valor fiscal.
+          {[marca, "relatório financeiro gerencial sem valor fiscal."].filter(Boolean).join(" — ")}
         </p>
       </div>
     </div>

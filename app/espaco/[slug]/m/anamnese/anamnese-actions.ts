@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/auth";
 import { logActivity } from "@/lib/endurance/activity-log";
-import { hit } from "@/lib/rate-limit";
 import { consumeAiCredit } from "@/lib/endurance/ai-credits";
 import { saveAnamnese, deleteAnamnese } from "@/lib/endurance/anamnese";
 import { summarizeAnamnese } from "@/lib/endurance/anamnese-summary";
+import { hitAi } from "@/lib/endurance/ai-throttle";
 
 /** Ações da Anamnese. Gate `anamnese.manage` em toda mutação. */
 
@@ -73,7 +73,7 @@ export async function summarizeAnamneseAction(payload: {
   const gate = await requirePermission("anamnese.manage");
   if (!gate.ok) return gate;
   const s = gate.session;
-  if (!(await hit(`anamnese:summary:${s.sub}`, 12, 60_000)).ok)
+  if (!(await hitAi(s.org, `anamnese:summary:${s.sub}`, 12, 60_000)).ok)
     return { ok: false, error: "Muitos resumos seguidos. Aguarde um instante." };
 
   const credit = await consumeAiCredit(s.org, "anamnese_summary");

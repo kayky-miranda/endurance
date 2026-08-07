@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { vendorFooter } from "@/lib/endurance/white-label";
 import { requireOrgAccess } from "@/lib/auth";
 import { money } from "@/lib/endurance/money";
 import { getReceiptConfig } from "@/lib/endurance/receipt-settings";
@@ -22,6 +23,8 @@ export default async function ReciboPage({
 }) {
   const { slug, saleId } = await params;
   const session = await requireOrgAccess(slug);
+  // Marca do fornecedor: some para quem tem marca própria (Enterprise).
+  const marca = await vendorFooter(session.org, "Emitido por ENDURANCE");
 
   const sale = await prisma.sale.findUnique({
     where: { id: saleId },
@@ -165,9 +168,11 @@ export default async function ReciboPage({
         <div className="my-3 border-t border-dashed border-slate-300" />
 
         <p className="text-center text-[11px] text-slate-500">{cfg.footer}</p>
-        <p className="mt-1 text-center text-[10px] text-slate-400">
-          Emitido por ENDURANCE
-        </p>
+        {/* Com marca própria a linha some inteira — um rodapé vazio deixaria
+            um espaço órfão no meio da bobina. */}
+        {marca && (
+          <p className="mt-1 text-center text-[10px] text-slate-400">{marca}</p>
+        )}
       </div>
     </div>
   );
