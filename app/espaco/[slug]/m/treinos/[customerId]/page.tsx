@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getPatientWorkoutsFull } from "@/lib/endurance/treinos";
 import { prisma } from "@/lib/db";
+import { canAccessModule } from "@/lib/endurance/permissions";
+import { documentsFor } from "@/lib/endurance/document-catalog";
 import { loadModule, DeniedModule } from "../../module-kit";
+import PrintMenu from "../../../components/PrintMenu";
 import TreinosClient from "./treinos-client";
 
 /** Fichas de treino de um aluno: visualização + editor. */
@@ -38,12 +41,28 @@ export default async function StudentWorkoutsPage({
           <ArrowLeft className="h-4 w-4" />
           Fichas de treino
         </Link>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight">
-          {customer?.name ?? "Aluno"}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Treinos por divisão (A/B/C) do aluno.
-        </p>
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {customer?.name ?? "Aluno"}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Treinos por divisão (A/B/C) do aluno.
+            </p>
+          </div>
+          <PrintMenu
+            slug={slug}
+            customerId={customerId}
+            available={
+              session
+                ? documentsFor((m) =>
+                    canAccessModule(session.role, session.permissions, m),
+                  )
+                : []
+            }
+            ownerModule="treinos"
+          />
+        </div>
       </div>
 
       <TreinosClient slug={slug} customerId={customerId} workouts={data.workouts} />

@@ -43,6 +43,10 @@ export function renderDocument(payload: DocumentPayload): React.ReactNode {
       return <ResultadosExames p={payload} />;
     case "historico-consultas":
       return <HistoricoConsultas p={payload} />;
+    case "plano-alimentar":
+      return <PlanoAlimentar p={payload} />;
+    case "prescricao-treino":
+      return <PrescricaoTreino p={payload} />;
     case "ficha-cadastral":
       return <FichaCadastral p={payload} />;
   }
@@ -257,6 +261,109 @@ function HistoricoConsultas({ p }: { p: Extract<DocumentPayload, { type: "histor
           </table>
         )}
       </DocSection>
+    </>
+  );
+}
+
+function PlanoAlimentar({ p }: { p: Extract<DocumentPayload, { type: "plano-alimentar" }> }) {
+  const { plan } = p;
+  return (
+    <>
+      <PatientHeader patient={p.patient} />
+
+      {!plan ? (
+        // Um plano revogado impresso como se valesse é pior do que folha
+        // nenhuma: o paciente segue uma dieta que o profissional já suspendeu.
+        <Empty>Nenhum plano alimentar ativo para este paciente.</Empty>
+      ) : (
+        <>
+          <DocSection title={plan.title || "Plano alimentar"}>
+            {plan.goal && <DocField label="Objetivo" value={plan.goal} />}
+            <DocField label="Atualizado em" value={dt(plan.updatedAt)} />
+          </DocSection>
+
+          {plan.meals.length === 0 ? (
+            <Empty>Nenhum item cadastrado neste plano.</Empty>
+          ) : (
+            plan.meals.map((meal) => (
+              <DocSection key={meal.meal} title={meal.label}>
+                <table className="doc-table">
+                  <thead>
+                    <tr>
+                      <th>Alimento</th>
+                      <th>Quantidade</th>
+                      <th>Observações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {meal.items.map((it, i) => (
+                      <tr key={i}>
+                        <td>{it.food}</td>
+                        <td>{it.amount || "—"}</td>
+                        <td className="doc-muted">{it.notes || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </DocSection>
+            ))
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+function PrescricaoTreino({ p }: { p: Extract<DocumentPayload, { type: "prescricao-treino" }> }) {
+  const { workout } = p;
+  return (
+    <>
+      <PatientHeader patient={p.patient} />
+
+      {!workout ? (
+        <Empty>Nenhuma ficha de treino ativa para este aluno.</Empty>
+      ) : (
+        <>
+          <DocSection title={workout.title || "Ficha de treino"}>
+            {workout.goal && <DocField label="Objetivo" value={workout.goal} />}
+            <DocField label="Atualizada em" value={dt(workout.updatedAt)} />
+          </DocSection>
+
+          {workout.groups.length === 0 ? (
+            <Empty>Nenhum exercício cadastrado nesta ficha.</Empty>
+          ) : (
+            workout.groups.map((g) => (
+              <DocSection key={g.group} title={g.group || "Treino"}>
+                <table className="doc-table">
+                  <thead>
+                    <tr>
+                      <th>Exercício</th>
+                      <th>Séries / repetições</th>
+                      <th>Carga</th>
+                      <th>Descanso</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {g.items.map((it, i) => (
+                      <tr key={i}>
+                        <td>
+                          {it.exercise}
+                          {it.notes && (
+                            <span className="doc-author"> · {it.notes}</span>
+                          )}
+                        </td>
+                        <td>{it.sets || "—"}</td>
+                        <td>{it.load || "—"}</td>
+                        <td>{it.rest || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </DocSection>
+            ))
+          )}
+        </>
+      )}
     </>
   );
 }

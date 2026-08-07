@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { getPatient, type PatientDetail } from "./pacientes";
 import { getPatientExams, type LabExamRow } from "./lab-exams";
 import { getPatientBriefing, type MetricTrend } from "./patient-briefing";
+import { getPatientPlansFull, type MealPlanFull } from "./planos";
+import { getPatientWorkoutsFull, type WorkoutFull } from "./treinos";
 import type { DocumentType } from "./document-catalog";
 
 /**
@@ -66,6 +68,16 @@ export type DocumentPayload =
         professional: string;
         status: string;
       }[];
+    }
+  | {
+      type: "plano-alimentar";
+      patient: PatientLite;
+      plan: MealPlanFull | null;
+    }
+  | {
+      type: "prescricao-treino";
+      patient: PatientLite;
+      workout: WorkoutFull | null;
     }
   | { type: "ficha-cadastral"; detail: PatientDetail };
 
@@ -192,6 +204,20 @@ export async function buildDocument(
     case "resultados-exames": {
       const v = await getPatientExams(org, customerId, 80);
       return { type, patient, exams: v.exams };
+    }
+
+    case "plano-alimentar": {
+      // O plano ATIVO é o que se entrega. `getPatientPlansFull` já ordena
+      // ativo primeiro, então o primeiro da lista é o vigente; se nenhum estiver
+      // ativo, o documento diz isso em vez de imprimir um plano revogado como
+      // se valesse.
+      const { plans } = await getPatientPlansFull(org, customerId);
+      return { type, patient, plan: plans.find((p) => p.active) ?? null };
+    }
+
+    case "prescricao-treino": {
+      const { workouts } = await getPatientWorkoutsFull(org, customerId);
+      return { type, patient, workout: workouts.find((w) => w.active) ?? null };
     }
 
     case "historico-consultas": {

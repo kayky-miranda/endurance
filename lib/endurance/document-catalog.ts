@@ -16,6 +16,8 @@ export const DOCUMENT_TYPES = [
   "historico-consultas",
   "resultados-exames",
   "evolucao",
+  "plano-alimentar",
+  "prescricao-treino",
 ] as const;
 
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
@@ -74,6 +76,22 @@ export const DOCUMENTS: DocumentDef[] = [
     module: "evolucao",
   },
   {
+    id: "plano-alimentar",
+    label: "Plano alimentar",
+    title: "Plano alimentar",
+    description: "Cardápio prescrito, refeição por refeição.",
+    signed: true,
+    module: "planos_alimentares",
+  },
+  {
+    id: "prescricao-treino",
+    label: "Prescrição de exercícios",
+    title: "Prescrição de exercícios",
+    description: "Ficha de treino com séries, carga e descanso.",
+    signed: true,
+    module: "treinos",
+  },
+  {
     id: "resultados-exames",
     label: "Resultados de exames",
     title: "Resultados de exames laboratoriais",
@@ -100,6 +118,25 @@ export const DOCUMENTS: DocumentDef[] = [
 ];
 
 const BY_ID = new Map(DOCUMENTS.map((d) => [d.id, d]));
+
+/**
+ * Documentos liberados para um perfil. Recebe o teste de acesso pronto em vez
+ * da sessão para continuar puro — quem chama é sempre servidor e já sabe
+ * responder "esse perfil abre esse módulo?".
+ *
+ * Existe para o filtro não ser reescrito em cada página que oferece impressão;
+ * era assim que uma tela acabava oferecendo documento que outra escondia.
+ */
+export function documentsFor(
+  canAccess: (moduleId: string) => boolean,
+): DocumentType[] {
+  return DOCUMENTS.filter((d) => canAccess(d.module)).map((d) => d.id);
+}
+
+/** Documentos que "pertencem" a um módulo — os que ele imprime por natureza. */
+export function documentsOfModule(moduleId: string): DocumentType[] {
+  return DOCUMENTS.filter((d) => d.module === moduleId).map((d) => d.id);
+}
 
 export function documentById(id: string): DocumentDef | undefined {
   return BY_ID.get(id as DocumentType);

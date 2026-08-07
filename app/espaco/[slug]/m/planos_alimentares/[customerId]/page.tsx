@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getPatientPlansFull } from "@/lib/endurance/planos";
 import { prisma } from "@/lib/db";
+import { canAccessModule } from "@/lib/endurance/permissions";
+import { documentsFor } from "@/lib/endurance/document-catalog";
 import { loadModule, DeniedModule } from "../../module-kit";
+import PrintMenu from "../../../components/PrintMenu";
 import PlansClient from "./plans-client";
 
 /** Planos alimentares de um paciente: lista + editor de cardápio. */
@@ -38,12 +41,28 @@ export default async function PatientPlansPage({
           <ArrowLeft className="h-4 w-4" />
           Planos alimentares
         </Link>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight">
-          {customer?.name ?? "Paciente"}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Cardápios e planos alimentares do paciente.
-        </p>
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {customer?.name ?? "Paciente"}
+            </h1>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Cardápios e planos alimentares do paciente.
+            </p>
+          </div>
+          <PrintMenu
+            slug={slug}
+            customerId={customerId}
+            available={
+              session
+                ? documentsFor((m) =>
+                    canAccessModule(session.role, session.permissions, m),
+                  )
+                : []
+            }
+            ownerModule="planos_alimentares"
+          />
+        </div>
       </div>
 
       <PlansClient slug={slug} customerId={customerId} plans={data.plans} />

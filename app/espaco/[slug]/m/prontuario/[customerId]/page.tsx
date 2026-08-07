@@ -8,7 +8,7 @@ import { listTemplates } from "@/lib/endurance/document-templates";
 import { listProfessionals } from "@/lib/endurance/agenda";
 import { getPatientBriefing } from "@/lib/endurance/patient-briefing";
 import { getPatientExams } from "@/lib/endurance/lab-exams";
-import { DOCUMENTS } from "@/lib/endurance/document-catalog";
+import { documentsFor } from "@/lib/endurance/document-catalog";
 import { canAccessModule } from "@/lib/endurance/permissions";
 import { loadModule, DeniedModule } from "../../module-kit";
 import RecordClient from "./record-client";
@@ -47,9 +47,7 @@ export default async function PatientRecordPage({
 
   // Só oferece o documento cujo módulo o perfil pode acessar.
   const availableDocs = session
-    ? DOCUMENTS.filter((d) =>
-        canAccessModule(session.role, session.permissions, d.module),
-      ).map((d) => d.id)
+    ? documentsFor((m) => canAccessModule(session.role, session.permissions, m))
     : [];
 
   return (

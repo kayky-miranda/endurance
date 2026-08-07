@@ -3,9 +3,12 @@ import {
   DOCUMENTS,
   DOCUMENT_TYPES,
   documentById,
+  documentsFor,
+  documentsOfModule,
   isDocumentType,
   parseDocSelection,
 } from "@/lib/endurance/document-catalog";
+import { MODULES } from "@/lib/endurance/catalog";
 
 describe("catálogo de documentos", () => {
   it("todo tipo declarado tem definição correspondente", () => {
@@ -13,11 +16,30 @@ describe("catálogo de documentos", () => {
     expect(DOCUMENTS).toHaveLength(DOCUMENT_TYPES.length);
   });
 
-  it("toda definição aponta para um módulo (base do gate de permissão)", () => {
+  it("toda definição aponta para um módulo QUE EXISTE no catálogo", () => {
+    // O gate do documento é `canAccessModule(role, perms, def.module)`. Um id de
+    // módulo escrito errado não dá erro: simplesmente nunca libera, e o
+    // documento some da tela sem explicação.
+    const modulos = new Set(MODULES.map((m) => m.id));
     for (const d of DOCUMENTS) {
-      expect(d.module.length).toBeGreaterThan(0);
+      expect(modulos.has(d.module), `${d.id} → ${d.module}`).toBe(true);
       expect(d.title.length).toBeGreaterThan(0);
+      expect(d.label.length).toBeGreaterThan(0);
+      expect(d.description.length).toBeGreaterThan(0);
     }
+  });
+
+  it("documentsOfModule devolve o que o módulo imprime", () => {
+    expect(documentsOfModule("planos_alimentares")).toEqual(["plano-alimentar"]);
+    expect(documentsOfModule("treinos")).toEqual(["prescricao-treino"]);
+    expect(documentsOfModule("modulo_inexistente")).toEqual([]);
+  });
+
+  it("documentsFor respeita o acesso a módulo", () => {
+    const soClinico = documentsFor((m) => m === "prontuario");
+    expect(soClinico).toContain("prontuario");
+    expect(soClinico).not.toContain("ficha-cadastral");
+    expect(documentsFor(() => false)).toEqual([]);
   });
 
   it("documentos não assinados são os que não têm responsabilidade técnica", () => {
