@@ -10,6 +10,7 @@ import { modulePlanFeature, planAllows } from "@/lib/endurance/billing";
 import { resolvePlanContext } from "@/lib/endurance/plan-limits";
 import Shell from "./shell";
 import AiMeter from "./ai-meter";
+import SubscriptionBanner from "./subscription-banner";
 
 export default async function EspacoLayout({
   children,
@@ -64,6 +65,13 @@ export default async function EspacoLayout({
         slug={slug}
         modules={modules}
         aiMeter={<AiMeter slug={slug} orgId={session.org} />}
+        banner={
+          <SubscriptionBanner
+            slug={slug}
+            ctx={planCtx}
+            canManageBilling={perms.has("subscription.manage")}
+          />
+        }
         userName={session.name}
         userEmail={session.email}
         emailVerified={session.emailVerified ?? false}

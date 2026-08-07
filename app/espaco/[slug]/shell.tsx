@@ -28,6 +28,7 @@ import {
   Barcode,
   FileText,
   CreditCard,
+  ShieldCheck,
   Layers,
   Dumbbell,
   ClipboardList,
@@ -133,6 +134,7 @@ export default function Shell({
   canViewDashboard = true,
   logoDataUrl = null,
   aiMeter = null,
+  banner = null,
   children,
 }: {
   orgName: string;
@@ -148,6 +150,8 @@ export default function Shell({
   logoDataUrl?: string | null;
   /** Medidor de créditos de IA (Server Component vindo do layout). */
   aiMeter?: React.ReactNode;
+  /** Aviso fixo no topo (assinatura vencida) — vem pronto do layout. */
+  banner?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -317,6 +321,13 @@ export default function Shell({
       icon: Palette,
       label: "Aparência",
     });
+  if (canManage)
+    entries.push({
+      category: "Administração",
+      href: `${base}/auditoria`,
+      icon: ShieldCheck,
+      label: "Auditoria",
+    });
   if (canManageBilling)
     entries.push({
       category: "Administração",
@@ -448,6 +459,7 @@ export default function Shell({
             </div>
           </header>
 
+          {banner}
           {!emailVerified && <VerifyEmailBanner email={userEmail} />}
 
           <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>

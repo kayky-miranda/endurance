@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
+import { allowedWhenDelinquent } from "@/lib/endurance/billing-gate";
 
 export const SESSION_COOKIE = "endurance_session";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 dias
@@ -53,9 +54,20 @@ export type PermissionCheck =
   | { ok: false; error: string };
 
 /**
- * Guarda padrão das server actions mutantes: exige sessão válida E a
- * permissão granular. A UI esconder um botão não é autorização — toda action
- * que altera dados deve abrir com `const gate = await requirePermission(...)`.
+ * Guarda padrão das server actions mutantes: exige sessão válida, a permissão
+ * granular E uma assinatura em dia. A UI esconder um botão não é autorização —
+ * toda action que altera dados deve abrir com
+ * `const gate = await requirePermission(...)`.
+ *
+ * O gate de assinatura mora AQUI, e não em cada action, porque durante muito
+ * tempo ele existiu (`assertSubscriptionActive`) mas era chamado só nas ações de
+ * equipe: na prática o teste de 14 dias nunca terminava — o cliente seguia
+ * vendendo, emitindo nota e prescrevendo para sempre, impedido apenas de
+ * convidar um colega. Ligar no ponto de estrangulamento comum é o que torna a
+ * regra verdadeira em todo o sistema em vez de em três telas.
+ *
+ * LEITURA CONTINUA LIBERADA de propósito: só as mutações param. O cliente
+ * inadimplente precisa conseguir consultar o histórico, exportar e pagar.
  */
 export async function requirePermission(
   permId: import("@/lib/endurance/permissions").PermissionId,
@@ -64,6 +76,18 @@ export async function requirePermission(
   if (!session) return { ok: false, error: "Sessão expirada." };
   if (!sessionHasPermission(session, permId))
     return { ok: false, error: "Você não tem permissão para isso." };
+
+  if (!allowedWhenDelinquent(permId)) {
+    // Import dinâmico: plan-limits depende de db/billing e é carregado só
+    // quando a checagem é necessária (mesmo padrão já usado em equipe-actions).
+    const { assertSubscriptionActive } = await import(
+      "@/lib/endurance/plan-limits"
+    );
+    const sub = await assertSubscriptionActive(session.org);
+    if (!sub.ok)
+      return { ok: false, error: sub.error ?? "Assinatura indisponível." };
+  }
+
   return { ok: true, session };
 }
 
