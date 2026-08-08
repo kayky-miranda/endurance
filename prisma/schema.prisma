@@ -364,6 +364,17 @@ model Subscription {
   /// chamada — sem job agendado, que seria mais uma peça para manter no ar.
   aiCreditsSince     DateTime  @default(now())
   trialEndsAt        DateTime?
+  /// CPF/CNPJ do responsável pela conta, exigido pelo gateway para emitir a
+  /// cobrança. Mora AQUI e não em FiscalConfig porque é dado de cobrança, não
+  /// de nota fiscal: quem emite recibo (psicólogo, nutricionista) não configura
+  /// o módulo fiscal, e salvá-lo lá exigia `fiscal.manage` — bloqueada com a
+  /// assinatura vencida, o que prendia o cliente sem poder pagar.
+  billingDocument    String    @default("")
+  /// Quando um pagamento REAL falhou (cliente que já pagava). Marca o início da
+  /// carência — cartão recusado não é inadimplência, e travar a operação no
+  /// mesmo dia queima um cliente bom por um problema do banco dele.
+  /// Nulo em teste expirado: ali a carência já foram os 14 dias.
+  pastDueSince       DateTime?
   // Referências do gateway de cobrança recorrente (Asaas). Null no modo manual.
   asaasCustomerId     String?
   asaasSubscriptionId String?

@@ -26,6 +26,7 @@ import {
   type BillingView,
   type InvoiceView,
 } from "@/lib/endurance/billing";
+import BillingDocumentCard from "./billing-document-card";
 import {
   changePlanAction,
   cancelSubscriptionAction,
@@ -85,6 +86,9 @@ export default function BillingClient({
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(
     null,
   );
+  // Checkout recusado por falta do CPF/CNPJ: leva o cliente ao campo em vez de
+  // deixá-lo procurar onde resolver.
+  const [pedirDocumento, setPedirDocumento] = useState(0);
 
   const current = plans.find((p) => p.id === billing.plan) ?? plans[0];
   const seatLimit = current.seats; // 0 = ilimitado
@@ -98,6 +102,7 @@ export default function BillingClient({
       error?: string;
       redirectUrl?: string | null;
       pendingPayment?: boolean;
+      needsDocument?: boolean;
     }>,
     plan?: string,
   ) {
@@ -122,6 +127,7 @@ export default function BillingClient({
         router.refresh();
       } else {
         setMsg({ tone: "err", text: res.error ?? "Não foi possível concluir." });
+        if (res.needsDocument) setPedirDocumento((n) => n + 1);
       }
     });
   }
@@ -156,6 +162,12 @@ export default function BillingClient({
           {msg.text}
         </div>
       )}
+
+      <BillingDocumentCard
+        initial={billing.billingDocument}
+        highlight={pedirDocumento > 0}
+        key={pedirDocumento}
+      />
 
       {/* Checkout iniciado mas ainda sem pagamento confirmado: o plano só
           muda quando o webhook do gateway confirmar. */}

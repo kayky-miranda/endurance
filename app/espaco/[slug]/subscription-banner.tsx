@@ -25,8 +25,15 @@ export default function SubscriptionBanner({
   const message = messageFor(ctx);
   if (!message) return null;
 
+  // Durante a carência o sistema continua funcionando — o aviso é âmbar, de
+  // lembrete. Vermelho é reservado para quando a operação realmente parou;
+  // usar a mesma cor nos dois casos ensinaria o cliente a ignorar o vermelho.
+  const tom = message.grace
+    ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+    : "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200";
+
   return (
-    <div className="flex flex-wrap items-center gap-3 border-b border-rose-300 bg-rose-50 px-4 py-2.5 text-sm text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+    <div className={`flex flex-wrap items-center gap-3 border-b px-4 py-2.5 text-sm ${tom}`}>
       <AlertTriangle className="h-4 w-4 shrink-0" />
       <span className="min-w-0 flex-1">
         <strong>{message.title}</strong>{" "}
@@ -35,7 +42,11 @@ export default function SubscriptionBanner({
       {canManageBilling ? (
         <Link
           href={`/espaco/${slug}/assinatura`}
-          className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-rose-500"
+          className={`rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition ${
+            message.grace
+              ? "bg-amber-600 hover:bg-amber-500"
+              : "bg-rose-600 hover:bg-rose-500"
+          }`}
         >
           {message.cta}
         </Link>
@@ -52,8 +63,20 @@ export default function SubscriptionBanner({
 
 function messageFor(
   ctx: PlanContext,
-): { title: string; detail: string; cta: string } | null {
+): { title: string; detail: string; cta: string; grace?: boolean } | null {
   if (ctx.legacyFullAccess) return null;
+
+  // Carência: pagamento falhou, mas o sistema NÃO parou. O aviso avisa —
+  // avisar cedo é o que permite resolver antes de doer.
+  if (ctx.status === "past_due" && ctx.inGrace) {
+    const d = ctx.graceDaysLeft;
+    return {
+      title: "Não conseguimos processar seu pagamento.",
+      detail: `Seu acesso segue normal por mais ${d} ${d === 1 ? "dia" : "dias"}. Atualize a forma de pagamento para não haver interrupção.`,
+      cta: "Regularizar",
+      grace: true,
+    };
+  }
 
   if (ctx.status === "canceled")
     return {

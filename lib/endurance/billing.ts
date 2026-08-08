@@ -288,6 +288,8 @@ export interface BillingView {
   virtual: boolean;
   /** Plano aguardando confirmação de pagamento no gateway (checkout iniciado). */
   pendingPlan: PlanId | null;
+  /** CPF/CNPJ do responsável, só dígitos. Vazio = ainda não informado. */
+  billingDocument: string;
 }
 
 const PLAN_BY_ID = new Map(PLAN_CATALOG.map((p) => [p.id, p]));

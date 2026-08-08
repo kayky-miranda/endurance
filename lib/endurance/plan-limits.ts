@@ -9,6 +9,7 @@ import {
   type PlanFeature,
   type PlanId,
 } from "@/lib/endurance/billing";
+import { graceDaysLeft, inGracePeriod } from "./billing-grace";
 
 /**
  * Enforcement em runtime dos limites de cada plano. A UI esconde o botão de
@@ -26,6 +27,12 @@ export interface PlanContext {
   trialExpired: boolean;
   /** Contrato anterior à vigência das capacidades: mantém tudo liberado. */
   legacyFullAccess: boolean;
+  /** Início da carência por falha de pagamento (nulo = sem carência). */
+  pastDueSince: Date | null;
+  /** Atrasado, mas ainda dentro da carência — opera normalmente. */
+  inGrace: boolean;
+  /** Dias inteiros restantes de carência (0 fora dela). */
+  graceDaysLeft: number;
 }
 
 /**
@@ -49,6 +56,7 @@ export const resolvePlanContext = cache(async function resolvePlanContext(
         seats: true,
         trialEndsAt: true,
         legacyFullAccess: true,
+        pastDueSince: true,
       },
     }),
     prisma.organization.findUnique({
@@ -65,6 +73,9 @@ export const resolvePlanContext = cache(async function resolvePlanContext(
       trialEndsAt: null,
       trialExpired: false,
       legacyFullAccess: legacyByAge,
+      pastDueSince: null,
+      inGrace: false,
+      graceDaysLeft: 0,
     };
   }
   const trialExpired =
@@ -78,6 +89,9 @@ export const resolvePlanContext = cache(async function resolvePlanContext(
     trialEndsAt: sub.trialEndsAt,
     trialExpired,
     legacyFullAccess: sub.legacyFullAccess || legacyByAge,
+    pastDueSince: sub.pastDueSince,
+    inGrace: inGracePeriod(sub.pastDueSince),
+    graceDaysLeft: graceDaysLeft(sub.pastDueSince),
   };
 });
 
@@ -118,6 +132,10 @@ export async function checkSeatAvailability(orgId: string): Promise<SeatVerdict>
 /**
  * Bloqueia mutações sensíveis se a assinatura está em past_due ou canceled.
  * Leitura e operações de manutenção continuam liberadas.
+ *
+ * CARÊNCIA: `past_due` vindo de uma assinatura que estava ativa (cartão
+ * recusado) não bloqueia nos primeiros dias — ver `billing-grace.ts`. Teste
+ * expirado NÃO tem carência: ali ela já foram os 14 dias.
  */
 export interface SubscriptionVerdict {
   ok: boolean;
@@ -130,7 +148,7 @@ export async function assertSubscriptionActive(
   const ctx = await resolvePlanContext(orgId);
   if (ctx.status === "canceled")
     return { ok: false, status: ctx.status, error: "Assinatura cancelada. Reative o plano para continuar." };
-  if (ctx.status === "past_due")
+  if (ctx.status === "past_due" && !ctx.inGrace)
     return { ok: false, status: ctx.status, error: "Pagamento pendente. Regularize para liberar esta ação." };
   if (ctx.trialExpired)
     return { ok: false, status: ctx.status, error: "Período de teste encerrado. Escolha um plano para continuar." };

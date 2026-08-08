@@ -7,7 +7,12 @@ import {
   createExternalSubscription,
   setCancelAtPeriodEnd,
 } from "@/lib/endurance/billing-service";
-import { planById, isPaidPlan } from "@/lib/endurance/billing";
+import { planById, isPaidPlan, nextPeriodEnd } from "@/lib/endurance/billing";
+import {
+  billingDocumentError,
+  onlyDigits,
+} from "@/lib/endurance/billing-document";
+import { prisma } from "@/lib/db";
 import { resolveBillingProvider } from "@/lib/endurance/billing-provider";
 import { logActivity } from "@/lib/endurance/activity-log";
 
@@ -17,6 +22,8 @@ type R = {
   redirectUrl?: string | null;
   /** Checkout criado no gateway — o plano só muda após o pagamento. */
   pendingPayment?: boolean;
+  /** Faltou o CPF/CNPJ: a tela leva o cliente ao campo em vez de só avisar. */
+  needsDocument?: boolean;
 };
 
 /**
@@ -55,6 +62,49 @@ export async function changePlanAction(planId: string): Promise<R> {
     s,
     "subscription.change",
     `Mudou o plano para ${plan.name}${res.invoiced ? " (fatura emitida)" : ""}`,
+  );
+  return { ok: true };
+}
+
+/**
+ * Grava o CPF/CNPJ do responsável pela conta.
+ *
+ * Gate `subscription.manage` — e é ele que desfaz o impasse: essa permissão
+ * está entre as que sobrevivem à assinatura vencida. Antes o documento só podia
+ * ser salvo na aba Fiscal (`fiscal.manage`, bloqueada), então quem deixasse o
+ * teste expirar sem tê-lo preenchido não conseguia mais nem pagar.
+ *
+ * Sem `requirePermissionVerified` de propósito: aqui não há efeito financeiro,
+ * é só preparar o cadastro. A exigência de e-mail confirmado continua no
+ * `changePlanAction`, que é onde o dinheiro entra.
+ */
+export async function saveBillingDocumentAction(document: string): Promise<R> {
+  const gate = await requirePermission("subscription.manage");
+  if (!gate.ok) return gate;
+  const s = gate.session;
+
+  const problema = billingDocumentError(document);
+  if (problema) return { ok: false, error: problema };
+
+  const digits = onlyDigits(document);
+  await prisma.subscription.upsert({
+    where: { organizationId: s.org },
+    // A organização pode não ter assinatura se nasceu antes do teste automático.
+    create: {
+      organizationId: s.org,
+      currentPeriodEnd: nextPeriodEnd(),
+      billingDocument: digits,
+    },
+    update: { billingDocument: digits },
+  });
+
+  revalidatePath(`/espaco/${s.slug}/assinatura`);
+  // Registra a MUDANÇA sem gravar o documento na trilha: auditoria não é lugar
+  // de replicar dado pessoal que já está no cadastro.
+  await logActivity(
+    s,
+    "subscription.document",
+    `Definiu o ${digits.length === 11 ? "CPF" : "CNPJ"} de cobrança`,
   );
   return { ok: true };
 }

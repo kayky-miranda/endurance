@@ -177,16 +177,42 @@ describe("applyGatewayEvent — desistência e inadimplência", () => {
     expect(provider.cancelSubscription).toHaveBeenCalledWith("sub_asaas_1");
   });
 
-  it("overdue de assinatura ativa real: marca past_due e sinaliza dunning", async () => {
+  it("overdue de assinatura ativa real: marca past_due, inicia a carência e sinaliza dunning", async () => {
     prisma.subscription.findUnique.mockResolvedValue(
       subRow({ plan: "professional", status: "active" }),
     );
     const res = await applyGatewayEvent(ORG, "past_due");
     expect(res.becamePastDue).toBe(true);
-    expect(prisma.subscription.update).toHaveBeenCalledWith({
-      where: { organizationId: ORG },
-      data: { status: "past_due" },
-    });
+
+    const upd = prisma.subscription.update.mock.calls[0][0];
+    expect(upd.data.status).toBe("past_due");
+    // O relógio da carência começa AQUI — é o que evita travar a operação de
+    // quem estava pagando por um cartão que o banco recusou.
+    expect(upd.data.pastDueSince).toBeInstanceOf(Date);
+  });
+
+  it("segunda notificação da MESMA pendência não reinicia a carência", async () => {
+    // Sem esta guarda o gateway poderia empurrar a carência para sempre a cada
+    // reenvio de webhook, e ela nunca terminaria.
+    prisma.subscription.findUnique.mockResolvedValue(
+      subRow({ plan: "professional", status: "past_due" }),
+    );
+    const res = await applyGatewayEvent(ORG, "past_due");
+    expect(res.becamePastDue).toBe(false);
+
+    const upd = prisma.subscription.update.mock.calls[0][0];
+    expect(upd.data.status).toBe("past_due");
+    expect(upd.data.pastDueSince).toBeUndefined();
+  });
+
+  it("pagamento confirmado encerra a carência", async () => {
+    prisma.subscription.findUnique.mockResolvedValue(
+      subRow({ plan: "professional", status: "past_due", pendingPlan: null }),
+    );
+    await applyGatewayEvent(ORG, "active");
+    const upd = prisma.subscription.update.mock.calls[0][0];
+    expect(upd.data.status).toBe("active");
+    expect(upd.data.pastDueSince).toBeNull();
   });
 
   it("cancelamento real: status canceled + cancelAtPeriodEnd", async () => {

@@ -14,6 +14,10 @@ import {
   type BillingView,
   type InvoiceView,
 } from "@/lib/endurance/billing";
+import {
+  isValidBillingDocument,
+  onlyDigits,
+} from "@/lib/endurance/billing-document";
 
 /** Estado padrão de quem nunca mexeu na assinatura: Starter em teste. */
 function defaultBilling(): BillingView {
@@ -26,6 +30,7 @@ function defaultBilling(): BillingView {
     trialEndsAt: null,
     virtual: true,
     pendingPlan: null,
+    billingDocument: "",
   };
 }
 
@@ -56,6 +61,7 @@ export async function loadBilling(
         trialEndsAt: sub.trialEndsAt ? sub.trialEndsAt.toISOString() : null,
         virtual: false,
         pendingPlan: sub.pendingPlan ? asPlanId(sub.pendingPlan) : null,
+        billingDocument: sub.billingDocument,
       }
     : defaultBilling();
 
@@ -153,7 +159,8 @@ export async function changePlan(
 
 export type CheckoutResult =
   | { ok: true; redirectUrl: string | null }
-  | { ok: false; error: string };
+  /** Sinaliza à tela que o caminho é PEDIR o CPF/CNPJ, não só exibir o erro. */
+  | { ok: false; error: string; needsDocument?: boolean };
 
 /**
  * Inicia a assinatura de um plano pago via gateway externo (Asaas): cria a
@@ -190,12 +197,18 @@ export async function createExternalSubscription(
     }),
     prisma.subscription.findUnique({ where: { organizationId: org } }),
   ]);
-  const cpfCnpj = (fiscal?.cnpj ?? "").replace(/\D/g, "");
-  if (cpfCnpj.length !== 11 && cpfCnpj.length !== 14)
+  // O documento de COBRANÇA tem precedência; o fiscal entra como retaguarda
+  // para quem já preenchia a aba Fiscal antes desta separação existir — assim
+  // nenhum cliente atual precisa redigitar nada para continuar assinando.
+  const raw = existing?.billingDocument || fiscal?.cnpj || "";
+  if (!isValidBillingDocument(raw))
     return {
       ok: false,
-      error: "Configure um CPF/CNPJ válido na aba Fiscal antes de assinar.",
+      error:
+        "Informe um CPF ou CNPJ válido do responsável pela conta para continuar.",
+      needsDocument: true,
     };
+  const cpfCnpj = onlyDigits(raw);
 
   const created = await provider.createSubscription({
     orgId: org,
@@ -302,6 +315,8 @@ export async function applyGatewayEvent(
           cancelAtPeriodEnd: false,
           trialEndsAt: null,
           pendingPlan: null,
+          // Pagou: se havia carência correndo, ela some.
+          pastDueSince: null,
         },
       });
       if (applied.count > 0) {
@@ -330,6 +345,8 @@ export async function applyGatewayEvent(
         status: "active",
         currentPeriodStart: now,
         currentPeriodEnd: nextPeriodEnd(now),
+        // Renovação em dia encerra qualquer carência pendente.
+        pastDueSince: null,
       },
     });
     return { rows: 1, activatedPlan: null, becamePastDue: false };
@@ -364,7 +381,15 @@ export async function applyGatewayEvent(
     data:
       status === "canceled"
         ? { status, cancelAtPeriodEnd: true }
-        : { status },
+        : {
+            status,
+            // Marca o início da carência SÓ na primeira falha (`wasActive`) —
+            // uma segunda notificação do gateway sobre a mesma pendência não
+            // pode reiniciar o relógio, senão a carência nunca terminaria.
+            ...(status === "past_due" && wasActive
+              ? { pastDueSince: now }
+              : {}),
+          },
   });
   return {
     rows: 1,
