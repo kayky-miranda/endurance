@@ -175,10 +175,24 @@ describe("resolveFiscalProvider (gating)", () => {
     });
   });
 
-  it("provider vazio → simula", () => {
+  it("provider vazio em HOMOLOGAÇÃO → simula", () => {
     expect(resolveFiscalProvider({ provider: "", ambiente: "2" }).kind).toBe(
       "simulate",
     );
+  });
+
+  it("provider vazio em PRODUÇÃO → RECUSA (não emite cupom sem valor fiscal)", () => {
+    // A combinação simulada + produção gerava um cupom com chave, QR Code e
+    // status "autorizada", e o aviso impresso dependia de ambiente === "2".
+    // O comerciante entregaria ao cliente um documento de aparência legítima
+    // sem nada ter sido transmitido à SEFAZ — e descobriria na fiscalização.
+    const r = resolveFiscalProvider({ provider: "", ambiente: "1" });
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") {
+      expect(r.error).toMatch(/simulada/i);
+      // A mensagem precisa dizer a saída, não só o impedimento.
+      expect(r.error).toMatch(/homologa|provedor/i);
+    }
   });
 
   it("focusnfe sem token → erro (não simula silenciosamente)", () => {

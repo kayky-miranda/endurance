@@ -88,7 +88,26 @@ export function resolveFiscalProvider(
   cfg: FiscalConfigLike,
   deps?: { fetchImpl?: typeof fetch },
 ): ProviderResolution {
-  if (cfg.provider !== "focusnfe") return { kind: "simulate" };
+  if (cfg.provider !== "focusnfe") {
+    // SIMULAÇÃO EM PRODUÇÃO É RECUSADA.
+    //
+    // A combinação "emissão simulada" + "ambiente 1" produzia um cupom com
+    // chave, QR Code e status "autorizada" — e o único aviso impresso no DANFE
+    // dependia de `ambiente === "2"`. Ou seja: o comerciante que trocasse o
+    // ambiente para produção sem contratar o provedor entregaria ao cliente um
+    // cupom de aparência perfeitamente legítima, sem nada ter sido transmitido
+    // à SEFAZ. Ele descobriria na fiscalização.
+    //
+    // Recusar aqui é melhor do que avisar no papel: o erro aparece no ato da
+    // venda, quando ainda dá para corrigir.
+    if (cfg.ambiente === "1")
+      return {
+        kind: "error",
+        error:
+          "A emissão está configurada como Simulada, que não transmite à SEFAZ e não tem valor fiscal — não é possível usá-la em ambiente de Produção. Contrate um provedor de emissão real ou volte o ambiente para Homologação.",
+      };
+    return { kind: "simulate" };
+  }
 
   const producao = cfg.ambiente === "1";
   const ambiente: FiscalAmbiente = producao ? "producao" : "homologacao";

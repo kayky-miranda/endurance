@@ -184,6 +184,14 @@ export default function FiscalClient({
                     </td>
                     <td className="px-5 py-3 text-slate-500 dark:text-slate-400">
                       {r.numero ? `nº ${r.numero}` : "—"}
+                      {/* Documento simulado não foi à SEFAZ. Dizer isso na
+                          listagem evita que ele seja tratado como nota válida
+                          no fechamento do dia. */}
+                      {r.simulado && (
+                        <span className="mt-0.5 block text-[10px] font-semibold uppercase text-amber-600 dark:text-amber-400">
+                          simulada
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-3">
                       <span
@@ -218,11 +226,22 @@ export default function FiscalClient({
                             Emitir
                           </button>
                         )}
+                        {/* O prazo de cancelamento é curto (30 min na NFC-e) e
+                            o operador não tinha como saber: descobria pela
+                            recusa da SEFAZ, já com o cliente no balcão. O botão
+                            continua clicável fora do prazo porque a autoridade
+                            é a SEFAZ e a regra varia por estado — mas o título
+                            explica o que esperar. */}
                         {r.status === "autorizada" && r.docId && (
                           <button
                             onClick={() => cancel(r.docId!)}
                             disabled={loading}
-                            className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs text-red-500 transition hover:bg-red-500/10 disabled:opacity-40 dark:border-red-500/30"
+                            title={r.prazoCancelamento}
+                            className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition disabled:opacity-40 ${
+                              r.podeCancelar
+                                ? "border-red-200 text-red-500 hover:bg-red-500/10 dark:border-red-500/30"
+                                : "border-slate-200 text-slate-400 hover:bg-slate-500/10 dark:border-ink-600"
+                            }`}
                           >
                             {loading ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />

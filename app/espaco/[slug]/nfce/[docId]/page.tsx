@@ -77,6 +77,15 @@ export default async function DanfePage({
             EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO — SEM VALOR FISCAL
           </p>
         )}
+        {/* Segunda camada: o documento SIMULADO (provider vazio) nunca foi
+            transmitido à SEFAZ. A emissão simulada em produção agora é recusada
+            na origem, mas os documentos já gravados continuam existindo — e um
+            cupom sem valor fiscal não pode circular parecendo válido. */}
+        {!doc.provider && (
+          <p className="mt-2 rounded border border-red-400 py-1 text-center text-[10px] font-bold uppercase text-red-600">
+            Documento simulado — não transmitido à SEFAZ, sem valor fiscal
+          </p>
+        )}
 
         <div className="my-3 border-t border-dashed border-slate-300" />
 

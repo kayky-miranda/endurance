@@ -21,6 +21,11 @@ import {
   type NfceEmitInput,
   type NfceEmitItem,
 } from "./fiscal-provider";
+import {
+  cancelWindowLabel,
+  cancelWindowMinutes,
+  withinCancelWindow,
+} from "./fiscal-cancel-window";
 import { fetchXmlContent } from "./fiscal-xml";
 import { logger } from "@/lib/logger";
 import type { Prisma } from "@prisma/client";
@@ -438,8 +443,27 @@ export async function cancelNfce(
             : "Provedor fiscal indisponível para cancelar este documento.",
       };
     const c = await resolution.provider.cancelNfce(doc.providerRef, m);
-    if (!c.ok)
-      return { ok: false, error: c.mensagem ?? "Falha ao cancelar na SEFAZ." };
+    if (!c.ok) {
+      // A recusa fora do prazo chegava como mensagem técnica do provedor, e o
+      // operador não tinha como saber que a causa era o relógio. Explicamos a
+      // causa provável e o caminho correto — sem esconder o retorno original.
+      const foraDoPrazo = !withinCancelWindow(doc.modelo, doc.dataAutorizacao);
+      const detalhe = c.mensagem ?? "Falha ao cancelar na SEFAZ.";
+      return {
+        ok: false,
+        error: foraDoPrazo
+          ? `${detalhe} O prazo de cancelamento (${cancelWindowMinutes(doc.modelo)} min após a autorização) já passou — nesse caso o caminho é emitir uma nota de devolução.`
+          : detalhe,
+      };
+    }
+  } else if (!withinCancelWindow(doc.modelo, doc.dataAutorizacao)) {
+    // Documento SIMULADO: aqui a autoridade somos nós. Recusar fora do prazo
+    // mantém a homologação fiel ao que vai acontecer em produção — deixar
+    // cancelar uma semana depois ensinaria um hábito que falha no dia real.
+    return {
+      ok: false,
+      error: `Prazo de cancelamento encerrado (${cancelWindowMinutes(doc.modelo)} min após a autorização). Em produção a SEFAZ recusaria — o caminho é emitir uma nota de devolução.`,
+    };
   }
 
   await prisma.fiscalDocument.update({
@@ -458,6 +482,12 @@ export interface NfceRow {
   total: number;
   cliente: string;
   quando: string;
+  /** Documento simulado (nunca transmitido à SEFAZ). */
+  simulado: boolean;
+  /** Ainda dentro do prazo de cancelamento? */
+  podeCancelar: boolean;
+  /** Texto do prazo para o operador — vazio quando não se aplica. */
+  prazoCancelamento: string;
 }
 
 export interface NfceOverview {
@@ -539,6 +569,14 @@ export async function getNfceOverview(
         hour: "2-digit",
         minute: "2-digit",
       }),
+      simulado: Boolean(d) && !d!.provider,
+      podeCancelar:
+        status === "autorizada" &&
+        withinCancelWindow(d!.modelo, d!.dataAutorizacao ?? d!.dataEmissao),
+      prazoCancelamento:
+        status === "autorizada"
+          ? cancelWindowLabel(d!.modelo, d!.dataAutorizacao ?? d!.dataEmissao)
+          : "",
     };
   });
 
@@ -556,3 +594,4 @@ export async function getNfceOverview(
 }
 
 export { PAY_LABEL };
+
