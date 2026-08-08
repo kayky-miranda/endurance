@@ -21,6 +21,7 @@ import {
   type FiscalConfigInput,
 } from "./fiscal-actions";
 import { lookupCnpjAction } from "./lookup-actions";
+import CertificateCard from "./certificate-card";
 import type { NfceRow, FiscalConfigView } from "@/lib/endurance/fiscal-service";
 
 const brl = (n: number) =>
@@ -130,6 +131,16 @@ export default function FiscalClient({
             setShowConfig(false);
             router.refresh();
           }}
+        />
+      )}
+
+      {/* Certificado sempre visível quando os dados fiscais já existem: é o
+          passo que habilita a emissão real, e o aviso de vencimento precisa
+          alcançar o cliente mesmo quando ele não abriu a configuração. */}
+      {config.configured && (
+        <CertificateCard
+          validoAte={config.certValidoAte}
+          habilitado={config.certHabilitado}
         />
       )}
 

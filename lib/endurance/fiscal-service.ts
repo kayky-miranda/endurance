@@ -47,6 +47,10 @@ export interface FiscalConfigView {
   provider: string;
   defaultNcm: string;
   configured: boolean;
+  /** Validade do certificado A1 no provedor (ISO) — null se não houver. */
+  certValidoAte: string | null;
+  /** A empresa já tem token próprio no provedor (emissão real habilitada). */
+  certHabilitado: boolean;
 }
 
 /** Lê a config fiscal; cria uma padrão (a partir da org) se ainda não existir. */
@@ -86,6 +90,8 @@ export async function getFiscalConfigView(org: string): Promise<FiscalConfigView
     provider: c.provider,
     defaultNcm: c.defaultNcm,
     configured: Boolean(c.cnpj && c.razaoSocial),
+    certValidoAte: c.certValidoAte ? c.certValidoAte.toISOString() : null,
+    certHabilitado: Boolean(c.focusTokenProducao || c.focusTokenHomologacao),
   };
 }
 

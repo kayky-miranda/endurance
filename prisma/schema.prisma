@@ -705,6 +705,17 @@ model FiscalConfig {
   csc            String   @default("")
   // Emissão real: "" = simulada (protótipo) | "focusnfe" = provedor homologado.
   provider       String   @default("")
+  /// Cadastro da empresa no provedor (multiempresa). O certificado A1 do
+  /// cliente é enviado ao provedor e NUNCA guardado aqui: o .pfx mais a senha
+  /// são a identidade digital da empresa — quem tem os dois assina qualquer
+  /// coisa em nome dela. Guardamos só o que o provedor devolve.
+  focusEmpresaId       String    @default("")
+  focusTokenHomologacao String   @default("")
+  focusTokenProducao   String    @default("")
+  /// Validade do certificado, devolvida pelo provedor no cadastro. Sem isto o
+  /// A1 vence (dura 1 ano) e as notas param sem aviso, com fila no caixa.
+  certValidoDe         DateTime?
+  certValidoAte        DateTime?
   // NCM padrão dos itens (8 díg.) quando o produto não tem NCM próprio. A SEFAZ
   // valida o NCM, então a emissão real exige ao menos este default por empresa.
   defaultNcm     String   @default("")

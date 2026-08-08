@@ -66,6 +66,14 @@ export interface FiscalProvider {
 export interface FiscalConfigLike {
   provider: string;
   ambiente: string; // "1" produção | "2" homologação
+  /**
+   * Tokens DA EMPRESA, devolvidos pelo provedor quando o cliente enviou o
+   * próprio certificado A1 (modelo multiempresa). Quando presentes têm
+   * precedência sobre o token de servidor, que só serve à instalação de
+   * empresa única.
+   */
+  focusTokenProducao?: string;
+  focusTokenHomologacao?: string;
 }
 
 export type ProviderResolution =
@@ -119,13 +127,21 @@ export function resolveFiscalProvider(
         "Emissão em PRODUÇÃO está desabilitada nesta instalação. Use homologação (ambiente 2) ou habilite FOCUS_NFE_ALLOW_PRODUCTION no servidor.",
     };
 
-  const token = producao
+  // MULTIEMPRESA: o token da própria empresa (obtido quando o cliente enviou o
+  // certificado A1 dele) tem precedência. O token de servidor continua valendo
+  // como retaguarda para instalação de empresa única — sem ele, um cliente que
+  // ainda não enviou certificado receberia um erro que não sabe resolver.
+  const empresaToken = producao
+    ? cfg.focusTokenProducao
+    : cfg.focusTokenHomologacao;
+  const serverToken = producao
     ? process.env.FOCUS_NFE_TOKEN_PRODUCAO
     : process.env.FOCUS_NFE_TOKEN_HOMOLOGACAO;
+  const token = (empresaToken || "").trim() || serverToken;
   if (!token)
     return {
       kind: "error",
-      error: `Token do Focus NFe (${ambiente}) não configurado no servidor.`,
+      error: `Emissão em ${ambiente} indisponível: envie o certificado digital A1 da empresa na aba Fiscal para habilitar a emissão.`,
     };
 
   const provider = createFocusNfeProvider({

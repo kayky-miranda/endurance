@@ -195,6 +195,35 @@ describe("resolveFiscalProvider (gating)", () => {
     }
   });
 
+  it("MULTIEMPRESA: o token da empresa tem precedência sobre o do servidor", () => {
+    // Cada cliente traz o próprio certificado e recebe o próprio token. O token
+    // de servidor é retaguarda de instalação de empresa única — se ele vencesse
+    // o da empresa, as notas de um cliente sairiam pelo certificado de outro.
+    process.env.FOCUS_NFE_TOKEN_HOMOLOGACAO = "TOKEN_DO_SERVIDOR";
+    const r = resolveFiscalProvider({
+      provider: "focusnfe",
+      ambiente: "2",
+      focusTokenHomologacao: "TOKEN_DA_EMPRESA",
+    });
+    expect(r.kind).toBe("provider");
+  });
+
+  it("sem token da empresa nem do servidor, o erro diz o que fazer", () => {
+    const r = resolveFiscalProvider({ provider: "focusnfe", ambiente: "2" });
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.error).toMatch(/certificado digital/i);
+  });
+
+  it("token da empresa vazio cai na retaguarda do servidor", () => {
+    process.env.FOCUS_NFE_TOKEN_HOMOLOGACAO = "TOKEN_DO_SERVIDOR";
+    const r = resolveFiscalProvider({
+      provider: "focusnfe",
+      ambiente: "2",
+      focusTokenHomologacao: "   ",
+    });
+    expect(r.kind).toBe("provider");
+  });
+
   it("focusnfe sem token → erro (não simula silenciosamente)", () => {
     expect(
       resolveFiscalProvider({ provider: "focusnfe", ambiente: "2" }).kind,
