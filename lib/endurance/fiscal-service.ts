@@ -26,6 +26,7 @@ import {
   cancelWindowMinutes,
   withinCancelWindow,
 } from "./fiscal-cancel-window";
+import { checkNfceDestinatario } from "./nfce-destinatario";
 import { fetchXmlContent } from "./fiscal-xml";
 import { logger } from "@/lib/logger";
 import type { Prisma } from "@prisma/client";
@@ -138,6 +139,13 @@ export async function emitNfce(org: string, saleId: string): Promise<EmitResult>
       ok: false,
       error: "Complete os dados fiscais (CNPJ e razão social) antes de emitir.",
     };
+
+  // Destinatário pessoa jurídica: a SEFAZ recusa NFC-e desde jan/2026. A
+  // checagem fica ANTES do despacho para valer nos dois caminhos (simulado e
+  // provedor real) — na simulação ela também importa, senão a homologação
+  // ensinaria um fluxo que quebra no primeiro dia de produção.
+  const dest = checkNfceDestinatario(sale.customer?.document);
+  if (!dest.ok) return { ok: false, error: dest.error! };
 
   const resolution = resolveFiscalProvider(cfg);
   if (resolution.kind === "error") return { ok: false, error: resolution.error };

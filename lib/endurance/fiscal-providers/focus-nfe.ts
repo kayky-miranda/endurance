@@ -96,7 +96,12 @@ export function buildFocusNfcePayload(input: NfceEmitInput): FocusNfcePayload {
       valor_pagamento: round2(p.valor),
     })),
   };
-  if (input.dest?.doc) {
+  // Só CPF entra como destinatário: a NFC-e não aceita pessoa jurídica, e o
+  // campo do provedor é `cpf_destinatario`. Um CNPJ aqui viraria um CPF de 14
+  // dígitos — dois erros de uma vez. O caminho já é barrado antes (ver
+  // `nfce-destinatario.ts`); esta é a segunda linha de defesa, para o caso de
+  // alguém chamar o adapter direto no futuro.
+  if (input.dest?.doc && digits(input.dest.doc).length === 11) {
     payload.cpf_destinatario = digits(input.dest.doc);
     if (input.dest.nome) payload.nome_destinatario = input.dest.nome;
   }

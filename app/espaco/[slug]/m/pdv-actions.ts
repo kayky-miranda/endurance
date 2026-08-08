@@ -311,6 +311,8 @@ export type CustomerData = {
   name: string;
   phone: string;
   email: string;
+  /** CPF/CNPJ — o PDV precisa dele para avisar que CNPJ não vai em NFC-e. */
+  document: string;
 };
 
 export type CustomerResult =
@@ -335,7 +337,13 @@ export async function createCustomerAction(
   revalidatePath(`/espaco/${s.slug}/m/pdv`);
   return {
     ok: true,
-    customer: { id: c.id, name: c.name, phone: c.phone, email: c.email },
+    customer: {
+      id: c.id,
+      name: c.name,
+      phone: c.phone,
+      email: c.email,
+      document: c.document ?? "",
+    },
   };
 }
 

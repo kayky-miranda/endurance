@@ -23,7 +23,9 @@ import {
   Copy,
   MessageCircle,
   Send,
+  AlertTriangle,
 } from "lucide-react";
+import { destinatarioKind } from "@/lib/endurance/nfce-destinatario";
 import type { Product } from "./products-client";
 import {
   finalizeSaleAction,
@@ -738,6 +740,16 @@ export default function PdvClient({
                   {[customer.phone, customer.email].filter(Boolean).join(" · ") ||
                     "sem contato"}
                 </p>
+                {/* Avisa ANTES de fechar a venda. A NFC-e com destinatário PJ é
+                    recusada pela SEFAZ, e descobrir isso na hora de emitir
+                    deixa o operador travado com o cliente no balcão. */}
+                {destinatarioKind(customer.document) === "cnpj" && (
+                  <p className="mt-1.5 flex items-start gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                    <AlertTriangle className="mt-px h-3 w-3 shrink-0" />
+                    Cliente com CNPJ: esta venda não sai em NFC-e. Emita uma NF-e
+                    pelo módulo de NF-e.
+                  </p>
+                )}
               </div>
               <button
                 onClick={() => setCustomer(null)}
