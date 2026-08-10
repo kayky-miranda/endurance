@@ -128,29 +128,6 @@ export default function CertificateCard({
           ficam guardados no ENDURANCE.
         </p>
 
-        <div className="grid gap-3 sm:grid-cols-4">
-          <label className="block text-xs font-medium text-slate-500">
-            CEP
-            <input name="cep" required className={`mt-1 ${inputCls}`} />
-          </label>
-          <label className="block text-xs font-medium text-slate-500 sm:col-span-2">
-            Logradouro
-            <input name="logradouro" required className={`mt-1 ${inputCls}`} />
-          </label>
-          <label className="block text-xs font-medium text-slate-500">
-            Número
-            <input name="numero" required className={`mt-1 ${inputCls}`} />
-          </label>
-          <label className="block text-xs font-medium text-slate-500 sm:col-span-2">
-            Bairro
-            <input name="bairro" required className={`mt-1 ${inputCls}`} />
-          </label>
-          <label className="block text-xs font-medium text-slate-500 sm:col-span-2">
-            E-mail para o provedor
-            <input name="email" type="email" className={`mt-1 ${inputCls}`} />
-          </label>
-        </div>
-
         {error && <p className="text-sm text-red-500">{error}</p>}
         {okMsg && (
           <p className="inline-flex items-center gap-1.5 text-sm text-emerald-600 dark:text-emerald-400">

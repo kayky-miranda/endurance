@@ -110,20 +110,13 @@ export async function uploadCertificateAction(
   if (!(file instanceof File))
     return { ok: false, error: "Selecione o arquivo do certificado (.pfx)." };
 
-  const str = (k: string) => String(form.get(k) ?? "").trim();
-
   const res = await onboardFiscalCompany(
     s.org,
     {
       certificado: await file.arrayBuffer(),
       senha: String(form.get("senha") ?? ""),
-      endereco: {
-        cep: str("cep"),
-        logradouro: str("logradouro"),
-        numero: str("numero"),
-        bairro: str("bairro"),
-      },
-      email: str("email") || s.email,
+      // O endereço vem do cadastro do estabelecimento, não do formulário.
+      email: s.email,
     },
     // Enquanto não há contrato de parceria, o fluxo roda validando no provedor
     // sem persistir nada do lado dele.

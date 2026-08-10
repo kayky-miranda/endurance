@@ -39,6 +39,10 @@ function missingFields(cfg: {
   uf: string;
   municipio: string;
   cMun: string;
+  cep: string;
+  logradouro: string;
+  numeroEnd: string;
+  bairro: string;
 }): string[] {
   const faltando: string[] = [];
   if (!cfg.cnpj.replace(/\D/g, "")) faltando.push("CNPJ");
@@ -47,6 +51,13 @@ function missingFields(cfg: {
   if (!cfg.uf.trim()) faltando.push("UF");
   if (!cfg.municipio.trim()) faltando.push("município");
   if (!cfg.cMun.replace(/\D/g, "")) faltando.push("código IBGE do município");
+  // O endereço agora mora no cadastro do estabelecimento. Antes ele era pedido
+  // no formulário do certificado e descartado — o cliente redigitava a cada
+  // envio, e um erro de digitação ali reprovava o cadastro no provedor.
+  if (cfg.cep.replace(/\D/g, "").length !== 8) faltando.push("CEP");
+  if (!cfg.logradouro.trim()) faltando.push("logradouro");
+  if (!cfg.numeroEnd.trim()) faltando.push("número");
+  if (!cfg.bairro.trim()) faltando.push("bairro");
   return faltando;
 }
 
@@ -54,14 +65,8 @@ export interface OnboardInput {
   /** Conteúdo do .pfx. Convertido para base64 aqui e descartado em seguida. */
   certificado: ArrayBuffer;
   senha: string;
-  /** Endereço do emitente (o provedor exige; não vive na FiscalConfig hoje). */
-  endereco: {
-    cep: string;
-    logradouro: string;
-    numero: string;
-    bairro: string;
-  };
-  email: string;
+  /** Opcional: cai no e-mail do cadastro da empresa quando vazio. */
+  email?: string;
 }
 
 export async function onboardFiscalCompany(
@@ -104,11 +109,11 @@ export async function onboardFiscalCompany(
     uf: cfg.uf,
     municipio: cfg.municipio,
     codigoMunicipio: cfg.cMun,
-    cep: input.endereco.cep,
-    logradouro: input.endereco.logradouro,
-    numero: input.endereco.numero,
-    bairro: input.endereco.bairro,
-    email: input.email,
+    cep: cfg.cep,
+    logradouro: cfg.logradouro,
+    numero: cfg.numeroEnd,
+    bairro: cfg.bairro,
+    email: (input.email ?? "").trim() || cfg.email,
     certificadoBase64: Buffer.from(input.certificado).toString("base64"),
     certificadoSenha: input.senha,
   };

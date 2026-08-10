@@ -31,6 +31,7 @@ model Organization {
   sales            Sale[]
   customers        Customer[]
   fiscalConfig     FiscalConfig?
+  companyContacts  CompanyContact[]
   fiscalDocs       FiscalDocument[]
   cashSessions     CashSession[]
   finEntries       FinancialEntry[]
@@ -698,6 +699,42 @@ model FiscalConfig {
   uf             String   @default("SP")
   cMun           String   @default("")
   municipio      String   @default("")
+  // ---- Identificação (Receita Federal) ----
+  inscricaoMunicipal String @default("")
+  cnaePrincipal      String @default("")
+  /// CNAEs secundários separados por vírgula — lista curta, não vale tabela.
+  cnaeSecundarios    String @default("")
+  naturezaJuridica   String @default("")
+  porte              String @default("")
+  dataAbertura       DateTime?
+  situacaoCadastral  String @default("")
+  email              String @default("")
+  telefone           String @default("")
+  site               String @default("")
+
+  // ---- Endereço estruturado do estabelecimento ----
+  // Separado em campos porque a NF-e exige logradouro, número e bairro
+  // individualmente. Antes o endereço era pedido no envio do certificado e
+  // descartado: o cliente redigitava a cada envio.
+  cep         String @default("")
+  logradouro  String @default("")
+  numeroEnd   String @default("")
+  complemento String @default("")
+  bairro      String @default("")
+  pais        String @default("Brasil")
+
+  /// Indicador de contribuinte de ICMS: 1 contribuinte, 2 isento, 9 não.
+  indicadorIe String @default("1")
+  /// Natureza da operação padrão impressa na nota.
+  naturezaOperacao String @default("Venda ao consumidor")
+
+  // ---- Responsável legal (assina pela empresa) ----
+  respNome     String @default("")
+  respCpf      String @default("")
+  respEmail    String @default("")
+  respTelefone String @default("")
+  respCargo    String @default("")
+
   serie          Int      @default(1)
   proxNumero     Int      @default(1)
   ambiente       String   @default("2")
@@ -1846,4 +1883,23 @@ model DocumentSettings {
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+/// Contatos por área do estabelecimento (financeiro, fiscal, comercial…).
+/// Tabela separada porque a quantidade varia por empresa — travar em quatro
+/// colunas fixas obrigaria migração a cada área nova.
+model CompanyContact {
+  id             String   @id @default(cuid())
+  organizationId String
+  /// financeiro | fiscal | administrativo | comercial | outro
+  area           String
+  name           String
+  email          String   @default("")
+  phone          String   @default("")
+  role           String   @default("")
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, area])
 }

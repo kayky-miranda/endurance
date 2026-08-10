@@ -1,11 +1,15 @@
 import { CheckCircle2, Clock, DollarSign, FileText } from "lucide-react";
-import { getNfceOverview } from "@/lib/endurance/fiscal-service";
+import {
+  getNfceOverview,
+  getFiscalReadiness,
+} from "@/lib/endurance/fiscal-service";
 import {
   getImportedInvoices,
   type ImportedInvoiceRow,
 } from "@/lib/endurance/invoice-import";
 import { parsePage } from "@/lib/endurance/pagination";
 import FiscalClient from "../fiscal-client";
+import ReadinessPanel from "../readiness-panel";
 import Pager from "../pager";
 import {
   loadModule,
@@ -33,6 +37,7 @@ export default async function NfcePage({
     ? await getNfceOverview(session.org, parsePage(sp.pagina))
     : null;
   const imported = session ? await getImportedInvoices(session.org) : [];
+  const readiness = session ? await getFiscalReadiness(session.org) : null;
 
   return (
     <div className="space-y-6">
@@ -72,6 +77,9 @@ export default async function NfcePage({
             />
           </div>
 
+          {readiness && (
+            <ReadinessPanel docs={readiness.docs} status={readiness.status} />
+          )}
           <FiscalClient slug={slug} rows={data.rows} config={data.config} />
           <Pager param="pagina" meta={data.pageMeta} />
           <ImportedInvoicesList rows={imported} />

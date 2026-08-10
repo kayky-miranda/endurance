@@ -27,6 +27,11 @@ import {
   withinCancelWindow,
 } from "./fiscal-cancel-window";
 import { checkNfceDestinatario } from "./nfce-destinatario";
+import {
+  evaluateReadiness,
+  overallStatus,
+  type EstablishmentSnapshot,
+} from "./fiscal-readiness";
 import { fetchXmlContent } from "./fiscal-xml";
 import { logger } from "@/lib/logger";
 import type { Prisma } from "@prisma/client";
@@ -609,3 +614,42 @@ export async function getNfceOverview(
 
 export { PAY_LABEL };
 
+/**
+ * Recorte do estabelecimento para a regra de prontidão. Existe para a regra
+ * continuar PURA: ela recebe dado, não consulta banco.
+ */
+export async function getEstablishmentSnapshot(
+  org: string,
+): Promise<EstablishmentSnapshot> {
+  const c = await ensureFiscalConfig(org);
+  return {
+    cnpj: c.cnpj,
+    razaoSocial: c.razaoSocial,
+    ie: c.ie,
+    inscricaoMunicipal: c.inscricaoMunicipal,
+    cMun: c.cMun,
+    municipio: c.municipio,
+    uf: c.uf,
+    cep: c.cep,
+    logradouro: c.logradouro,
+    numeroEnd: c.numeroEnd,
+    bairro: c.bairro,
+    crt: c.crt,
+    cscId: c.cscId,
+    csc: c.csc,
+    defaultNcm: c.defaultNcm,
+    provider: c.provider,
+    ambiente: c.ambiente,
+    certValidoAte: c.certValidoAte,
+    certHabilitado: Boolean(c.focusTokenProducao || c.focusTokenHomologacao),
+    respNome: c.respNome,
+    respCpf: c.respCpf,
+  };
+}
+
+/** Prontidão fiscal calculada a partir do cadastro atual. */
+export async function getFiscalReadiness(org: string) {
+  const snap = await getEstablishmentSnapshot(org);
+  const docs = evaluateReadiness(snap);
+  return { docs, status: overallStatus(docs) };
+}
