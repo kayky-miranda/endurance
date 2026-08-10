@@ -3,7 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI, Type } from "@google/genai";
 import {
   MODULES,
-  NICHES,
+  availableNiches,
+  isNicheAvailable,
   type NicheId,
   type NicheOrOther,
   allModuleIds,
@@ -29,7 +30,7 @@ const ONBOARDING_SCHEMA = {
   properties: {
     niche: {
       type: "string",
-      enum: [...NICHES.map((n) => n.id), "outro"],
+      enum: [...availableNiches().map((n) => n.id), "outro"],
       description: "nicho do negócio; use 'outro' se nenhum se encaixar",
     },
     confidence: {
@@ -94,7 +95,7 @@ const ORDER = [
 const GEMINI_SCHEMA = {
   type: Type.OBJECT,
   properties: {
-    niche: { type: Type.STRING, enum: [...NICHES.map((n) => n.id), "outro"] },
+    niche: { type: Type.STRING, enum: [...availableNiches().map((n) => n.id), "outro"] },
     confidence: { type: Type.NUMBER },
     businessName: { type: Type.STRING },
     city: { type: Type.STRING },
@@ -135,7 +136,7 @@ function renderCatalog(): string {
   for (const m of coreModules()) {
     lines.push(`- ${m.id}: ${m.label} — ${m.description}`);
   }
-  for (const niche of NICHES) {
+  for (const niche of availableNiches()) {
     lines.push("");
     lines.push(`MÓDULOS DO NICHO "${niche.id}" (${niche.label}):`);
     for (const m of modulesForNiche(niche.id)) {
@@ -149,7 +150,7 @@ const SYSTEM = `Você é o motor de onboarding do ENDURANCE, um ERP em SaaS para
 O cliente descreve o negócio em texto livre e você precisa: (1) classificar o nicho, (2) extrair os dados disponíveis e (3) escolher quais módulos do sistema ativar.
 
 NICHOS SUPORTADOS NO MVP:
-${NICHES.map((n) => `- ${n.id}: ${n.label}`).join("\n")}
+${availableNiches().map((n) => `- ${n.id}: ${n.label}`).join("\n")}
 - outro: quando o negócio não se encaixa em nenhum dos acima.
 
 CATÁLOGO DE MÓDULOS (só pode escolher ids desta lista):
@@ -350,7 +351,10 @@ function normalize(
   raw: OnboardingJson,
   source: "ai" | "fallback",
 ): OnboardingResult {
-  const validNiche = NICHES.some((n) => n.id === raw.niche);
+  // Só aceita ramo que o produto realmente entrega hoje. Se o modelo
+  // devolver um ramo fora da oferta, cai em "outro" e a empresa nasce com o
+  // núcleo — melhor do que abrir um espaço cheio de "Em construção".
+  const validNiche = isNicheAvailable(raw.niche);
   const niche: NicheOrOther = validNiche ? (raw.niche as NicheId) : "outro";
 
   const allowed = new Set<string>([
@@ -398,7 +402,7 @@ function fallbackClassify(text: string): OnboardingResult {
   const norm = stripAccents(text.toLowerCase());
 
   let best: { niche: NicheId; score: number } | null = null;
-  for (const niche of NICHES) {
+  for (const niche of availableNiches()) {
     let score = 0;
     for (const kw of niche.keywords) {
       if (norm.includes(stripAccents(kw))) score += 1;

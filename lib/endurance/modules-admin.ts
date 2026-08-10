@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import {
   MODULES,
   NICHES,
+  isNicheAvailable,
   MODULE_CATEGORIES,
   activeModuleIds,
   moduleCategory,
@@ -101,7 +102,13 @@ export async function getModulesConfig(org: string): Promise<ModulesConfig> {
   return {
     niche,
     nicheLabel: orgRow?.nicheLabel ?? nicheLabel((niche || "outro") as NicheId),
-    niches: NICHES.map((n) => ({ id: n.id, label: n.label })),
+    // Oferece os ramos disponíveis MAIS o atual, quando ele já não é
+    // oferecido: sem isso, a empresa que escolheu Academia veria o próprio
+    // ramo sumir do seletor e não conseguiria nem reconhecer a configuração
+    // dela. Ela continua onde está; só não há caminho de volta depois de sair.
+    niches: NICHES.filter(
+      (n) => n.available !== false || n.id === niche,
+    ).map((n) => ({ id: n.id, label: n.label })),
     categories,
   };
 }
@@ -137,6 +144,13 @@ export async function setOrgNiche(
 ): Promise<{ ok: boolean; error?: string }> {
   if (!VALID_NICHES.has(niche))
     return { ok: false, error: "Ramo de atuação inválido." };
+  // Não deixa MIGRAR para um ramo fora da oferta — quem já está nele fica,
+  // mas ninguém entra: os módulos ainda não existem.
+  if (!isNicheAvailable(niche))
+    return {
+      ok: false,
+      error: "Este ramo ainda não está disponível para novos espaços.",
+    };
 
   const ids = [
     ...coreModules().map((m) => m.id),

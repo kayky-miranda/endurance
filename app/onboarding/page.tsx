@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { MODULES, NICHES } from "@/lib/endurance/catalog";
+import { MODULES, availableNiches } from "@/lib/endurance/catalog";
 import { isOnboardingAIEnabled } from "@/lib/endurance/onboarding";
 import OnboardingClient from "../onboarding-client";
 
@@ -13,7 +13,7 @@ export default function OnboardingPage() {
   // Catálogo é estático e seguro para enviar ao cliente (rótulos/descrições).
   return (
     <OnboardingClient
-      niches={NICHES.map((n) => ({
+      niches={availableNiches().map((n) => ({
         id: n.id,
         label: n.label,
         example: n.example,

@@ -29,6 +29,15 @@ export interface Niche {
   keywords: string[];
   /** Frase de exemplo mostrada na interface como atalho. */
   example: string;
+  /**
+   * Oferecido a QUEM ESTÁ SE CADASTRANDO agora.
+   *
+   * `false` NÃO remove o ramo do catálogo — remover quebraria as empresas que
+   * já o escolheram: `activeModuleIds` deixaria de reconhecer o ramo, os
+   * módulos delas sumiriam da barra lateral e `nicheLabel` devolveria o id cru.
+   * Só deixa de aparecer para contratos novos.
+   */
+  available?: boolean;
 }
 
 export const NICHES: Niche[] = [
@@ -75,6 +84,12 @@ export const NICHES: Niche[] = [
       "box",
     ],
     example: "Abri uma academia de musculação em São Paulo.",
+    // Fora da oferta: 5 dos 8 módulos do ramo (mensalidades, planos,
+    // equipamentos, catraca, cobrança automática) ainda estão em construção —
+    // e são praticamente o modelo de negócio de uma academia. Vender agora
+    // seria entregar "Em construção" onde deveria estar o trabalho do cliente,
+    // no pior momento possível: depois de ele já ter pago.
+    available: false,
   },
   {
     id: "cabelereiro",
@@ -90,6 +105,10 @@ export const NICHES: Niche[] = [
       "manicure",
     ],
     example: "Sou dono de um salão de beleza em Belo Horizonte.",
+    // Fora da oferta: os 6 módulos do ramo estão em construção. Um salão que
+    // contratasse hoje receberia apenas o núcleo — nada de agenda, comanda,
+    // comissão ou fidelidade. Não é lançamento, é promessa.
+    available: false,
   },
   {
     id: "nutricionista",
@@ -583,4 +602,21 @@ export function activeModuleIds(
 export function nicheLabel(id: NicheOrOther): string {
   if (id === "outro") return "Outro / não identificado";
   return NICHES.find((n) => n.id === id)?.label ?? id;
+}
+
+/**
+ * Ramos oferecidos a quem se cadastra AGORA.
+ *
+ * Use esta lista em toda superfície de escolha (onboarding, classificador de
+ * IA, troca de ramo nas configurações). `NICHES` continua completa e é o que
+ * `nicheLabel`, `modulesForNiche` e `activeModuleIds` consultam — quem já
+ * escolheu um ramo hoje indisponível segue operando sem notar diferença.
+ */
+export function availableNiches(): Niche[] {
+  return NICHES.filter((n) => n.available !== false);
+}
+
+/** O ramo ainda é oferecido a novos contratos? */
+export function isNicheAvailable(id: string): boolean {
+  return availableNiches().some((n) => n.id === id);
 }
