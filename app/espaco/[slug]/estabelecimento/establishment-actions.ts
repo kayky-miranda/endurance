@@ -83,6 +83,18 @@ const EmissaoSchema = z.object({
   proxNumero: z.coerce.number().int().min(1).default(1),
   ambiente: z.enum(["1", "2"]).default("2"),
   naturezaOperacao: opt(120),
+  // Códigos tributários da empresa. Nada aqui calcula imposto: são os códigos
+  // que a SEFAZ exige no XML, e a coerência com o regime é conferida por
+  // `validateTaxConfig` antes de emitir.
+  cfopPadrao: opt(4),
+  icmsOrigem: opt(1),
+  csosn: opt(4),
+  cstIcms: opt(3),
+  pisSituacao: opt(2),
+  cofinsSituacao: opt(2),
+  finalidade: z.enum(["1", "2", "3", "4"]).default("1"),
+  consumidorFinal: z.enum(["0", "1"]).default("1"),
+  presencaComprador: z.enum(["1", "2", "3", "4", "9"]).default("1"),
 });
 
 const SCHEMAS = {

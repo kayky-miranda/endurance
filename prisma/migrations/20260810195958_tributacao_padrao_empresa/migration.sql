@@ -1,0 +1,10 @@
+-- AlterTable
+ALTER TABLE "FiscalConfig" ADD COLUMN     "cfopPadrao" TEXT NOT NULL DEFAULT '5102',
+ADD COLUMN     "cofinsSituacao" TEXT NOT NULL DEFAULT '49',
+ADD COLUMN     "consumidorFinal" TEXT NOT NULL DEFAULT '1',
+ADD COLUMN     "csosn" TEXT NOT NULL DEFAULT '102',
+ADD COLUMN     "cstIcms" TEXT NOT NULL DEFAULT '00',
+ADD COLUMN     "finalidade" TEXT NOT NULL DEFAULT '1',
+ADD COLUMN     "icmsOrigem" TEXT NOT NULL DEFAULT '0',
+ADD COLUMN     "pisSituacao" TEXT NOT NULL DEFAULT '49',
+ADD COLUMN     "presencaComprador" TEXT NOT NULL DEFAULT '1';

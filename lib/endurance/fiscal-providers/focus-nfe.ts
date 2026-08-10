@@ -5,6 +5,7 @@ import type {
   NfceEmitResult,
   NfceStatus,
 } from "../fiscal-provider";
+import { icmsCodigo } from "../tax-defaults";
 
 /**
  * Adapter do Focus NFe (https://focusnfe.com.br) para NFC-e (modelo 65).
@@ -23,17 +24,6 @@ const PAG_TPAG: Record<string, string> = {
   pix: "17",
 };
 
-/**
- * Defaults tributários para Simples Nacional (CRT=1), espelhando o XML simulado
- * (CFOP 5102 / CSOSN 102). A tributação real é específica do emitente/produto
- * (NCM, CST/CSOSN, PIS/COFINS) — centralizado aqui para ajuste futuro.
- */
-const TAX = {
-  icmsOrigem: "0",
-  csosn: "102",
-  pisSituacao: "49",
-  cofinsSituacao: "49",
-};
 
 const digits = (s: string) => (s ?? "").replace(/\D/g, "");
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -60,14 +50,15 @@ export interface FocusNfcePayload {
 
 /** Mapeia a venda para o payload de NFC-e do Focus NFe (função pura/testável). */
 export function buildFocusNfcePayload(input: NfceEmitInput): FocusNfcePayload {
+  const t = input.tributacao;
   const payload: FocusNfcePayload = {
     cnpj_emitente: digits(input.emit.cnpj),
     data_emissao: emissaoISO(input.emissao),
-    presenca_comprador: "1",
-    natureza_operacao: "Venda ao consumidor",
+    presenca_comprador: t.presencaComprador,
+    natureza_operacao: input.naturezaOperacao,
     tipo_documento: "1",
-    finalidade_emissao: "1",
-    consumidor_final: "1",
+    finalidade_emissao: t.finalidade,
+    consumidor_final: t.consumidorFinal,
     modalidade_frete: "9",
     local_destino: "1",
     valor_produtos: round2(input.subtotal),
@@ -86,10 +77,11 @@ export function buildFocusNfcePayload(input: NfceEmitInput): FocusNfcePayload {
       unidade_tributavel: it.unidade,
       quantidade_tributavel: round2(it.quantidade),
       valor_unitario_tributavel: round2(it.valorUnitario),
-      icms_origem: TAX.icmsOrigem,
-      icms_situacao_tributaria: TAX.csosn,
-      pis_situacao_tributaria: TAX.pisSituacao,
-      cofins_situacao_tributaria: TAX.cofinsSituacao,
+      icms_origem: t.icmsOrigem,
+      // O código segue o REGIME: CSOSN no Simples, CST no Regime Normal.
+      icms_situacao_tributaria: icmsCodigo(input.emit.crt, t).codigo,
+      pis_situacao_tributaria: t.pisSituacao,
+      cofins_situacao_tributaria: t.cofinsSituacao,
     })),
     formas_pagamento: input.pagamentos.map((p) => ({
       forma_pagamento: PAG_TPAG[p.metodo] ?? "99",

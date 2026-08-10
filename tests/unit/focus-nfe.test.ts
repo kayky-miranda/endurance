@@ -11,6 +11,18 @@ const INPUT: NfceEmitInput = {
   ambiente: "homologacao",
   emissao: new Date("2026-06-13T10:00:00-03:00"),
   emit: { cnpj: "14.200.166/0001-87", ie: "ISENTO", crt: "1", uf: "SP" },
+  tributacao: {
+    cfopPadrao: "5102",
+    icmsOrigem: "0",
+    csosn: "102",
+    cstIcms: "00",
+    pisSituacao: "49",
+    cofinsSituacao: "49",
+    finalidade: "1",
+    consumidorFinal: "1",
+    presencaComprador: "1",
+  },
+  naturezaOperacao: "Venda ao consumidor",
   dest: null,
   itens: [
     {
@@ -247,5 +259,42 @@ describe("resolveFiscalProvider (gating)", () => {
     process.env.FOCUS_NFE_ALLOW_PRODUCTION = "true";
     const r = resolveFiscalProvider({ provider: "focusnfe", ambiente: "1" });
     expect(r.kind).toBe("provider");
+  });
+});
+
+describe("tributação vem da EMPRESA, não de constante", () => {
+  it("Simples Nacional envia o CSOSN configurado", () => {
+    const p = buildFocusNfcePayload(INPUT);
+    expect(p.items[0].icms_situacao_tributaria).toBe("102");
+  });
+
+  it("Regime Normal envia o CST, não o CSOSN", () => {
+    // Mandar CSOSN para Lucro Presumido derruba a nota inteira na SEFAZ.
+    const p = buildFocusNfcePayload({
+      ...INPUT,
+      emit: { ...INPUT.emit, crt: "3" },
+      tributacao: { ...INPUT.tributacao, csosn: "102", cstIcms: "00" },
+    });
+    expect(p.items[0].icms_situacao_tributaria).toBe("00");
+  });
+
+  it("presença, finalidade e consumidor final saem da configuração", () => {
+    const p = buildFocusNfcePayload({
+      ...INPUT,
+      tributacao: { ...INPUT.tributacao, presencaComprador: "4", finalidade: "4", consumidorFinal: "0" },
+    });
+    expect(p.presenca_comprador).toBe("4");
+    expect(p.finalidade_emissao).toBe("4");
+    expect(p.consumidor_final).toBe("0");
+  });
+
+  it("natureza da operação é a da empresa", () => {
+    const p = buildFocusNfcePayload({ ...INPUT, naturezaOperacao: "Venda de mercadoria" });
+    expect(p.natureza_operacao).toBe("Venda de mercadoria");
+  });
+
+  it("origem da mercadoria é respeitada", () => {
+    const p = buildFocusNfcePayload({ ...INPUT, tributacao: { ...INPUT.tributacao, icmsOrigem: "2" } });
+    expect(p.items[0].icms_origem).toBe("2");
   });
 });

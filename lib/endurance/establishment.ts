@@ -54,6 +54,15 @@ export interface EstablishmentView {
   proxNumero: number;
   ambiente: string;
   naturezaOperacao: string;
+  cfopPadrao: string;
+  icmsOrigem: string;
+  csosn: string;
+  cstIcms: string;
+  pisSituacao: string;
+  cofinsSituacao: string;
+  finalidade: string;
+  consumidorFinal: string;
+  presencaComprador: string;
   // Integração / certificado
   provider: string;
   certValidoAte: string | null;
@@ -100,6 +109,15 @@ export async function getEstablishment(org: string): Promise<EstablishmentView> 
     proxNumero: c.proxNumero,
     ambiente: c.ambiente,
     naturezaOperacao: c.naturezaOperacao,
+    cfopPadrao: c.cfopPadrao,
+    icmsOrigem: c.icmsOrigem,
+    csosn: c.csosn,
+    cstIcms: c.cstIcms,
+    pisSituacao: c.pisSituacao,
+    cofinsSituacao: c.cofinsSituacao,
+    finalidade: c.finalidade,
+    consumidorFinal: c.consumidorFinal,
+    presencaComprador: c.presencaComprador,
     provider: c.provider,
     certValidoAte: c.certValidoAte ? c.certValidoAte.toISOString() : null,
     certHabilitado: Boolean(c.focusTokenProducao || c.focusTokenHomologacao),

@@ -728,6 +728,29 @@ model FiscalConfig {
   /// Natureza da operação padrão impressa na nota.
   naturezaOperacao String @default("Venda ao consumidor")
 
+  // ---- Tributação padrão da EMPRESA ----
+  // Granularidade por empresa: resolve o varejo cujo mix tem a mesma
+  // tributação. Quando um produto precisar divergir, o lugar da exceção é o
+  // cadastro do produto — não outra coluna aqui.
+  //
+  // Nada aqui calcula imposto. São os CÓDIGOS que a SEFAZ exige no XML; as
+  // alíquotas e a regra de cada operação são do contador da empresa.
+  cfopPadrao      String @default("5102")
+  icmsOrigem      String @default("0")
+  /// Simples Nacional (CRT 1 e 2) usa CSOSN.
+  csosn           String @default("102")
+  /// Regime Normal (CRT 3) usa CST de ICMS. Mandar o código do regime errado
+  /// é rejeição na origem — ver `tax-defaults.ts`.
+  cstIcms         String @default("00")
+  pisSituacao     String @default("49")
+  cofinsSituacao  String @default("49")
+  /// 1 normal | 2 complementar | 3 ajuste | 4 devolução
+  finalidade      String @default("1")
+  /// 0 não | 1 consumidor final
+  consumidorFinal String @default("1")
+  /// 1 presencial | 2 internet | 4 entrega a domicílio | 9 não presencial
+  presencaComprador String @default("1")
+
   // ---- Responsável legal (assina pela empresa) ----
   respNome     String @default("")
   respCpf      String @default("")

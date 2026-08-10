@@ -1,5 +1,6 @@
 import "server-only";
 import crypto from "crypto";
+import { icmsCodigo } from "./tax-defaults";
 
 /**
  * Camada fiscal — NFC-e (Nota Fiscal de Consumidor Eletrônica, modelo 65).
@@ -145,6 +146,16 @@ export interface XmlInput {
     municipio: string;
     cMun: string;
   };
+  /**
+   * Códigos tributários da empresa. Opcional para não quebrar chamadas
+   * antigas — ausente, cai no padrão de Simples Nacional.
+   */
+  tributacao?: {
+    cfopPadrao: string;
+    icmsOrigem: string;
+    csosn: string;
+    cstIcms: string;
+  };
   dest?: { nome: string; doc: string } | null;
   itens: { nome: string; quantidade: number; valorUnit: number; codigo: string }[];
   subtotal: number;
@@ -156,6 +167,22 @@ export interface XmlInput {
 /** XML da NFC-e (leiaute 4.00, simplificado e não assinado — demonstração). */
 export function buildNfceXml(i: XmlInput): string {
   const cUF = UF_CODE[i.emit.uf] ?? "35";
+  // Tributação da EMPRESA. O bloco de ICMS muda de ESTRUTURA conforme o regime:
+  // Simples usa <ICMSSN102> com <CSOSN>; Regime Normal usa <ICMS00> com <CST>.
+  // O XML fixava o do Simples, então a simulação de uma empresa de Lucro
+  // Presumido saía num leiaute que a SEFAZ recusaria em produção — e a
+  // homologação passava a ensinar o formato errado.
+  const cfop = i.tributacao?.cfopPadrao || "5102";
+  const origem = i.tributacao?.icmsOrigem || "0";
+  const { tipo, codigo } = icmsCodigo(i.emit.crt || "1", {
+    csosn: i.tributacao?.csosn || "102",
+    cstIcms: i.tributacao?.cstIcms || "00",
+  });
+  const grupo = tipo === "csosn" ? `ICMSSN${codigo}` : `ICMS${codigo}`;
+  const tag = tipo === "csosn" ? "CSOSN" : "CST";
+  const icmsBloco =
+    `<ICMS><${grupo}><orig>${esc(origem)}</orig>` +
+    `<${tag}>${esc(codigo)}</${tag}></${grupo}></ICMS>`;
   const id = i.chave;
   const dh = i.emissao.toISOString().replace(/\.\d{3}Z$/, "-03:00");
   const det = i.itens
@@ -165,7 +192,7 @@ export function buildNfceXml(i: XmlInput): string {
       <prod>
         <cProd>${esc(it.codigo || String(idx + 1))}</cProd>
         <xProd>${esc(it.nome)}</xProd>
-        <CFOP>5102</CFOP>
+        <CFOP>${esc(cfop)}</CFOP>
         <uCom>UN</uCom>
         <qCom>${num(it.quantidade, 4)}</qCom>
         <vUnCom>${num(it.valorUnit, 2)}</vUnCom>
@@ -173,7 +200,7 @@ export function buildNfceXml(i: XmlInput): string {
         <indTot>1</indTot>
       </prod>
       <imposto>
-        <ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS>
+        ${icmsBloco}
       </imposto>
     </det>`;
     })

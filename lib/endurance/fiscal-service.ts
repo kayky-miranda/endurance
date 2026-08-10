@@ -32,6 +32,7 @@ import {
   overallStatus,
   type EstablishmentSnapshot,
 } from "./fiscal-readiness";
+import { icmsCodigo, type TaxConfig } from "./tax-defaults";
 import { fetchXmlContent } from "./fiscal-xml";
 import { logger } from "@/lib/logger";
 import type { Prisma } from "@prisma/client";
@@ -202,6 +203,7 @@ export function resolveNfceItems(
   items: SaleLineLike[],
   products: ProductFiscal[],
   companyDefaultNcm: string,
+  cfopPadrao = "5102",
 ): { itens: NfceEmitItem[]; semNcm: string[] } {
   const defaultNcm = (companyDefaultNcm ?? "").replace(/\D/g, "");
   const byId = new Map(products.map((p) => [p.id, p]));
@@ -216,7 +218,7 @@ export function resolveNfceItems(
       codigo: it.productId ?? "",
       descricao: it.name,
       ncm,
-      cfop: "5102",
+      cfop: cfopPadrao,
       unidade: (prod?.unit || "un").toUpperCase(),
       quantidade: it.quantity,
       valorUnitario: it.unitPrice,
@@ -224,6 +226,22 @@ export function resolveNfceItems(
   });
 
   return { itens, semNcm };
+}
+
+
+/** Recorte tributário da empresa para o emissor (mantém a regra pura). */
+function taxConfigFrom(cfg: FiscalCfg): TaxConfig {
+  return {
+    cfopPadrao: cfg.cfopPadrao,
+    icmsOrigem: cfg.icmsOrigem,
+    csosn: cfg.csosn,
+    cstIcms: cfg.cstIcms,
+    pisSituacao: cfg.pisSituacao,
+    cofinsSituacao: cfg.cofinsSituacao,
+    finalidade: cfg.finalidade,
+    consumidorFinal: cfg.consumidorFinal,
+    presencaComprador: cfg.presencaComprador,
+  };
 }
 
 async function emitNfceViaProvider(
@@ -254,6 +272,7 @@ async function emitNfceViaProvider(
     })),
     products,
     cfg.defaultNcm,
+    cfg.cfopPadrao,
   );
 
   // A SEFAZ valida o NCM (8 díg.) de cada item — bloqueia antes de transmitir
@@ -273,6 +292,8 @@ async function emitNfceViaProvider(
     ambiente,
     emissao,
     emit: { cnpj: cfg.cnpj, ie: cfg.ie, crt: cfg.crt, uf: cfg.uf },
+    tributacao: taxConfigFrom(cfg),
+    naturezaOperacao: cfg.naturezaOperacao,
     dest: sale.customer?.document
       ? { nome: sale.customer.name, doc: sale.customer.document }
       : null,
@@ -378,6 +399,14 @@ async function emitNfceSimulated(
     serie: cfg.serie,
     numero,
     emissao,
+    // A simulação passa a refletir a tributação REAL da empresa: assim a
+    // homologação ensina o mesmo leiaute que a produção vai exigir.
+    tributacao: {
+      cfopPadrao: cfg.cfopPadrao,
+      icmsOrigem: cfg.icmsOrigem,
+      csosn: cfg.csosn,
+      cstIcms: cfg.cstIcms,
+    },
     emit: {
       cnpj: cfg.cnpj,
       razaoSocial: cfg.razaoSocial,

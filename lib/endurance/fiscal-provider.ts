@@ -1,5 +1,6 @@
 import "server-only";
 import { createFocusNfeProvider } from "./fiscal-providers/focus-nfe";
+import type { TaxConfig } from "./tax-defaults";
 
 /**
  * Abstração de PROVEDOR FISCAL homologado para emissão real de NFC-e (modelo 65).
@@ -32,6 +33,14 @@ export interface NfceEmitInput {
   ambiente: FiscalAmbiente;
   emissao: Date;
   emit: { cnpj: string; ie: string; crt: string; uf: string };
+  /**
+   * Códigos tributários DA EMPRESA. Antes eram constantes no adapter, o que
+   * dava certo só para Simples Nacional — Regime Normal precisa de CST no
+   * lugar de CSOSN, e a SEFAZ recusa quando o código não bate com o CRT.
+   */
+  tributacao: TaxConfig;
+  /** Natureza da operação impressa na nota (configurável por empresa). */
+  naturezaOperacao: string;
   dest: { nome: string; doc: string } | null;
   itens: NfceEmitItem[];
   pagamentos: { metodo: string; valor: number }[];

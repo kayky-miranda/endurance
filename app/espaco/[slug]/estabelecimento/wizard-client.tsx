@@ -14,6 +14,14 @@ import {
 } from "lucide-react";
 import type { EstablishmentView } from "@/lib/endurance/establishment";
 import type { StepState, StepId } from "@/lib/endurance/establishment-steps";
+import {
+  tributacaoIcms,
+  validateTaxConfig,
+  ORIGEM_OPTIONS,
+  FINALIDADE_OPTIONS,
+  PRESENCA_OPTIONS,
+  CONSUMIDOR_OPTIONS,
+} from "@/lib/endurance/tax-defaults";
 import { lookupCnpjAction, lookupCepAction } from "../m/lookup-actions";
 import {
   saveEstablishmentStepAction,
@@ -155,6 +163,24 @@ export default function WizardClient({
       setMsg({ tone: "ok", text: "Endereço carregado pelo CEP." });
     });
   }
+
+  // A tributação é conferida na tela com a MESMA função do servidor.
+  const tribIcms = tributacaoIcms(form.crt);
+  const taxIssues = validateTaxConfig(
+    {
+      cfopPadrao: form.cfopPadrao,
+      icmsOrigem: form.icmsOrigem,
+      csosn: form.csosn,
+      cstIcms: form.cstIcms,
+      pisSituacao: form.pisSituacao,
+      cofinsSituacao: form.cofinsSituacao,
+      finalidade: form.finalidade,
+      consumidorFinal: form.consumidorFinal,
+      presencaComprador: form.presencaComprador,
+    },
+    form.crt,
+    "65",
+  );
 
   const err = (k: string) =>
     badField === k ? "border-red-500 ring-1 ring-red-500/30" : "";
@@ -595,10 +621,125 @@ export default function WizardClient({
                 />
               </Field>
             </div>
+
+            <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Tributação padrão
+            </h3>
+            <p className="mt-1 text-[11px] text-slate-400">
+              Códigos exigidos no XML. O ENDURANCE não calcula imposto nem
+              escolhe alíquota — esses valores vêm do seu contador.
+            </p>
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <Field label="CFOP padrão" hint="5xxx dentro do estado, 6xxx interestadual">
+                <input
+                  value={form.cfopPadrao}
+                  onChange={(e) => set("cfopPadrao", e.target.value)}
+                  className={`${input} ${err("cfopPadrao")}`}
+                />
+              </Field>
+              <Field label="Origem da mercadoria">
+                <select
+                  value={form.icmsOrigem}
+                  onChange={(e) => set("icmsOrigem", e.target.value)}
+                  className={input}
+                >
+                  {ORIGEM_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </Field>
+              {/* Mostra só o código do REGIME da empresa: exibir os dois faria o
+                  cliente preencher um campo que nunca vai ao XML. */}
+              {tribIcms === "csosn" ? (
+                <Field label="CSOSN" hint="Simples Nacional">
+                  <input
+                    value={form.csosn}
+                    onChange={(e) => set("csosn", e.target.value)}
+                    className={`${input} ${err("csosn")}`}
+                  />
+                </Field>
+              ) : (
+                <Field label="CST de ICMS" hint="Regime Normal">
+                  <input
+                    value={form.cstIcms}
+                    onChange={(e) => set("cstIcms", e.target.value)}
+                    className={`${input} ${err("cstIcms")}`}
+                  />
+                </Field>
+              )}
+              <Field label="Situação do PIS">
+                <input
+                  value={form.pisSituacao}
+                  onChange={(e) => set("pisSituacao", e.target.value)}
+                  className={input}
+                />
+              </Field>
+              <Field label="Situação do COFINS">
+                <input
+                  value={form.cofinsSituacao}
+                  onChange={(e) => set("cofinsSituacao", e.target.value)}
+                  className={input}
+                />
+              </Field>
+              <Field label="Finalidade">
+                <select
+                  value={form.finalidade}
+                  onChange={(e) => set("finalidade", e.target.value)}
+                  className={input}
+                >
+                  {FINALIDADE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Presença do comprador">
+                <select
+                  value={form.presencaComprador}
+                  onChange={(e) => set("presencaComprador", e.target.value)}
+                  className={input}
+                >
+                  {PRESENCA_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Consumidor final">
+                <select
+                  value={form.consumidorFinal}
+                  onChange={(e) => set("consumidorFinal", e.target.value)}
+                  className={input}
+                >
+                  {CONSUMIDOR_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+
+            {/* Coerência conferida enquanto digita: o cliente vê o problema
+                antes de tentar emitir e ser recusado pela SEFAZ. */}
+            {taxIssues.length > 0 && (
+              <ul className="mt-3 space-y-1.5">
+                {taxIssues.map((i) => (
+                  <li
+                    key={i.field}
+                    className={`text-xs ${i.blocking ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`}
+                  >
+                    {i.blocking ? "Impede emitir: " : "Atenção: "}
+                    {i.message}
+                  </li>
+                ))}
+              </ul>
+            )}
             <SaveBar
               pending={pending}
               onSave={() =>
-                save("emissao", ["serie", "proxNumero", "ambiente", "naturezaOperacao"])
+                save("emissao", [
+                  "serie", "proxNumero", "ambiente", "naturezaOperacao",
+                  "cfopPadrao", "icmsOrigem", "csosn", "cstIcms",
+                  "pisSituacao", "cofinsSituacao", "finalidade",
+                  "consumidorFinal", "presencaComprador",
+                ])
               }
             />
           </Card>
