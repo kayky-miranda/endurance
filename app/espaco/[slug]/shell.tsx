@@ -29,6 +29,7 @@ import {
   FileText,
   CreditCard,
   ShieldCheck,
+  Building2,
   Layers,
   Dumbbell,
   ClipboardList,
@@ -320,6 +321,13 @@ export default function Shell({
       href: `${base}/aparencia`,
       icon: Palette,
       label: "Aparência",
+    });
+  if (canManage)
+    entries.push({
+      category: "Administração",
+      href: `${base}/estabelecimento`,
+      icon: Building2,
+      label: "Estabelecimento",
     });
   if (canManage)
     entries.push({

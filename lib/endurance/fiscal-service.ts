@@ -59,21 +59,34 @@ export interface FiscalConfigView {
   certHabilitado: boolean;
 }
 
-/** Lê a config fiscal; cria uma padrão (a partir da org) se ainda não existir. */
+/**
+ * Lê a config fiscal; cria uma padrão (a partir da org) se ainda não existir.
+ *
+ * UPSERT e não "ler, depois criar": duas chamadas concorrentes encontravam a
+ * linha ausente e ambas tentavam criar, estourando a unicidade de
+ * `organizationId`. Não era hipótese — a própria tela do estabelecimento carrega
+ * o cadastro e a prontidão em `Promise.all`, e as duas passam por aqui. Quebrava
+ * na PRIMEIRA visita de cada cliente, justamente quando a linha ainda não existe.
+ */
 export async function ensureFiscalConfig(org: string) {
   const existing = await prisma.fiscalConfig.findUnique({
     where: { organizationId: org },
   });
   if (existing) return existing;
+
   const o = await prisma.organization.findUnique({ where: { id: org } });
-  return prisma.fiscalConfig.create({
-    data: {
+  return prisma.fiscalConfig.upsert({
+    where: { organizationId: org },
+    create: {
       organizationId: org,
       razaoSocial: o?.name ?? "",
       nomeFantasia: o?.name ?? "",
       uf: (o?.state || "SP").toUpperCase().slice(0, 2),
       municipio: o?.city ?? "",
     },
+    // Vazio de propósito: quem chegou depois na corrida só quer a linha que o
+    // outro criou, sem sobrescrever nada.
+    update: {},
   });
 }
 
