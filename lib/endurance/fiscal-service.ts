@@ -28,6 +28,7 @@ import {
 } from "./fiscal-cancel-window";
 import { checkNfceDestinatario } from "./nfce-destinatario";
 import {
+  blockingForEmission,
   evaluateReadiness,
   overallStatus,
   type EstablishmentSnapshot,
@@ -168,6 +169,25 @@ export async function emitNfce(org: string, saleId: string): Promise<EmitResult>
 
   const resolution = resolveFiscalProvider(cfg);
   if (resolution.kind === "error") return { ok: false, error: resolution.error };
+
+  // GATE DE PRONTIDÃO — a mesma lista que o checklist da tela mostra.
+  //
+  // Antes eram duas fontes de verdade: a tela dizia "nenhuma nota sai" e aqui
+  // só se conferia CNPJ e razão social, então a nota saía — consumindo número
+  // fiscal, com status "autorizada" e QR Code assinado sobre um CSC vazio.
+  // Recusar aqui é o que faz o aviso da tela significar alguma coisa.
+  const faltando = blockingForEmission(toSnapshot(cfg), "nfce", {
+    simulated: resolution.kind === "simulate",
+  });
+  if (faltando.length)
+    return {
+      ok: false,
+      error:
+        `Complete o cadastro do estabelecimento antes de emitir. Falta: ${faltando
+          .map((f) => f.label)
+          .join(", ")}.`,
+    };
+
   if (resolution.kind === "provider")
     return emitNfceViaProvider(
       org,
@@ -663,7 +683,16 @@ export { PAY_LABEL };
 export async function getEstablishmentSnapshot(
   org: string,
 ): Promise<EstablishmentSnapshot> {
-  const c = await ensureFiscalConfig(org);
+  return toSnapshot(await ensureFiscalConfig(org));
+}
+
+/**
+ * Recorte do estabelecimento para a regra de prontidão, a partir de uma config
+ * JÁ CARREGADA. Separado de `getEstablishmentSnapshot` porque `emitNfce` já tem
+ * a config em mãos — reler o banco ali só para montar o mesmo objeto seria uma
+ * consulta a mais em cada venda.
+ */
+function toSnapshot(c: FiscalCfg): EstablishmentSnapshot {
   return {
     cnpj: c.cnpj,
     razaoSocial: c.razaoSocial,

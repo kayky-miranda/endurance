@@ -78,8 +78,12 @@ export async function onboardFiscalCompany(
   if (!partnerToken)
     return {
       ok: false,
+      // A causa é NOSSA (contrato com o provedor ainda não ativo). Dizer
+      // "falta o token de parceiro" jogava um problema interno no colo do
+      // cliente, que não tem o que fazer com essa informação. A mensagem diz o
+      // estado e o caminho — e não sugere que ele errou alguma coisa.
       error:
-        "O cadastro de empresas no provedor fiscal ainda não está habilitado nesta instalação (falta o token de parceiro).",
+        "A emissão fiscal ainda está sendo habilitada para esta conta. Seu cadastro foi salvo; fale com o suporte para liberar o envio do certificado.",
     };
 
   if (!input.senha.trim())

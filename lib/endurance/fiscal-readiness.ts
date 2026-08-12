@@ -204,6 +204,32 @@ export function evaluateReadiness(
   ];
 }
 
+/**
+ * Requisitos que IMPEDEM a emissão agora — a lista que o gate usa.
+ *
+ * Existe para o checklist e o bloqueio falarem a MESMA coisa. Antes eram duas
+ * fontes de verdade: a tela dizia "nenhuma nota sai" e `emitNfce`, que só
+ * conferia CNPJ e razão social, emitia mesmo assim — com número fiscal
+ * consumido, status "autorizada" e um QR Code assinado com CSC vazio. O
+ * cliente aprendia que o aviso vermelho podia ser ignorado.
+ *
+ * `simulated` retira o certificado da lista: na emissão simulada não há
+ * provedor para assinar nada, e exigi-lo impediria o cliente de experimentar em
+ * homologação antes de ter o arquivo em mãos. Todo o resto continua valendo —
+ * é o dado que vai dentro do XML.
+ */
+export function blockingForEmission(
+  e: EstablishmentSnapshot,
+  doc: FiscalDoc,
+  opts: { now?: Date; simulated?: boolean } = {},
+): Requirement[] {
+  const alvo = evaluateReadiness(e, { now: opts.now }).find((d) => d.doc === doc);
+  if (!alvo) return [];
+  return opts.simulated
+    ? alvo.pending.filter((r) => r.field !== "certificado")
+    : alvo.pending;
+}
+
 /** Remove requisitos repetidos preservando a ordem (base entra em todos). */
 function dedupe(list: Requirement[]): Requirement[] {
   const seen = new Set<string>();

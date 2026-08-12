@@ -71,8 +71,32 @@ describe("lookupCep", () => {
     const r = await lookupCep("13010-000", { fetchImpl: fetchImpl as typeof fetch });
     expect(r).toEqual({
       ok: true,
-      data: { zip: "13010000", address: "Rua A, Centro", city: "Campinas", state: "SP" },
+      data: {
+        zip: "13010000",
+        // Linha única, para telas que mostram o endereço junto.
+        address: "Rua A, Centro",
+        // SEPARADOS — a NF-e exige logradouro e bairro em campos próprios. Sem
+        // isto o cadastro fiscal punha o bairro dentro do logradouro e deixava
+        // o campo Bairro vazio, seguindo como pendência.
+        street: "Rua A",
+        district: "Centro",
+        city: "Campinas",
+        state: "SP",
+      },
     });
+  });
+
+  it("CEP sem bairro não inventa dado nem quebra", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      jsonRes({ logradouro: "Rua B", localidade: "Santos", uf: "SP" }),
+    );
+    const r = await lookupCep("11010-000", { fetchImpl: fetchImpl as typeof fetch });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data.street).toBe("Rua B");
+      expect(r.data.district).toBe("");
+      expect(r.data.address).toBe("Rua B");
+    }
   });
 
   it("CEP inexistente (erro:true) e CEP malformado", async () => {

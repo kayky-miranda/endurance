@@ -28,9 +28,16 @@ type ModuleCard = {
   label: string;
   description: string;
   scope: "core" | string[];
+  /** Plano exigido, quando o módulo depende de um superior. */
+  requiresPlan?: string | null;
 };
 
-const TYPE_WORDS = ["mercado", "academia", "salão", "consultório"];
+/**
+ * Palavras do título rotativo. Só ramos que o produto REALMENTE entrega — a
+ * frase é uma promessa ("já vem pronto para o seu ___") e prometia salão e
+ * academia, que saíram da oferta porque os módulos deles estão em construção.
+ */
+const TYPE_WORDS = ["mercado", "consultório", "clínica", "negócio"];
 
 export default function OnboardingClient({
   niches,
@@ -634,6 +641,14 @@ function ModuleSection({
               <span>
                 <span className="block text-sm font-medium text-slate-100">
                   {m.label}
+                  {/* Dizer o plano AQUI evita a descoberta ruim: o cliente via
+                      o módulo na lista do que ia receber e encontrava cadeado
+                      depois de entrar. */}
+                  {m.requiresPlan && (
+                    <span className="ml-1.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-brand-300 ring-1 ring-brand-500/40">
+                      {m.requiresPlan}
+                    </span>
+                  )}
                 </span>
                 <span className="block text-xs text-slate-500">
                   {m.description}

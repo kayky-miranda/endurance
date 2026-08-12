@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 import { MODULES, availableNiches } from "@/lib/endurance/catalog";
+import {
+  modulePlanFeature,
+  planRequiredFor,
+  planLabel,
+} from "@/lib/endurance/billing";
 import { isOnboardingAIEnabled } from "@/lib/endurance/onboarding";
 import OnboardingClient from "../onboarding-client";
 
@@ -23,6 +28,12 @@ export default function OnboardingPage() {
         label: m.label,
         description: m.description,
         scope: m.scope,
+        // Módulo que existe mas depende de plano superior. Sem esta marca o
+        // cliente via o item na lista de "o que você recebe" no momento da
+        // adesão e encontrava cadeado depois de entrar.
+        requiresPlan: modulePlanFeature(m.id)
+          ? planLabel(planRequiredFor(modulePlanFeature(m.id)!) ?? "business")
+          : null,
       }))}
       aiEnabled={isOnboardingAIEnabled()}
     />

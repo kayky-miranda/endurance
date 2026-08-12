@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  blockingForEmission,
   evaluateReadiness,
   overallStatus,
   type EstablishmentSnapshot,
@@ -144,5 +145,52 @@ describe("semáforo do cadastro", () => {
   it("bloqueado quando nada sai", () => {
     const r = evaluateReadiness({ ...completo, cnpj: "", certHabilitado: false });
     expect(overallStatus(r)).toBe("bloqueado");
+  });
+});
+
+describe("gate de emissão", () => {
+  it("usa a MESMA lista do checklist — não uma segunda regra", () => {
+    // A divergência entre os dois foi o pior defeito encontrado na simulação:
+    // a tela dizia "nenhuma nota sai" e o sistema emitia assim mesmo.
+    const semCsc = { ...completo, csc: "" };
+    const checklist = doc(evaluateReadiness(semCsc), "nfce").pending;
+    const gate = blockingForEmission(semCsc, "nfce");
+    expect(gate.map((r) => r.field)).toEqual(checklist.map((r) => r.field));
+  });
+
+  it("bloqueia quando falta dado que vai dentro do XML", () => {
+    for (const campo of ["csc", "defaultNcm", "cMun", "logradouro"] as const) {
+      const s = { ...completo, [campo]: "" };
+      expect(blockingForEmission(s, "nfce").length, campo).toBeGreaterThan(0);
+    }
+  });
+
+  it("na SIMULAÇÃO não exige certificado — não há o que assinar", () => {
+    // Exigi-lo impediria o cliente de experimentar em homologação antes de ter
+    // o arquivo, que costuma estar com o contador.
+    const semCert = { ...completo, certHabilitado: false };
+    expect(blockingForEmission(semCert, "nfce", { simulated: true })).toEqual([]);
+    expect(
+      blockingForEmission(semCert, "nfce").some((r) => r.field === "certificado"),
+    ).toBe(true);
+  });
+
+  it("a simulação NÃO perdoa o resto do cadastro", () => {
+    const s = { ...completo, certHabilitado: false, csc: "", defaultNcm: "" };
+    const campos = blockingForEmission(s, "nfce", { simulated: true }).map((r) => r.field);
+    expect(campos).toContain("csc");
+    expect(campos).toContain("defaultNcm");
+    expect(campos).not.toContain("certificado");
+  });
+
+  it("cadastro completo não bloqueia nada", () => {
+    expect(blockingForEmission(completo, "nfce")).toEqual([]);
+    expect(blockingForEmission(completo, "nfce", { simulated: true })).toEqual([]);
+  });
+
+  it("documento desconhecido devolve lista vazia em vez de quebrar", () => {
+    expect(
+      blockingForEmission(completo, "inexistente" as never, {}),
+    ).toEqual([]);
   });
 });

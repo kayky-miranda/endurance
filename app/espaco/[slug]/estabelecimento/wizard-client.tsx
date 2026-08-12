@@ -11,9 +11,11 @@ import {
   Loader2,
   Search,
   Save,
+  ExternalLink,
 } from "lucide-react";
 import type { EstablishmentView } from "@/lib/endurance/establishment";
 import type { StepState, StepId } from "@/lib/endurance/establishment-steps";
+import { cscHelpText, sefazCscUrl } from "@/lib/endurance/sefaz-portais";
 import {
   tributacaoIcms,
   validateTaxConfig,
@@ -154,13 +156,20 @@ export default function WizardClient({
         return;
       }
       const d = res.data;
+      // Logradouro e bairro SEPARADOS: a NF-e exige os dois em campos próprios.
+      // Antes o bairro vinha dentro do logradouro e o campo Bairro ficava
+      // vazio, seguindo como pendência que o cliente resolvia recortando texto.
       setForm((f) => ({
         ...f,
-        logradouro: d.address || f.logradouro,
+        logradouro: d.street || f.logradouro,
+        bairro: d.district || f.bairro,
         municipio: d.city || f.municipio,
         uf: d.state || f.uf,
       }));
-      setMsg({ tone: "ok", text: "Endereço carregado pelo CEP." });
+      setMsg({
+        tone: "ok",
+        text: "Endereço carregado. Falta o número — o CEP não traz.",
+      });
     });
   }
 
@@ -181,6 +190,8 @@ export default function WizardClient({
     form.crt,
     "65",
   );
+
+  const etapaAtual = steps.find((s) => s.step.id === current);
 
   const err = (k: string) =>
     badField === k ? "border-red-500 ring-1 ring-red-500/30" : "";
@@ -243,6 +254,22 @@ export default function WizardClient({
             }`}
           >
             {msg.text}
+          </div>
+        )}
+
+        {/* Pendências DA ETAPA ATUAL. Antes o menu dizia "1 pendência" e o
+            cliente tinha 19 campos para adivinhar qual — só descobria indo até
+            a Revisão. */}
+        {etapaAtual && etapaAtual.blocking.length > 0 && (
+          <div className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+            <p className="font-medium">
+              Falta preencher para conseguir emitir:
+            </p>
+            <ul className="mt-1 list-inside list-disc">
+              {etapaAtual.blocking.map((b) => (
+                <li key={b.field}>{b.label}</li>
+              ))}
+            </ul>
           </div>
         )}
 
@@ -543,6 +570,28 @@ export default function WizardClient({
                   <option value="9">9 — Não contribuinte</option>
                 </select>
               </Field>
+            </div>
+
+            {/* O CSC foi onde o cliente real travou na simulação: o campo pedia
+                o código sem dizer o que era nem onde obter — e não se obtém
+                aqui, cada SEFAZ estadual gera o dela. */}
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-ink-700 dark:bg-ink-950 dark:text-slate-300">
+              <p className="font-medium">O que é o CSC?</p>
+              <p className="mt-0.5">{cscHelpText(form.uf)}</p>
+              {sefazCscUrl(form.uf) && (
+                <a
+                  href={sefazCscUrl(form.uf)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 inline-flex items-center gap-1 font-semibold text-brand-600 hover:underline dark:text-brand-300"
+                >
+                  Abrir o portal da SEFAZ-{form.uf.toUpperCase()}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <Field label="ID do CSC" hint="Só para NFC-e">
                 <input
                   value={form.cscId}
@@ -591,7 +640,10 @@ export default function WizardClient({
                   className={input}
                 />
               </Field>
-              <Field label="Próximo número">
+              <Field
+                label="Próximo número"
+                hint="Testes em homologação também consomem numeração — ajuste aqui antes de ir para produção"
+              >
                 <input
                   type="number"
                   min={1}

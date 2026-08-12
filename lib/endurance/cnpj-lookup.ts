@@ -106,7 +106,20 @@ export async function lookupCnpj(
 
 export interface CepData {
   zip: string;
-  address: string; // logradouro + bairro
+  /**
+   * Logradouro + bairro juntos, para telas que mostram o endereço em uma linha
+   * só (ficha de paciente, por exemplo).
+   *
+   * NÃO use em cadastro fiscal: a NF-e exige logradouro e bairro em campos
+   * separados. Era o que acontecia no cadastro do estabelecimento — o bairro
+   * ia junto dentro do logradouro e o campo Bairro ficava vazio, seguindo como
+   * pendência que o cliente tinha de resolver recortando o texto na mão.
+   */
+  address: string;
+  /** Logradouro isolado, como veio do ViaCEP. */
+  street: string;
+  /** Bairro isolado. */
+  district: string;
   city: string;
   state: string;
 }
@@ -148,6 +161,8 @@ export async function lookupCep(
           .map((s) => (s ?? "").trim())
           .filter(Boolean)
           .join(", "),
+        street: (r.logradouro ?? "").trim(),
+        district: (r.bairro ?? "").trim(),
         city: (r.localidade ?? "").trim(),
         state: (r.uf ?? "").trim().toUpperCase(),
       },
