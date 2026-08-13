@@ -103,10 +103,23 @@ function baseRequirements(e: EstablishmentSnapshot): Requirement[] {
 function certificateRequirements(
   e: EstablishmentSnapshot,
   now: Date,
+  uploadDisponivel: boolean,
 ): Requirement[] {
   const out: Requirement[] = [];
   if (!e.certHabilitado)
-    out.push(req("certificado", "Certificado digital A1 enviado", "certificado"));
+    out.push(
+      req(
+        "certificado",
+        // Quando o envio ainda não está liberado, a pendência é NOSSA. Dizer
+        // "Certificado digital A1 enviado" mandava o cliente resolver algo que
+        // ele não consegue: ele abria a etapa, tentava enviar e só ali
+        // descobria que a trava era do nosso lado.
+        uploadDisponivel
+          ? "Certificado digital A1 enviado"
+          : "Emissão fiscal em habilitação — nossa equipe libera o envio do certificado",
+        "certificado",
+      ),
+    );
   else if (e.certValidoAte && e.certValidoAte.getTime() < now.getTime())
     out.push(req("certificado", "Certificado digital vencido", "certificado"));
   return out;
@@ -139,11 +152,20 @@ function commonWarnings(e: EstablishmentSnapshot): Requirement[] {
  */
 export function evaluateReadiness(
   e: EstablishmentSnapshot,
-  opts: { now?: Date; nfseSupported?: boolean } = {},
+  opts: {
+    now?: Date;
+    nfseSupported?: boolean;
+    /** O envio do certificado está liberado nesta instalação? */
+    certificateUploadAvailable?: boolean;
+  } = {},
 ): DocReadiness[] {
   const now = opts.now ?? new Date();
   const base = baseRequirements(e);
-  const cert = certificateRequirements(e, now);
+  const cert = certificateRequirements(
+    e,
+    now,
+    opts.certificateUploadAvailable ?? true,
+  );
   const warns = commonWarnings(e);
 
   // ---- NFC-e (modelo 65): consumidor no balcão ----
@@ -221,9 +243,12 @@ export function evaluateReadiness(
 export function blockingForEmission(
   e: EstablishmentSnapshot,
   doc: FiscalDoc,
-  opts: { now?: Date; simulated?: boolean } = {},
+  opts: { now?: Date; simulated?: boolean; certificateUploadAvailable?: boolean } = {},
 ): Requirement[] {
-  const alvo = evaluateReadiness(e, { now: opts.now }).find((d) => d.doc === doc);
+  const alvo = evaluateReadiness(e, {
+    now: opts.now,
+    certificateUploadAvailable: opts.certificateUploadAvailable,
+  }).find((d) => d.doc === doc);
   if (!alvo) return [];
   return opts.simulated
     ? alvo.pending.filter((r) => r.field !== "certificado")

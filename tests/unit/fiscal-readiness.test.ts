@@ -194,3 +194,44 @@ describe("gate de emissão", () => {
     ).toEqual([]);
   });
 });
+
+describe("pendência que o CLIENTE não pode resolver", () => {
+  it("quando o envio do certificado não está liberado, a pendência diz que é nossa", () => {
+    // Antes dizia "Certificado digital A1 enviado": o cliente abria a etapa,
+    // tentava enviar e só ali descobria que a trava era do nosso lado.
+    const r = evaluateReadiness(
+      { ...completo, certHabilitado: false },
+      { certificateUploadAvailable: false },
+    );
+    const cert = doc(r, "nfce").pending.find((p) => p.field === "certificado")!;
+    expect(cert.label).toMatch(/habilita/i);
+    expect(cert.label).not.toMatch(/^Certificado digital A1 enviado$/);
+  });
+
+  it("com o envio liberado, volta a cobrar o cliente", () => {
+    const r = evaluateReadiness(
+      { ...completo, certHabilitado: false },
+      { certificateUploadAvailable: true },
+    );
+    const cert = doc(r, "nfce").pending.find((p) => p.field === "certificado")!;
+    expect(cert.label).toBe("Certificado digital A1 enviado");
+  });
+
+  it("o padrão é assumir que o envio funciona", () => {
+    const r = evaluateReadiness({ ...completo, certHabilitado: false });
+    expect(
+      doc(r, "nfce").pending.find((p) => p.field === "certificado")!.label,
+    ).toBe("Certificado digital A1 enviado");
+  });
+
+  it("certificado VENCIDO continua sendo problema do cliente", () => {
+    // Ele resolve renovando — a habilitação não tem nada a ver com isso.
+    const r = evaluateReadiness(
+      { ...completo, certValidoAte: new Date("2020-01-01") },
+      { certificateUploadAvailable: false },
+    );
+    expect(
+      doc(r, "nfce").pending.find((p) => p.field === "certificado")!.label,
+    ).toMatch(/vencido/i);
+  });
+});

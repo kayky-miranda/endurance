@@ -154,11 +154,6 @@ export async function emitNfce(org: string, saleId: string): Promise<EmitResult>
     };
 
   const cfg = await ensureFiscalConfig(org);
-  if (!cfg.cnpj || !cfg.razaoSocial)
-    return {
-      ok: false,
-      error: "Complete os dados fiscais (CNPJ e razão social) antes de emitir.",
-    };
 
   // Destinatário pessoa jurídica: a SEFAZ recusa NFC-e desde jan/2026. A
   // checagem fica ANTES do despacho para valer nos dois caminhos (simulado e
@@ -182,10 +177,13 @@ export async function emitNfce(org: string, saleId: string): Promise<EmitResult>
   if (faltando.length)
     return {
       ok: false,
+      // Diz o que falta E ONDE resolver. Antes a primeira recusa de todas era
+      // um "Complete os dados fiscais" genérico, e o cliente perguntava "onde
+      // faço isso?" — a tela existe, mas nada apontava para ela.
       error:
         `Complete o cadastro do estabelecimento antes de emitir. Falta: ${faltando
           .map((f) => f.label)
-          .join(", ")}.`,
+          .join(", ")}. Resolva em Administração › Estabelecimento.`,
     };
 
   if (resolution.kind === "provider")
@@ -721,6 +719,10 @@ function toSnapshot(c: FiscalCfg): EstablishmentSnapshot {
 /** Prontidão fiscal calculada a partir do cadastro atual. */
 export async function getFiscalReadiness(org: string) {
   const snap = await getEstablishmentSnapshot(org);
-  const docs = evaluateReadiness(snap);
+  // Sem contrato ativo com o provedor, o envio do certificado não está
+  // liberado — e a pendência passa a ser descrita como nossa.
+  const docs = evaluateReadiness(snap, {
+    certificateUploadAvailable: Boolean(process.env.FOCUS_NFE_PARTNER_TOKEN),
+  });
   return { docs, status: overallStatus(docs) };
 }
