@@ -1,6 +1,7 @@
 import "server-only";
 import crypto from "crypto";
 import { icmsCodigo } from "./tax-defaults";
+import { nfceQrUrl } from "./nfce-qr-urls";
 
 /**
  * Camada fiscal — NFC-e (Nota Fiscal de Consumidor Eletrônica, modelo 65).
@@ -25,15 +26,6 @@ const UF_CODE: Record<string, string> = {
   SC: "42", RS: "43", MS: "50", MT: "51", GO: "52", DF: "53",
 };
 
-// URL de consulta do QR Code por UF (ambiente de homologação quando aplicável).
-const QR_URL: Record<string, string> = {
-  SP: "https://www.homologacao.nfce.fazenda.sp.gov.br/qrcode",
-  RJ: "https://www4.fazenda.rj.gov.br/consultaNFCe/QRCode",
-  MG: "https://hnfce.fazenda.mg.gov.br/portalnfce/sistema/qrcode.xhtml",
-  PR: "http://www.fazenda.pr.gov.br/nfce/qrcode",
-  RS: "https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx",
-};
-const QR_URL_FALLBACK = "https://www.sefaz.uf.gov.br/nfce/qrcode";
 
 const onlyDigits = (s: string) => (s ?? "").replace(/\D/g, "");
 const pad = (v: string | number, n: number) =>
@@ -105,7 +97,16 @@ export function buildQrCode(opts: {
     .update(dados + (opts.csc ?? ""))
     .digest("hex")
     .toUpperCase();
-  const url = QR_URL[opts.uf] ?? QR_URL_FALLBACK;
+
+  // O endereço varia por UF **e por ambiente**: antes a tabela tinha 5 estados
+  // e ignorava o ambiente, então uma nota de produção em SP levava o consumidor
+  // à consulta de HOMOLOGAÇÃO — onde a nota dele não existe. E os outros 22
+  // estados caíam num domínio de exemplo que não existe.
+  const url = nfceQrUrl(opts.uf, opts.ambiente);
+  // Sem endereço conhecido não inventamos um: um QR que aponta para o lugar
+  // errado é pior do que um QR ausente — o consumidor confere, não acha a nota
+  // e conclui que ela é falsa. O DANFE trata a string vazia omitindo o código.
+  if (!url) return "";
   return `${url}?p=${dados}|${hash}`;
 }
 

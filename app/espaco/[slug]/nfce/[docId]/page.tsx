@@ -35,7 +35,11 @@ export default async function DanfePage({
   });
   const sale = doc.sale;
   const docLabel = doc.modelo === "55" ? "NF-e" : "NFC-e";
-  const qrDataUrl = await QRCode.toDataURL(doc.qrCode, { margin: 1, width: 220 });
+  // Documento sem QR (UF sem endereço de consulta conhecido): `toDataURL("")`
+  // lança. Melhor omitir o código do que quebrar a impressão do cupom inteiro.
+  const qrDataUrl = doc.qrCode
+    ? await QRCode.toDataURL(doc.qrCode, { margin: 1, width: 220 })
+    : "";
   const cancelada = doc.status === "cancelada";
   const when = doc.dataEmissao.toLocaleString("pt-BR", {
     day: "2-digit",
@@ -169,8 +173,14 @@ export default async function DanfePage({
           <p className="mb-1 text-[10px] text-slate-500">
             Consulte pela chave de acesso em
           </p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={qrDataUrl} alt="QR Code NFC-e" className="h-40 w-40" />
+          {qrDataUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={qrDataUrl} alt="QR Code NFC-e" className="h-40 w-40" />
+          ) : (
+            <p className="text-center text-[10px] font-semibold text-red-600">
+              QR Code indisponível: confira a UF do estabelecimento no cadastro.
+            </p>
+          )}
         </div>
 
         <p className="mt-3 text-center text-[10px] text-slate-400">

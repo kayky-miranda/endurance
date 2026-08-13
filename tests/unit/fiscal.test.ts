@@ -88,7 +88,10 @@ describe("buildQrCode (NT 2015.002, versão 2.00)", () => {
     );
   });
 
-  it("UF sem URL própria usa o fallback", () => {
+  it("cada UF usa o endereço da própria SEFAZ", () => {
+    // Antes só 5 estados estavam mapeados e o resto caía num domínio de
+    // exemplo (`sefaz.uf.gov.br`), que não existe: o cupom saía com um QR que
+    // não abria em lugar nenhum.
     const qr = buildQrCode({
       chave: "1".repeat(44),
       uf: "AC",
@@ -96,7 +99,30 @@ describe("buildQrCode (NT 2015.002, versão 2.00)", () => {
       cscId: "1",
       csc: "",
     });
-    expect(qr.startsWith("https://www.sefaz.uf.gov.br/nfce/qrcode?p=")).toBe(true);
+    expect(qr).toContain("sefaznet.ac.gov.br");
+    expect(qr).not.toContain("sefaz.uf.gov.br");
+  });
+
+  it("o ambiente muda o endereço de consulta", () => {
+    const base = { chave: "1".repeat(44), uf: "BA", cscId: "1", csc: "" };
+    const prod = buildQrCode({ ...base, ambiente: "1" });
+    const homolog = buildQrCode({ ...base, ambiente: "2" });
+    expect(prod).not.toBe(homolog);
+    expect(homolog).toContain("hnfe.sefaz.ba.gov.br");
+  });
+
+  it("UF inválida NÃO gera QR — melhor ausente do que apontando errado", () => {
+    // Um QR que leva ao lugar errado faz o consumidor concluir que a nota é
+    // falsa. A prontidão fiscal barra esse cadastro antes de emitir.
+    expect(
+      buildQrCode({
+        chave: "1".repeat(44),
+        uf: "ZZ",
+        ambiente: "1",
+        cscId: "1",
+        csc: "",
+      }),
+    ).toBe("");
   });
 });
 

@@ -16,6 +16,7 @@
 
 import { isValidCnpj } from "./cnpj";
 import { isValidCpf } from "./patient";
+import { hasQrUrl } from "./nfce-qr-urls";
 
 export type FiscalDoc = "nfce" | "nfe" | "nfse";
 
@@ -176,6 +177,13 @@ export function evaluateReadiness(
   if (!filled(e.csc))
     nfcePending.push(req("csc", "CSC (código de segurança do contribuinte)", "fiscal"));
   if (!filled(e.cscId)) nfcePending.push(req("cscId", "ID do CSC", "fiscal"));
+  // Sem endereço de consulta da UF o cupom sai SEM QR Code — e um cupom sem QR
+  // não permite ao consumidor conferir a nota. Como as 27 UFs estão mapeadas,
+  // cair aqui significa UF inválida no cadastro (erro de digitação).
+  if (filled(e.uf) && !hasQrUrl(e.uf))
+    nfcePending.push(
+      req("uf", `UF "${e.uf}" não emite NFC-e — confira a sigla`, "endereco"),
+    );
   if (digits(e.defaultNcm).length !== 8)
     nfcePending.push(
       req("defaultNcm", "NCM padrão dos produtos (8 dígitos)", "fiscal"),
