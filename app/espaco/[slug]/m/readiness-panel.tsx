@@ -1,4 +1,5 @@
-import { CircleCheck, CircleAlert, CircleX, Clock } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, CircleCheck, CircleAlert, CircleX, Clock } from "lucide-react";
 import type { DocReadiness, OverallStatus } from "@/lib/endurance/fiscal-readiness";
 
 /**
@@ -45,9 +46,18 @@ const OVERALL: Record<
 export default function ReadinessPanel({
   docs,
   status,
+  /**
+   * Quando informado, o painel oferece o caminho para resolver. Fora do
+   * cadastro (na tela de NFC-e, por exemplo) o cliente lia as dez pendências e
+   * ficava sem saber ONDE mexer: o painel nomeia a etapa ("· Dados fiscais"),
+   * mas não levava a lugar nenhum. O wizard já abre na primeira etapa
+   * incompleta, então o link simples basta.
+   */
+  slug,
 }: {
   docs: DocReadiness[];
   status: OverallStatus;
+  slug?: string;
 }) {
   const suportados = docs.filter((d) => d.supported);
   // "Nenhuma nota sai" era literalmente falso quando só faltava o certificado:
@@ -67,12 +77,24 @@ export default function ReadinessPanel({
       }
     : OVERALL[status];
   const GeralIcon = geral.Icon;
+  const temPendencia = suportados.some((d) => d.pending.length > 0);
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-ink-700 dark:bg-ink-900">
-      <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-        Prontidão fiscal
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+          Prontidão fiscal
+        </h2>
+        {slug && temPendencia && (
+          <Link
+            href={`/espaco/${slug}/estabelecimento`}
+            className="inline-flex items-center gap-1 rounded-lg border border-brand-500/40 px-2.5 py-1 text-xs font-medium text-brand-600 transition hover:bg-brand-500/10 dark:text-brand-400"
+          >
+            Resolver no cadastro
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        )}
+      </div>
 
       <div
         className={`mt-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium ${geral.cls}`}

@@ -227,6 +227,16 @@ export default function FiscalClient({
                           <button
                             onClick={() => emit(r.saleId)}
                             disabled={loading || !config.configured}
+                            // Botão morto e mudo era o pior estado da tela: o
+                            // cliente clicava, nada acontecia, e nada dizia por
+                            // quê. O checklist logo acima explica, mas ninguém
+                            // liga um ao outro sozinho — e leitor de tela não
+                            // anunciava nada.
+                            title={
+                              !config.configured
+                                ? "Complete o cadastro do estabelecimento para emitir — veja as pendências acima."
+                                : undefined
+                            }
                             className="inline-flex items-center gap-1 rounded-lg bg-brand-500 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-brand-600 disabled:opacity-40"
                           >
                             {loading ? (

@@ -78,7 +78,11 @@ export default async function NfcePage({
           </div>
 
           {readiness && (
-            <ReadinessPanel docs={readiness.docs} status={readiness.status} />
+            <ReadinessPanel
+              docs={readiness.docs}
+              status={readiness.status}
+              slug={slug}
+            />
           )}
           <FiscalClient slug={slug} rows={data.rows} config={data.config} />
           <Pager param="pagina" meta={data.pageMeta} />
