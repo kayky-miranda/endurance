@@ -183,6 +183,33 @@ describe("gate de emissão", () => {
     expect(campos).not.toContain("certificado");
   });
 
+  it("readyForTest acompanha o gate simulado — mesma resposta, dois nomes", () => {
+    // A tela dizia "bloqueado, nenhuma nota sai" e o balcão emitia o cupom de
+    // homologação normalmente. O checklist precisa contar a MESMA história que
+    // o gate, senão o cliente aprende a ignorar o aviso vermelho.
+    for (const s of [
+      { ...completo, certHabilitado: false },
+      { ...completo, certHabilitado: false, csc: "" },
+      { ...completo, certValidoAte: new Date("2020-01-01") },
+      completo,
+    ]) {
+      const d = doc(evaluateReadiness(s), "nfce");
+      expect(d.readyForTest).toBe(
+        blockingForEmission(s, "nfce", { simulated: true }).length === 0,
+      );
+    }
+  });
+
+  it("readyForTest não perdoa nada além do certificado", () => {
+    const d = doc(evaluateReadiness({ ...completo, certHabilitado: false, cnpj: "" }), "nfce");
+    expect(d.readyForTest).toBe(false);
+    expect(d.ready).toBe(false);
+  });
+
+  it("NFS-e nunca é testável — o sistema não a emite", () => {
+    expect(doc(evaluateReadiness(completo), "nfse").readyForTest).toBe(false);
+  });
+
   it("cadastro completo não bloqueia nada", () => {
     expect(blockingForEmission(completo, "nfce")).toEqual([]);
     expect(blockingForEmission(completo, "nfce", { simulated: true })).toEqual([]);

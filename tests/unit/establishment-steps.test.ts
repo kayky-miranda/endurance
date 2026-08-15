@@ -19,6 +19,7 @@ const doc = (
   label: over.doc,
   supported: true,
   ready: true,
+  readyForTest: true,
   pending: [],
   warnings: [],
   ...over,

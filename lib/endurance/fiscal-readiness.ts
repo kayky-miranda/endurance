@@ -57,8 +57,17 @@ export interface Requirement {
 export interface DocReadiness {
   doc: FiscalDoc;
   label: string;
-  /** Apto a emitir: nenhum requisito bloqueante pendente. */
+  /** Apto a emitir COM VALOR FISCAL: nenhum requisito bloqueante pendente. */
   ready: boolean;
+  /**
+   * Apto a emitir EM HOMOLOGAÇÃO, para testar. É `ready` ignorando o
+   * certificado — a emissão simulada não assina nada, então não há o que
+   * exigir. Existe porque a tela dizia "bloqueado, nenhuma nota sai" enquanto
+   * o balcão emitia o cupom de teste normalmente: o cliente aprendia que o
+   * aviso vermelho podia ser ignorado, que é o pior efeito possível de um
+   * checklist.
+   */
+  readyForTest: boolean;
   pending: Requirement[];
   /** Recomendações não bloqueantes (qualidade do cadastro). */
   warnings: Requirement[];
@@ -205,31 +214,43 @@ export function evaluateReadiness(
 
   const nfseSupported = opts.nfseSupported ?? false;
 
+  /** Sobra alguma pendência além do certificado? É o que barra o teste. */
+  const semCert = (list: Requirement[]) =>
+    list.filter((r) => r.field !== "certificado").length === 0;
+
+  const nfce = dedupe(nfcePending);
+  const nfe = dedupe(nfePending);
+  const nfse = dedupe(nfsePending);
+
   return [
     {
       doc: "nfce",
       label: "NFC-e (cupom ao consumidor)",
       supported: true,
-      pending: dedupe(nfcePending),
+      pending: nfce,
       warnings: warns,
-      ready: dedupe(nfcePending).length === 0,
+      ready: nfce.length === 0,
+      readyForTest: semCert(nfce),
     },
     {
       doc: "nfe",
       label: "NF-e (venda a empresa)",
       supported: true,
-      pending: dedupe(nfePending),
+      pending: nfe,
       warnings: warns,
-      ready: dedupe(nfePending).length === 0,
+      ready: nfe.length === 0,
+      readyForTest: semCert(nfe),
     },
     {
       doc: "nfse",
       label: "NFS-e (serviços)",
       supported: nfseSupported,
-      pending: dedupe(nfsePending),
+      pending: nfse,
       warnings: warns,
       // Sem suporte no sistema, "pronto" seria mentira mesmo com tudo preenchido.
-      ready: nfseSupported && dedupe(nfsePending).length === 0,
+      ready: nfseSupported && nfse.length === 0,
+      // Idem: não há emissão de teste do que o sistema não emite.
+      readyForTest: nfseSupported && semCert(nfse),
     },
   ];
 }

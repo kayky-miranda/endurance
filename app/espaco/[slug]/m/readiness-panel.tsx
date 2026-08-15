@@ -49,7 +49,23 @@ export default function ReadinessPanel({
   docs: DocReadiness[];
   status: OverallStatus;
 }) {
-  const geral = OVERALL[status];
+  const suportados = docs.filter((d) => d.supported);
+  // "Nenhuma nota sai" era literalmente falso quando só faltava o certificado:
+  // a emissão em homologação continuava funcionando, e o cliente que via o
+  // aviso vermelho e emitia mesmo assim aprendia a ignorar o vermelho.
+  const soFaltaCertificado =
+    status === "bloqueado" &&
+    suportados.length > 0 &&
+    suportados.every((d) => d.readyForTest);
+
+  const geral = soFaltaCertificado
+    ? {
+        label:
+          "Já dá para emitir em homologação e testar. Falta o certificado digital para as notas valerem fiscalmente.",
+        cls: "border-amber-400/50 bg-amber-500/5 text-amber-700 dark:text-amber-300",
+        Icon: CircleAlert,
+      }
+    : OVERALL[status];
   const GeralIcon = geral.Icon;
 
   return (
@@ -76,6 +92,8 @@ export default function ReadinessPanel({
                 <Clock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
               ) : d.ready ? (
                 <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+              ) : d.readyForTest ? (
+                <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
               ) : (
                 <CircleX className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
               )}
@@ -88,7 +106,9 @@ export default function ReadinessPanel({
                     ? "Ainda não emitido pelo ENDURANCE"
                     : d.ready
                       ? "Pronto para emitir"
-                      : `${d.pending.length} ${d.pending.length === 1 ? "pendência" : "pendências"}`}
+                      : d.readyForTest
+                        ? "Emite em homologação · falta o certificado para valer fiscalmente"
+                        : `${d.pending.length} ${d.pending.length === 1 ? "pendência" : "pendências"}`}
                 </p>
               </div>
             </header>
@@ -99,7 +119,11 @@ export default function ReadinessPanel({
               <ul className="mt-2.5 space-y-1.5">
                 {d.pending.map((p) => (
                   <li key={p.field} className="flex items-start gap-1.5 text-xs">
-                    <CircleX className="mt-0.5 h-3 w-3 shrink-0 text-red-400" />
+                    {d.readyForTest ? (
+                      <CircleAlert className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
+                    ) : (
+                      <CircleX className="mt-0.5 h-3 w-3 shrink-0 text-red-400" />
+                    )}
                     <span className="min-w-0 text-slate-600 dark:text-slate-300">
                       {p.label}
                       <span className="ml-1 text-slate-400">
@@ -111,7 +135,11 @@ export default function ReadinessPanel({
               </ul>
             )}
 
-            {d.supported && d.ready && d.warnings.length > 0 && (
+            {/* As ressalvas (homologação, responsável legal) importam tanto
+                para quem já emite quanto para quem só falta o certificado —
+                escondê-las no segundo caso omitia justamente o aviso de que as
+                notas de teste não têm valor fiscal. */}
+            {d.supported && (d.ready || d.readyForTest) && d.warnings.length > 0 && (
               <ul className="mt-2.5 space-y-1.5">
                 {d.warnings.map((w) => (
                   <li key={w.field} className="flex items-start gap-1.5 text-xs">
