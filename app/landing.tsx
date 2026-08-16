@@ -305,10 +305,10 @@ function Navbar() {
             Entrar
           </a>
           <a
-            href="#contato"
+            href="/onboarding"
             className="btn-sheen inline-flex items-center gap-1.5 rounded-full bg-brand-500 px-4 py-2 text-sm font-semibold text-ink-950 transition hover:bg-brand-400"
           >
-            Falar com o time <ArrowRight className="h-4 w-4" />
+            Criar conta <ArrowRight className="h-4 w-4" />
           </a>
         </div>
 
@@ -350,11 +350,10 @@ function Navbar() {
                 Entrar
               </a>
               <a
-                href="#contato"
-                onClick={() => setOpen(false)}
+                href="/onboarding"
                 className="flex-1 rounded-xl bg-brand-500 px-4 py-2.5 text-center text-sm font-semibold text-ink-950"
               >
-                Falar com o time
+                Criar conta
               </a>
             </div>
           </div>

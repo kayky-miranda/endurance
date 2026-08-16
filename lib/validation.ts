@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { EMAIL_RE } from "./endurance/validation";
+import { isValidCnpj } from "./endurance/cnpj";
 
 /**
  * Schemas Zod compartilhados — fonte única de validação para o que entra
@@ -57,6 +58,51 @@ export const SignupSchema = z.object({
   password: strongPasswordField,
 });
 export type SignupInput = z.infer<typeof SignupSchema>;
+
+/**
+ * Cadastro em duas etapas: aqui é a ETAPA 1, que cria a conta e a empresa.
+ *
+ * Antes o cadastro vinha DEPOIS da análise: o cliente descrevia o negócio,
+ * via a classificação e só então digitava e-mail e senha. Quem abandonava no
+ * meio não deixava nada, e os dados da empresa (CNPJ, razão social) nunca
+ * eram pedidos — apareciam pela primeira vez lá no cadastro do
+ * estabelecimento, quando a pessoa já queria emitir nota.
+ *
+ * O nicho NÃO entra aqui: ele sai da descrição na etapa 2. Até lá a
+ * organização nasce com os módulos core.
+ */
+export const CompanySignupSchema = z
+  .object({
+    // Conta
+    ownerName: personNameField,
+    email: emailField,
+    password: strongPasswordField,
+    passwordConfirm: z.string(),
+    phone: phoneField,
+    // Empresa
+    razaoSocial: z
+      .string({ message: "Razão social é obrigatória." })
+      .trim()
+      .min(2, "Informe a razão social.")
+      .max(160, "Razão social muito longa."),
+    nomeFantasia: z.string().trim().max(160).default(""),
+    // CNPJ é opcional: MEI recém-aberto e empresa em abertura travariam aqui,
+    // e a emissão fiscal já cobra o dado no cadastro do estabelecimento.
+    cnpj: z
+      .string()
+      .trim()
+      .max(18)
+      .default("")
+      .refine((v) => !v || isValidCnpj(v), "CNPJ inválido."),
+    segmento: z.string().trim().max(60).default(""),
+    estado: z.string().trim().max(2).default(""),
+    cidade: z.string().trim().max(80).default(""),
+  })
+  .refine((d) => d.password === d.passwordConfirm, {
+    message: "As senhas não são iguais.",
+    path: ["passwordConfirm"],
+  });
+export type CompanySignupInput = z.infer<typeof CompanySignupSchema>;
 
 export const CreateUserSchema = z.object({
   name: personNameField,

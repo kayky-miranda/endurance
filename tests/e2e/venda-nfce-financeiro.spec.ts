@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  configureFiscal,
   createProduct,
   sellOneInCash,
   signupWorkspace,
@@ -33,15 +34,10 @@ test("venda no PDV emite NFC-e e gera o recebível no financeiro", async ({
   // Venda de R$ 10,00 em dinheiro.
   await sellOneInCash(page, slug, "Café E2E 500g");
 
-  // Fiscal: completa o emitente (formulário abre sozinho sem config) e emite.
-  await page.goto(`/espaco/${slug}/m/nfce`);
-  await page
-    .getByPlaceholder("00.000.000/0000-00")
-    .fill("12.345.678/0001-95");
-  await page.getByLabel("Razão social").fill("Mercadinho Fluxo Fiscal LTDA");
-  await page.getByRole("button", { name: "Salvar dados fiscais" }).click();
-  await expect(page.getByText("Dados fiscais incompletos")).toBeHidden();
+  // Fiscal: deixa o estabelecimento apto pelo cadastro real e emite.
+  await configureFiscal(page, slug);
 
+  await page.goto(`/espaco/${slug}/m/nfce`);
   const emitir = page.getByRole("button", { name: "Emitir" }).first();
   await expect(emitir).toBeEnabled();
   await emitir.click();

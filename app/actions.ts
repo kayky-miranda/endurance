@@ -17,7 +17,12 @@ import { allPermissionIds } from "@/lib/endurance/permissions";
 import { hit, peek, record, clientIp } from "@/lib/rate-limit";
 import { sendVerificationFor } from "@/lib/endurance/email-verification";
 import { logger } from "@/lib/logger";
-import { SignupSchema, firstError } from "@/lib/validation";
+import {
+  SignupSchema,
+  CompanySignupSchema,
+  firstError,
+  type CompanySignupInput,
+} from "@/lib/validation";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -102,6 +107,99 @@ export async function signupAction(input: SignupInput): Promise<AuthResult> {
     if (e instanceof EmailTakenError)
       return { ok: false, error: "Esse e-mail já tem conta — faça login." };
     logger.exception("Signup falhou", e);
+    return { ok: false, error: "Não consegui criar a conta." };
+  }
+}
+
+/**
+ * ETAPA 1 do onboarding: cria a conta e a empresa, antes de qualquer análise.
+ *
+ * A ordem inverteu de propósito. Antes o cliente descrevia o negócio, via a
+ * classificação e só então digitava e-mail e senha — quem desistia no meio
+ * não deixava nada, e os dados da empresa só eram pedidos muito depois, na
+ * hora de emitir nota.
+ *
+ * O nicho fica indefinido aqui ("outro", só módulos core) porque quem o
+ * decide é a descrição da etapa 2. Razão social, CNPJ, cidade e UF já descem
+ * para a FiscalConfig: são exatamente os campos que o cadastro do
+ * estabelecimento cobraria depois, e redigitar o que já foi dito é a
+ * fricção mais fácil de evitar.
+ */
+export async function companySignupAction(
+  input: CompanySignupInput,
+): Promise<AuthResult> {
+  const rl = await hit(`signup:${await clientIp()}`, 5, 10 * 60_000);
+  if (!rl.ok)
+    return {
+      ok: false,
+      error: "Muitas tentativas de cadastro. Tente novamente em alguns minutos.",
+    };
+
+  const parsed = CompanySignupSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const d = parsed.data;
+
+  try {
+    const passwordHash = await hashPassword(d.password);
+    const { slug, userId, orgId } = await createWorkspace({
+      // O espaço leva o nome fantasia quando existe: é como a empresa se
+      // chama no dia a dia, e é o que aparece no topo do sistema.
+      name: d.nomeFantasia || d.razaoSocial,
+      niche: "outro",
+      moduleIds: [],
+      city: d.cidade,
+      state: d.estado,
+      country: "Brasil",
+      segment: d.segmento,
+      owner: { name: d.ownerName, email: d.email, passwordHash },
+    });
+
+    if (d.phone) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { phone: d.phone },
+      });
+    }
+
+    // Semente da configuração fiscal. Não valida nada aqui: a prontidão
+    // fiscal continua sendo a única autoridade sobre o que falta para emitir.
+    await prisma.fiscalConfig.upsert({
+      where: { organizationId: orgId },
+      create: {
+        organizationId: orgId,
+        razaoSocial: d.razaoSocial,
+        nomeFantasia: d.nomeFantasia,
+        cnpj: d.cnpj.replace(/\D/g, ""),
+        municipio: d.cidade,
+        uf: d.estado.toUpperCase(),
+      },
+      update: {
+        razaoSocial: d.razaoSocial,
+        nomeFantasia: d.nomeFantasia,
+        cnpj: d.cnpj.replace(/\D/g, ""),
+        municipio: d.cidade,
+        uf: d.estado.toUpperCase(),
+      },
+    });
+
+    await createSession({
+      sub: userId,
+      name: d.ownerName,
+      email: d.email,
+      role: "OWNER",
+      org: orgId,
+      slug,
+      profile: "administrador",
+      permissions: allPermissionIds(),
+    });
+    sendVerificationFor(userId).catch((e) =>
+      logger.exception("Falha ao disparar verificação no signup", e),
+    );
+    return { ok: true, slug };
+  } catch (e) {
+    if (e instanceof EmailTakenError)
+      return { ok: false, error: "Esse e-mail já tem conta — faça login." };
+    logger.exception("Cadastro da empresa falhou", e);
     return { ok: false, error: "Não consegui criar a conta." };
   }
 }

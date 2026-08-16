@@ -58,23 +58,78 @@ export async function signupWorkspace(
   const password = "segredo123";
 
   await presetCookieConsent(page);
+
+  // ---- Etapa 1: conta + empresa -----------------------------------------
   await page.goto("/onboarding");
+  await page.locator("#ownerName").fill("Dono E2E");
+  await page.locator("#email").fill(email);
+  await page.locator("#password").fill(password);
+  await page.locator("#passwordConfirm").fill(password);
+  // O espaço herda o nome fantasia, que é o que os specs conferem depois.
+  await page.locator("#razaoSocial").fill(`${bizName} LTDA`);
+  await page.locator("#nomeFantasia").fill(bizName);
+  await page.locator("#segmento").selectOption("Comércio");
+  await page.locator("#estado").selectOption("SP");
+  await page.locator("#cidade").fill("Campinas");
+  await page.getByRole("button", { name: "Continuar" }).click();
+
+  // ---- Etapa 2: descrição + análise -------------------------------------
+  await page.waitForURL(/\/onboarding\/empresa$/, { timeout: 60_000 });
   await page
-    .locator("#desc")
-    .fill("Tenho um mercadinho de bairro em Campinas, SP.");
-  await page.getByRole("button", { name: "Montar meu sistema" }).click();
-
-  await expect(page.getByText("Encontramos o seu negócio")).toBeVisible();
-
-  await page.getByPlaceholder("Nome do negócio").fill(bizName);
-  await page.getByPlaceholder("Seu nome").fill("Dono E2E");
-  await page.getByPlaceholder("Seu e-mail").fill(email);
-  await page.locator('input[type="password"]').fill(password);
-  await page.getByRole("button", { name: "Criar meu espaço" }).click();
+    .locator("#descricao")
+    .fill(
+      "Tenho um mercadinho de bairro em Campinas, SP. Vendo ao consumidor final e controlo estoque, vendas e financeiro.",
+    );
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.getByText("Entendemos sua operação")).toBeVisible({
+    timeout: 60_000,
+  });
+  await page.getByRole("button", { name: /Ir para a plataforma/ }).click();
 
   await page.waitForURL(/\/espaco\/[^/?#]+$/, { timeout: 60_000 });
   const slug = new URL(page.url()).pathname.split("/")[2];
   return opts?.withCredentials ? { slug, email, password } : slug;
+}
+
+/**
+ * Deixa o estabelecimento apto a emitir NFC-e, pelo wizard real.
+ *
+ * A emissão é barrada por `blockingForEmission`, que exige bem mais do que
+ * CNPJ e razão social: endereço completo, código IBGE, inscrição estadual,
+ * CSC e NCM padrão. O spec fiscal preenchia só os dois primeiros e por isso
+ * parou de passar quando o gate entrou — o teste ficou para trás da regra,
+ * não o contrário.
+ *
+ * O certificado fica de fora de propósito: na emissão simulada não há o que
+ * assinar, e o gate perdoa esse item.
+ */
+export async function configureFiscal(page: Page, slug: string): Promise<void> {
+  const salvar = () => page.getByRole("button", { name: "Salvar etapa" }).click();
+  await page.goto(`/espaco/${slug}/estabelecimento`);
+
+  // Etapa "Dados da empresa" — é onde o wizard abre com o cadastro vazio.
+  await page.getByLabel("CNPJ").fill("12.345.678/0001-95");
+  await page.getByLabel("Razão social").fill("Mercadinho Fluxo Fiscal LTDA");
+  await page.getByLabel("Inscrição Estadual").fill("123456789");
+  await salvar();
+
+  await page.getByRole("button", { name: /Endereço/ }).first().click();
+  await page.getByLabel("CEP").fill("13010-000");
+  await page.getByLabel("Logradouro").fill("Rua Treze de Maio");
+  await page.getByLabel("Número").fill("100");
+  await page.getByLabel("Bairro").fill("Centro");
+  await page.getByLabel("Município").fill("Campinas");
+  await page.getByLabel("UF").fill("SP");
+  await page.getByLabel("Código IBGE").fill("3509502");
+  await salvar();
+
+  await page.getByRole("button", { name: /Dados fiscais/ }).first().click();
+  // O <label> engloba a dica, então o texto acessível é "CSC" + a dica. Casar
+  // pela dica é o que distingue do campo "ID do CSC".
+  await page.getByLabel(/^ID do CSC/).fill("000001");
+  await page.getByLabel(/Assina o QR Code/).fill("CSC-DE-TESTE-E2E");
+  await page.getByLabel(/^NCM padrão dos produtos/).fill("22021000");
+  await salvar();
 }
 
 /** Cadastra um produto pela tela de produtos. */

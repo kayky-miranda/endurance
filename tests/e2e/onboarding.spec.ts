@@ -2,52 +2,73 @@ import { expect, test } from "@playwright/test";
 import { uniqueEmail, presetCookieConsent } from "./helpers";
 
 /**
- * Fluxo 1 — Onboarding → workspace.
- * Descreve o negócio, confere a classificação (offline) e os módulos
- * sugeridos, cria a conta e chega ao espaço logado com o menu montado.
+ * Fluxo 1 — Onboarding em duas etapas → workspace.
+ *
+ * Etapa 1 cria conta e empresa; etapa 2 lê a descrição, mostra o que foi
+ * entendido e liga os módulos. A conta passa a existir ANTES da análise: quem
+ * abandona no meio não perde o cadastro, que era o caso quando a análise vinha
+ * primeiro.
  */
-test("onboarding cria o workspace com os módulos do nicho", async ({ page }) => {
+test("onboarding em duas etapas cria o workspace com os módulos do nicho", async ({
+  page,
+}) => {
   await presetCookieConsent(page);
   await page.goto("/onboarding");
 
+  // ---- Etapa 1: conta + empresa -----------------------------------------
+  await expect(page.getByText("Sua gestão começa aqui.")).toBeVisible();
+  // Pelo papel, não pelo texto: o <title> da página também casa com a frase.
+  await expect(
+    page.getByRole("heading", { name: "Crie sua conta" }),
+  ).toBeVisible();
+
+  await page.locator("#ownerName").fill("Dono E2E");
+  await page.locator("#email").fill(uniqueEmail());
+  await page.locator("#password").fill("segredo123");
+  await page.locator("#passwordConfirm").fill("segredo123");
+  await page.locator("#razaoSocial").fill("Mercadinho E2E LTDA");
+  await page.locator("#nomeFantasia").fill("Mercadinho E2E");
+  await page.locator("#segmento").selectOption("Comércio");
+  await page.locator("#estado").selectOption("SP");
+  await page.locator("#cidade").fill("Campinas");
+  await page.getByRole("button", { name: "Continuar" }).click();
+
+  // ---- Etapa 2: descrição -----------------------------------------------
+  await page.waitForURL(/\/onboarding\/empresa$/, { timeout: 60_000 });
+  await expect(page.getByText("Conte um pouco sobre sua empresa")).toBeVisible();
   await page
-    .locator("#desc")
-    .fill("Tenho um mercadinho de bairro em Campinas, SP.");
-  await page.getByRole("button", { name: "Montar meu sistema" }).click();
+    .locator("#descricao")
+    .fill(
+      "Tenho um mercadinho de bairro em Campinas, SP. Vendo ao consumidor final e controlo estoque, vendas e financeiro.",
+    );
+  await page.getByRole("button", { name: "Continuar" }).click();
 
-  // Classificação: nicho de varejo, com a cidade extraída da frase.
-  await expect(page.getByText("Encontramos o seu negócio")).toBeVisible();
-  await expect(
-    page.getByText("Mercado / Varejo", { exact: true }),
-  ).toBeVisible();
-  await expect(page.getByText(/Campinas/).first()).toBeVisible();
+  // ---- Análise: só afirma o que saiu da descrição ------------------------
+  await expect(page.getByText("Entendemos sua operação")).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(page.getByText("Comércio", { exact: true })).toBeVisible();
+  await expect(page.getByText("B2C", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Estoque/).first()).toBeVisible();
 
-  // Módulos sugeridos: o core e os do nicho aparecem pré-selecionados.
-  await expect(
-    page.getByText("O essencial — todo negócio usa"),
-  ).toBeVisible();
-  await expect(page.getByText("Feito para Mercado / Varejo")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: /PDV \(frente de caixa\)/ }),
-  ).toBeVisible();
+  await page.getByRole("button", { name: /Ir para a plataforma/ }).click();
 
-  // Conta + espaço.
-  await page.getByPlaceholder("Nome do negócio").fill("Mercadinho E2E");
-  await page.getByPlaceholder("Seu nome").fill("Dono E2E");
-  await page.getByPlaceholder("Seu e-mail").fill(uniqueEmail());
-  await page.getByPlaceholder(/Senha \(mín\./).fill("segredo123");
-  await page.getByRole("button", { name: "Criar meu espaço" }).click();
-
-  // Sessão criada e espaço persistido: cai na visão geral do tenant.
+  // ---- Espaço criado, com o menu montado --------------------------------
   await page.waitForURL(/\/espaco\/[^/?#]+$/, { timeout: 60_000 });
   await expect(page.getByText(/Bem-vindo/)).toBeVisible();
   await expect(page.getByText("Mercadinho E2E").first()).toBeVisible();
-
-  // O menu de módulos reflete o que foi ativado no onboarding.
   await expect(
     page.getByRole("link", { name: "PDV (frente de caixa)" }).first(),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Financeiro" }).first(),
   ).toBeVisible();
+});
+
+test("a etapa 2 exige sessão: sem conta, volta para o cadastro", async ({
+  page,
+}) => {
+  await presetCookieConsent(page);
+  await page.goto("/onboarding/empresa");
+  await expect(page).toHaveURL(/\/onboarding$/);
 });
