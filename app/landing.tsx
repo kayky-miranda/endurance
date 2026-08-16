@@ -36,7 +36,6 @@ import {
   Clock,
   Lock,
   ChevronDown,
-  Star,
   Menu,
   X,
   PlugZap,
@@ -201,12 +200,15 @@ export default function Landing() {
       <Hero />
       <TrustStrip />
       <About />
+      {/* A cadeia vem cedo: é o argumento que separa "mais um ERP" de
+          "um ecossistema", e sustenta tudo que vem depois. */}
+      <Connected />
       <Features />
       <AISection />
       <Benefits />
       <Integrations />
       <Showcase />
-      <Pricing />
+      <Solutions />
       <Faq />
       <FinalCta />
       <Footer />
@@ -217,11 +219,13 @@ export default function Landing() {
 /* ------------------------------------------------------------------ *
  * Navbar
  * ------------------------------------------------------------------ */
+// "Planos" saiu do menu de âncoras e virou link para /precos: a home não
+// compara preço, mas quem entra procurando valores não pode ficar sem caminho.
 const NAV_LINKS = [
   { href: "#sobre", label: "Sobre" },
+  { href: "#conectado", label: "Tudo conectado" },
   { href: "#recursos", label: "Funcionalidades" },
   { href: "#ia", label: "Inteligência" },
-  { href: "#planos", label: "Planos" },
   { href: "#faq", label: "FAQ" },
 ];
 
@@ -289,6 +293,12 @@ function Navbar() {
 
         <div className="hidden items-center gap-3 md:flex">
           <a
+            href="/precos"
+            className="hidden text-sm text-slate-400 transition hover:text-slate-100 lg:inline"
+          >
+            Planos
+          </a>
+          <a
             href="/entrar"
             className="text-sm text-slate-300 transition hover:text-white"
           >
@@ -325,6 +335,13 @@ function Navbar() {
                 {l.label}
               </a>
             ))}
+            <a
+              href="/precos"
+              onClick={() => setOpen(false)}
+              className="rounded-lg px-3 py-2.5 text-sm text-slate-300 hover:bg-ink-800"
+            >
+              Planos
+            </a>
             <div className="mt-2 flex gap-2">
               <a
                 href="/entrar"
@@ -363,19 +380,19 @@ function Hero() {
           </Reveal>
           <Reveal delay={60}>
             <h1 className="mt-6 text-4xl font-bold leading-[1.06] tracking-tight sm:text-6xl">
-              A gestão completa da sua empresa,
+              Da venda ao caixa, do estoque à nota:
               <br className="hidden sm:block" />{" "}
               <span className="text-gradient shine-text">
-                guiada por inteligência
+                quando tudo se conecta, a gestão flui
               </span>
             </h1>
           </Reveal>
           <Reveal delay={120}>
             <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-slate-400">
-              Financeiro, vendas, estoque, compras, fiscal e muito mais em uma
-              única plataforma. O ENDURANCE centraliza a operação e usa IA para
-              prever, analisar e automatizar decisões — para você crescer com
-              controle e lucratividade.
+              Vendas, estoque, financeiro, fiscal, logística e produção num
+              único ecossistema — cada informação entra uma vez e percorre a
+              operação inteira. Com inteligência artificial lendo os números
+              junto com você.
             </p>
           </Reveal>
           <Reveal delay={180}>
@@ -387,10 +404,10 @@ function Hero() {
                 Começar teste gratuito <ArrowRight className="h-4 w-4" />
               </a>
               <a
-                href="#contato"
+                href="#conectado"
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-ink-600 bg-ink-900/60 px-6 py-3 text-sm font-semibold text-slate-100 backdrop-blur transition hover:border-brand-500/60 hover:bg-ink-800/60 sm:w-auto"
               >
-                <Play className="h-4 w-4 text-brand-300" /> Solicitar demonstração
+                <Play className="h-4 w-4 text-brand-300" /> Veja como funciona
               </a>
             </div>
           </Reveal>
@@ -582,6 +599,10 @@ function DashboardMock() {
  * Trust strip
  * ------------------------------------------------------------------ */
 function TrustStrip() {
+  // Números do PRODUTO, conferíveis no sistema — não promessas de resultado.
+  // Antes esta faixa anunciava "+40% de produtividade" e "-30% de tempo em
+  // tarefas manuais": não medimos nem uma coisa nem outra, e prometer ganho
+  // que não se mede é o tipo de número que o cliente cobra depois.
   const stats: {
     l: string;
     to?: number;
@@ -590,10 +611,10 @@ function TrustStrip() {
     decimals?: number;
     static?: string;
   }[] = [
-    { to: 40, prefix: "+", suffix: "%", l: "produtividade da equipe" },
-    { to: 30, prefix: "-", suffix: "%", l: "tempo em tarefas manuais" },
-    { to: 99.9, suffix: "%", decimals: 1, l: "disponibilidade" },
-    { static: "1 só", l: "lugar para tudo" },
+    { to: 48, suffix: "", l: "módulos prontos para ligar" },
+    { to: 27, suffix: "", l: "estados com NFC-e mapeada" },
+    { static: "1 só", l: "lugar para toda a operação" },
+    { static: "LGPD", l: "dados isolados por empresa" },
   ];
   return (
     <section className="border-y border-ink-800 bg-ink-950/40">
@@ -1074,148 +1095,176 @@ function Showcase() {
 }
 
 /* ------------------------------------------------------------------ *
- * Planos
+ * Tudo conectado — o caminho que um único dado percorre
+ *
+ * É a seção que responde "por que um sistema só, e não cinco?". A resposta
+ * não é uma lista de módulos: é o fato de que UMA venda no balcão já move o
+ * estoque, emite a nota, lança o recebimento e reaparece no indicador. Por
+ * isso o desenho é uma cadeia, e não mais um grid de cards.
  * ------------------------------------------------------------------ */
-const PLANS = [
-  {
-    name: "Starter",
-    price: "Grátis",
-    period: "",
-    desc: "Para começar a organizar a operação.",
-    cta: "Começar grátis",
-    featured: false,
-    features: [
-      "Até 2 usuários",
-      "Dashboard e financeiro básico",
-      "Vendas e estoque",
-      "Relatórios essenciais",
-      "Suporte por e-mail",
-    ],
-  },
-  {
-    name: "Professional",
-    price: "R$ 149",
-    period: "/mês",
-    desc: "Para equipes que querem crescer com controle.",
-    cta: "Assinar Professional",
-    featured: true,
-    features: [
-      "Até 10 usuários",
-      "Todos os módulos operacionais",
-      "Assistente e insights de IA",
-      "Fiscal (NF-e / NFC-e)",
-      "Integrações (WhatsApp, Excel)",
-      "Suporte prioritário",
-    ],
-  },
-  {
-    name: "Business",
-    price: "R$ 349",
-    period: "/mês",
-    desc: "Para empresas com operação intensa.",
-    cta: "Assinar Business",
-    featured: false,
-    features: [
-      "Até 30 usuários",
-      "IA avançada e previsões",
-      "Produção e logística",
-      "Power BI e APIs externas",
-      "Permissões avançadas",
-      "Gerente de conta",
-    ],
-  },
-  {
-    name: "Enterprise",
-    price: "Sob consulta",
-    period: "",
-    desc: "Para grandes operações e múltiplas filiais.",
-    cta: "Falar com vendas",
-    featured: false,
-    features: [
-      "Usuários ilimitados",
-      "Multi-filial e multiempresa",
-      "SLA e segurança dedicados",
-      "Integrações personalizadas",
-      "Implantação assistida",
-      "Suporte 24/7",
-    ],
-  },
+const CHAIN: { icon: LucideIcon; title: string; text: string }[] = [
+  { icon: ShoppingCart, title: "Venda", text: "O pedido entra no PDV ou pelo WhatsApp." },
+  { icon: Boxes, title: "Estoque", text: "A baixa acontece na hora, no local certo." },
+  { icon: FileText, title: "Fiscal", text: "NFC-e ou NF-e sai com os dados da venda." },
+  { icon: Wallet, title: "Financeiro", text: "O recebimento cai no fluxo de caixa." },
+  { icon: Truck, title: "Logística", text: "Separação e entrega seguem o pedido." },
+  { icon: Factory, title: "Produção", text: "A reposição vira ordem quando falta." },
+  { icon: BarChart3, title: "Indicadores", text: "Margem e giro atualizam sozinhos." },
+  { icon: Brain, title: "Inteligência", text: "A IA lê o conjunto e aponta o que mudou." },
 ];
 
-function Pricing() {
+function Connected() {
   return (
-    <section id="planos" className="scroll-mt-20 border-t border-ink-800 py-24">
+    <section
+      id="conectado"
+      className="relative scroll-mt-20 overflow-hidden border-t border-ink-800 py-24"
+    >
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-px bg-gradient-to-r from-transparent via-brand-500/40 to-transparent"
+        aria-hidden
+      />
       <div className="mx-auto max-w-7xl px-5">
         <div className="mx-auto max-w-3xl text-center">
           <Reveal>
-            <SectionTag>Planos</SectionTag>
+            <SectionTag>Tudo conectado</SectionTag>
             <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-              Um plano para cada momento da empresa
+              Uma venda. Oito setores.{" "}
+              <span className="text-gradient">Nenhuma digitação repetida.</span>
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-slate-400">
-              Comece de graça e evolua conforme cresce. Sem fidelidade, cancele
-              quando quiser.
+              Não são módulos que exportam planilha um para o outro. É o mesmo
+              dado atravessando a operação inteira — e chegando no indicador
+              sem ninguém redigitar nada.
             </p>
           </Reveal>
         </div>
 
-        <div className="mt-12 grid gap-5 lg:grid-cols-4">
-          {PLANS.map((p, i) => (
-            <Reveal key={p.name} delay={i * 70}>
-              <SpotlightCard
-                className={`relative flex h-full flex-col rounded-2xl border p-6 transition hover:-translate-y-1 ${
-                  p.featured
-                    ? "ring-gradient border-brand-500/50 bg-ink-900/80 shadow-2xl shadow-brand-500/10 lg:scale-[1.03]"
-                    : "border-ink-700 bg-ink-900/50 hover:border-brand-500/40"
-                }`}
-              >
-                {p.featured && (
-                  <span className="absolute -top-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-full bg-brand-500 px-3 py-1 text-[11px] font-semibold text-ink-950">
-                    <Star className="h-3 w-3" /> Mais escolhido
-                  </span>
-                )}
-                <h3 className="text-lg font-semibold text-slate-100">{p.name}</h3>
-                <p className="mt-1 text-xs text-slate-500">{p.desc}</p>
-                <div className="mt-4 flex items-end gap-1">
-                  <span className="text-3xl font-bold text-slate-100">
-                    {p.price}
-                  </span>
-                  {p.period && (
-                    <span className="pb-1 text-xs text-slate-500">
-                      {p.period}
+        <div className="relative mt-14">
+          <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {CHAIN.map((c, i) => (
+              <Reveal key={c.title} delay={i * 70}>
+                <li className="group relative h-full rounded-2xl border border-ink-700 bg-ink-900/50 p-5 transition hover:-translate-y-1 hover:border-brand-500/40">
+                  <div className="flex items-center gap-3">
+                    <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25 transition group-hover:bg-brand-500/25">
+                      <c.icon className="h-5 w-5" />
                     </span>
+                    <span className="text-[11px] font-semibold tabular-nums text-slate-600">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                  </div>
+                  <p className="mt-4 text-sm font-semibold text-slate-100">
+                    {c.title}
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    {c.text}
+                  </p>
+                  {/* A seta só liga cards da MESMA linha. No fim da linha o
+                      fluxo desce para o card de baixo — uma seta apontando
+                      para a direita ali mandava o olho para fora da grade,
+                      contra o caminho real. A numeração conduz a virada. */}
+                  {(i + 1) % 4 !== 0 && (
+                    <ArrowRight
+                      className="absolute -right-3 top-1/2 hidden h-5 w-5 -translate-y-1/2 text-ink-600 lg:block"
+                      aria-hidden
+                    />
                   )}
-                </div>
-                <a
-                  href={p.name === "Enterprise" ? "#contato" : "/onboarding"}
-                  className={`mt-5 inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                    p.featured
-                      ? "btn-sheen bg-brand-500 text-ink-950 hover:bg-brand-400"
-                      : "border border-ink-600 text-slate-100 hover:border-brand-500/60 hover:bg-ink-800"
-                  }`}
-                >
-                  {p.cta}
-                </a>
-                <ul className="mt-6 space-y-2.5">
-                  {p.features.map((f) => (
-                    <li
-                      key={f}
-                      className="flex items-start gap-2 text-sm text-slate-300"
-                    >
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-400" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              </SpotlightCard>
-            </Reveal>
-          ))}
+                </li>
+              </Reveal>
+            ))}
+          </ol>
         </div>
+
+        <Reveal delay={200}>
+          <p className="mx-auto mt-10 max-w-2xl text-center text-sm text-slate-500">
+            O mesmo vale ao contrário: cancelou a nota, o estoque volta e o
+            caixa acerta. É o que muda quando a operação vive num sistema só.
+          </p>
+        </Reveal>
       </div>
     </section>
   );
 }
 
+/* ------------------------------------------------------------------ *
+ * Soluções — a ponte para os planos, sem preço na home
+ *
+ * A home não compara planos: ela vende o produto. Quem chegou até aqui já
+ * entendeu o que o sistema faz e só então tem motivo para olhar valores —
+ * que vivem em /precos.
+ * ------------------------------------------------------------------ */
+const SOLUTION_POINTS: { icon: LucideIcon; title: string; text: string }[] = [
+  {
+    icon: Rocket,
+    title: "Começa pequeno",
+    text: "Você descreve o negócio e o sistema já liga os módulos do seu ramo. Sem implantação de meses.",
+  },
+  {
+    icon: Layers,
+    title: "Cresce junto",
+    text: "Filiais, depósitos, produção e aprovações entram quando a operação pedir — sem trocar de sistema.",
+  },
+  {
+    icon: UserCog,
+    title: "Cada um vê o seu",
+    text: "Papéis e permissões por módulo e por registro: o caixa não abre o financeiro.",
+  },
+];
+
+function Solutions() {
+  return (
+    <section
+      id="solucoes"
+      className="scroll-mt-20 border-t border-ink-800 py-24"
+    >
+      <div className="mx-auto max-w-7xl px-5">
+        <div className="mx-auto max-w-3xl text-center">
+          <Reveal>
+            <SectionTag>Soluções</SectionTag>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
+              Do balcão de bairro à operação com filiais
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-slate-400">
+              O mesmo sistema acompanha a empresa em cada estágio. Você liga o
+              que precisa hoje e o resto espera o momento certo.
+            </p>
+          </Reveal>
+        </div>
+
+        <div className="mt-12 grid gap-5 lg:grid-cols-3">
+          {SOLUTION_POINTS.map((s, i) => (
+            <Reveal key={s.title} delay={i * 80}>
+              <SpotlightCard className="h-full rounded-2xl border border-ink-700 bg-ink-900/50 p-6 transition hover:-translate-y-1 hover:border-brand-500/40">
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25">
+                  <s.icon className="h-5 w-5" />
+                </span>
+                <h3 className="mt-4 text-base font-semibold text-slate-100">
+                  {s.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                  {s.text}
+                </p>
+              </SpotlightCard>
+            </Reveal>
+          ))}
+        </div>
+
+        <Reveal delay={240}>
+          <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <a
+              href="/precos"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-ink-600 bg-ink-900/60 px-6 py-3 text-sm font-semibold text-slate-100 backdrop-blur transition hover:border-brand-500/60 hover:bg-ink-800/60 sm:w-auto"
+            >
+              Conheça as opções <ArrowRight className="h-4 w-4" />
+            </a>
+            <span className="text-xs text-slate-500">
+              Comece grátis · sem cartão de crédito
+            </span>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
 /* ------------------------------------------------------------------ *
  * FAQ
  * ------------------------------------------------------------------ */
@@ -1230,7 +1279,9 @@ const FAQS = [
   },
   {
     q: "Que tipo de suporte vocês oferecem?",
-    a: "Suporte por e-mail no plano gratuito e suporte prioritário (chat e WhatsApp) nos planos pagos. No Enterprise há gerente de conta e atendimento 24/7.",
+    // Sem nome de plano: a home não compara planos, e citar "Enterprise" aqui
+    // obrigava o leitor a saber de cor uma tabela que ela não mostra mais.
+    a: "Suporte por e-mail desde a conta gratuita, e suporte prioritário por chat e WhatsApp nas contratações pagas. Para operações maiores há gerente de conta e atendimento 24/7 — os detalhes ficam na página de planos.",
   },
   {
     q: "O sistema integra com outras ferramentas?",
@@ -1320,11 +1371,15 @@ function FinalCta() {
             aria-hidden
           />
           <h2 className="relative text-3xl font-bold tracking-tight sm:text-4xl">
-            Pronto para colocar sua gestão no piloto inteligente?
+            Sua empresa já evoluiu.
+            <br className="hidden sm:block" />{" "}
+            <span className="text-gradient">
+              Agora o sistema dela também pode.
+            </span>
           </h2>
           <p className="relative mx-auto mt-4 max-w-2xl text-slate-400">
-            Centralize a operação, automatize o repetitivo e decida com dados.
-            Comece gratuitamente hoje — sem cartão, sem risco.
+            Uma operação inteira num lugar só, com a inteligência lendo os
+            números junto com você. Comece hoje — sem cartão, sem risco.
           </p>
           <div className="relative mt-8 flex flex-wrap items-center justify-center gap-3">
             <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
@@ -1343,13 +1398,13 @@ function FinalCta() {
               href="/onboarding"
               className="btn-sheen inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-7 py-3 text-sm font-semibold text-ink-950 transition hover:bg-brand-400 sm:w-auto"
             >
-              Criar minha conta grátis <ArrowRight className="h-4 w-4" />
+              Começar teste grátis <ArrowRight className="h-4 w-4" />
             </a>
             <a
-              href="mailto:contato@endurance.com.br?subject=Quero%20uma%20demonstra%C3%A7%C3%A3o%20do%20ENDURANCE"
+              href="/precos"
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-ink-600 bg-ink-900/60 px-7 py-3 text-sm font-semibold text-slate-100 transition hover:border-brand-500/60 sm:w-auto"
             >
-              <Play className="h-4 w-4 text-brand-300" /> Agendar demonstração
+              Conheça as opções
             </a>
           </div>
         </div>
@@ -1362,10 +1417,35 @@ function FinalCta() {
  * Footer
  * ------------------------------------------------------------------ */
 function Footer() {
-  const cols = [
-    { t: "Produto", links: ["Funcionalidades", "Planos", "Integrações", "Novidades"] },
-    { t: "Empresa", links: ["Sobre", "Carreiras", "Contato", "Parceiros"] },
-    { t: "Recursos", links: ["Central de ajuda", "Documentação", "Status", "Segurança"] },
+  // Só destinos que existem. Antes toda a coluna apontava para `href="#"` —
+  // quatorze links que não levavam a lugar nenhum, numa página cujo trabalho
+  // é justamente passar confiança.
+  const cols: { t: string; links: { l: string; href: string }[] }[] = [
+    {
+      t: "Produto",
+      links: [
+        { l: "Funcionalidades", href: "#recursos" },
+        { l: "Tudo conectado", href: "#conectado" },
+        { l: "Inteligência", href: "#ia" },
+        { l: "Planos", href: "/precos" },
+      ],
+    },
+    {
+      t: "Empresa",
+      links: [
+        { l: "Sobre", href: "#sobre" },
+        { l: "Contato", href: "#contato" },
+        { l: "Status do sistema", href: "/status" },
+      ],
+    },
+    {
+      t: "Recursos",
+      links: [
+        { l: "Dúvidas frequentes", href: "#faq" },
+        { l: "Privacidade", href: "/privacidade" },
+        { l: "Termos de uso", href: "/termos" },
+      ],
+    },
   ];
   return (
     <footer className="border-t border-ink-800 bg-ink-950/60">
@@ -1389,12 +1469,12 @@ function Footer() {
             <p className="text-sm font-semibold text-slate-200">{c.t}</p>
             <ul className="mt-4 space-y-2.5">
               {c.links.map((l) => (
-                <li key={l}>
+                <li key={l.l}>
                   <a
-                    href="#"
+                    href={l.href}
                     className="text-sm text-slate-500 transition hover:text-slate-200"
                   >
-                    {l}
+                    {l.l}
                   </a>
                 </li>
               ))}
