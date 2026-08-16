@@ -223,7 +223,7 @@ export default function Landing() {
 // compara preço, mas quem entra procurando valores não pode ficar sem caminho.
 const NAV_LINKS = [
   { href: "#sobre", label: "Sobre" },
-  { href: "#conectado", label: "Tudo conectado" },
+  { href: "#conectado", label: "A plataforma" },
   { href: "#recursos", label: "Funcionalidades" },
   { href: "#ia", label: "Inteligência" },
   { href: "#faq", label: "FAQ" },
@@ -305,10 +305,10 @@ function Navbar() {
             Entrar
           </a>
           <a
-            href="/onboarding"
+            href="#contato"
             className="btn-sheen inline-flex items-center gap-1.5 rounded-full bg-brand-500 px-4 py-2 text-sm font-semibold text-ink-950 transition hover:bg-brand-400"
           >
-            Teste grátis <ArrowRight className="h-4 w-4" />
+            Falar com o time <ArrowRight className="h-4 w-4" />
           </a>
         </div>
 
@@ -350,10 +350,11 @@ function Navbar() {
                 Entrar
               </a>
               <a
-                href="/onboarding"
+                href="#contato"
+                onClick={() => setOpen(false)}
                 className="flex-1 rounded-xl bg-brand-500 px-4 py-2.5 text-center text-sm font-semibold text-ink-950"
               >
-                Teste grátis
+                Falar com o time
               </a>
             </div>
           </div>
@@ -398,10 +399,10 @@ function Hero() {
           <Reveal delay={180}>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a
-                href="/onboarding"
+                href="#contato"
                 className="btn-sheen inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-ink-950 transition hover:bg-brand-400 sm:w-auto"
               >
-                Começar teste gratuito <ArrowRight className="h-4 w-4" />
+                Solicitar demonstração <ArrowRight className="h-4 w-4" />
               </a>
               <a
                 href="#conectado"
@@ -414,8 +415,8 @@ function Hero() {
           <Reveal delay={240}>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-slate-500">
               <span className="inline-flex items-center gap-1.5">
-                <Check className="h-3.5 w-3.5 text-brand-400" /> Sem cartão de
-                crédito
+                <Check className="h-3.5 w-3.5 text-brand-400" /> Módulos
+                conforme a sua operação
               </span>
               <span className="inline-flex items-center gap-1.5">
                 <Check className="h-3.5 w-3.5 text-brand-400" /> Configuração em
@@ -1095,23 +1096,117 @@ function Showcase() {
 }
 
 /* ------------------------------------------------------------------ *
- * Tudo conectado — o caminho que um único dado percorre
+ * A plataforma — ecossistema de módulos, não um fluxo
  *
- * É a seção que responde "por que um sistema só, e não cinco?". A resposta
- * não é uma lista de módulos: é o fato de que UMA venda no balcão já move o
- * estoque, emite a nota, lança o recebimento e reaparece no indicador. Por
- * isso o desenho é uma cadeia, e não mais um grid de cards.
+ * A versão anterior desenhava uma CADEIA: venda, estoque, fiscal, financeiro,
+ * logística, produção. Lia bem para um comércio de balcão e mal para todo o
+ * resto: uma indústria, uma distribuidora ou um prestador de serviço chegava
+ * aqui e via um sistema que começa numa venda de varejo que ele não faz.
+ * Sequência também sugere obrigatoriedade, e nenhuma empresa usa os oito.
+ *
+ * Agora o desenho é um núcleo com os módulos ao redor: cada empresa liga o
+ * que usa, e o que estiver ligado conversa entre si.
  * ------------------------------------------------------------------ */
-const CHAIN: { icon: LucideIcon; title: string; text: string }[] = [
-  { icon: ShoppingCart, title: "Venda", text: "O pedido entra no PDV ou pelo WhatsApp." },
-  { icon: Boxes, title: "Estoque", text: "A baixa acontece na hora, no local certo." },
-  { icon: FileText, title: "Fiscal", text: "NFC-e ou NF-e sai com os dados da venda." },
-  { icon: Wallet, title: "Financeiro", text: "O recebimento cai no fluxo de caixa." },
-  { icon: Truck, title: "Logística", text: "Separação e entrega seguem o pedido." },
-  { icon: Factory, title: "Produção", text: "A reposição vira ordem quando falta." },
-  { icon: BarChart3, title: "Indicadores", text: "Margem e giro atualizam sozinhos." },
-  { icon: Brain, title: "Inteligência", text: "A IA lê o conjunto e aponta o que mudou." },
+type ModuleGroup = "Gestão" | "Operação" | "Relacionamento" | "Inteligência";
+
+const GROUP_TONE: Record<ModuleGroup, string> = {
+  Gestão: "text-brand-300/80",
+  Operação: "text-indigo-300/80",
+  Relacionamento: "text-teal-300/80",
+  Inteligência: "text-sky-300/80",
+};
+
+const PLATFORM: {
+  icon: LucideIcon;
+  title: string;
+  text: string;
+  group: ModuleGroup;
+}[] = [
+  {
+    icon: Wallet,
+    title: "Financeiro",
+    text: "Contas, fluxo de caixa, pagamentos e recebimentos centralizados.",
+    group: "Gestão",
+  },
+  {
+    icon: Users,
+    title: "Comercial",
+    text: "Clientes, propostas, pedidos e acompanhamento das vendas.",
+    group: "Relacionamento",
+  },
+  {
+    icon: Boxes,
+    title: "Estoque",
+    text: "Visibilidade dos itens, movimentações, entradas e saídas.",
+    group: "Gestão",
+  },
+  {
+    icon: FileText,
+    title: "Fiscal",
+    text: "Emissão e gestão dos documentos fiscais da operação.",
+    group: "Gestão",
+  },
+  {
+    icon: ShoppingCart,
+    title: "Compras",
+    text: "Requisições, cotações, fornecedores e recebimento de materiais.",
+    group: "Operação",
+  },
+  {
+    icon: Factory,
+    title: "Produção",
+    text: "Planejamento e acompanhamento dos processos produtivos.",
+    group: "Operação",
+  },
+  {
+    icon: Truck,
+    title: "Logística",
+    text: "Movimentações entre unidades, entregas e operações logísticas.",
+    group: "Operação",
+  },
+  {
+    icon: BarChart3,
+    title: "Gestão e indicadores",
+    text: "Informações consolidadas para acompanhar o desempenho da empresa.",
+    group: "Inteligência",
+  },
 ];
+
+/** Perfis de operação atendidos. Cada empresa liga o que usa. */
+const PROFILES = [
+  "Indústrias",
+  "Distribuidoras",
+  "Comércio",
+  "Prestadores de serviços",
+  "Atacadistas",
+  "Operações logísticas",
+  "Empresas com múltiplas unidades",
+  "Operações B2B e B2C",
+];
+
+/** Núcleo da grade: centro do anel no desktop, abertura da lista no mobile. */
+function PlatformCore() {
+  return (
+    <div className="relative flex h-full flex-col items-center justify-center rounded-2xl border border-brand-500/30 bg-gradient-to-b from-ink-900 to-ink-950 p-6 text-center">
+      <div
+        className="pointer-events-none absolute inset-0 rounded-2xl bg-brand-500/10 blur-2xl"
+        aria-hidden
+      />
+      <span className="relative grid h-14 w-14 place-items-center rounded-2xl bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/30">
+        <BrandMark className="h-9 w-9" />
+      </span>
+      <p className="relative mt-4 text-base font-semibold tracking-tight text-slate-100">
+        ENDURANCE
+      </p>
+      <p className="relative mt-1 text-xs leading-relaxed text-slate-400">
+        Plataforma de gestão empresarial
+      </p>
+      <p className="relative mt-3 text-[11px] leading-relaxed text-slate-500">
+        Você escolhe o que precisa. A plataforma conecta o restante.
+      </p>
+    </div>
+  );
+}
 
 function Connected() {
   return (
@@ -1126,58 +1221,88 @@ function Connected() {
       <div className="mx-auto max-w-7xl px-5">
         <div className="mx-auto max-w-3xl text-center">
           <Reveal>
-            <SectionTag>Tudo conectado</SectionTag>
+            <SectionTag>A plataforma</SectionTag>
             <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-              Uma venda. Oito setores.{" "}
-              <span className="text-gradient">Nenhuma digitação repetida.</span>
+              Uma plataforma. Diferentes operações.{" "}
+              <span className="text-gradient">Tudo conectado.</span>
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-slate-400">
-              Não são módulos que exportam planilha um para o outro. É o mesmo
-              dado atravessando a operação inteira — e chegando no indicador
-              sem ninguém redigitar nada.
+              Cada empresa organiza o trabalho do seu jeito. Por isso os módulos
+              da Endurance não seguem uma ordem obrigatória: você ativa os que
+              fazem sentido para a sua operação, e as informações passam a
+              circular entre eles sem retrabalho de digitação.
             </p>
           </Reveal>
         </div>
 
+        {/* Grade em anel: no desktop os módulos cercam o núcleo (3x3 com o
+            centro ocupado pela plataforma). Nas telas menores tudo empilha e
+            o núcleo abre a lista, que é a ordem de leitura natural. */}
         <div className="relative mt-14">
-          <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {CHAIN.map((c, i) => (
-              <Reveal key={c.title} delay={i * 70}>
-                <li className="group relative h-full rounded-2xl border border-ink-700 bg-ink-900/50 p-5 transition hover:-translate-y-1 hover:border-brand-500/40">
-                  <div className="flex items-center gap-3">
-                    <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25 transition group-hover:bg-brand-500/25">
-                      <c.icon className="h-5 w-5" />
+          <div
+            className="pointer-events-none absolute left-1/2 top-1/2 hidden h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-500/10 blur-[90px] lg:block"
+            aria-hidden
+          />
+          <div className="relative grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Reveal delay={240} className="lg:order-2">
+              <PlatformCore />
+            </Reveal>
+            {PLATFORM.map((m, i) => (
+              <Reveal
+                key={m.title}
+                delay={i * 60}
+                className={i < 4 ? "lg:order-1" : "lg:order-3"}
+              >
+                <article className="group h-full rounded-2xl border border-ink-700 bg-ink-900/50 p-5 transition hover:-translate-y-1 hover:border-brand-500/40">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25 transition group-hover:bg-brand-500/25">
+                      <m.icon className="h-5 w-5" />
                     </span>
-                    <span className="text-[11px] font-semibold tabular-nums text-slate-600">
-                      {String(i + 1).padStart(2, "0")}
+                    <span
+                      className={`text-[10px] font-semibold uppercase tracking-widest ${GROUP_TONE[m.group]}`}
+                    >
+                      {m.group}
                     </span>
                   </div>
                   <p className="mt-4 text-sm font-semibold text-slate-100">
-                    {c.title}
+                    {m.title}
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                    {c.text}
+                    {m.text}
                   </p>
-                  {/* A seta só liga cards da MESMA linha. No fim da linha o
-                      fluxo desce para o card de baixo — uma seta apontando
-                      para a direita ali mandava o olho para fora da grade,
-                      contra o caminho real. A numeração conduz a virada. */}
-                  {(i + 1) % 4 !== 0 && (
-                    <ArrowRight
-                      className="absolute -right-3 top-1/2 hidden h-5 w-5 -translate-y-1/2 text-ink-600 lg:block"
-                      aria-hidden
-                    />
-                  )}
-                </li>
+                </article>
               </Reveal>
             ))}
-          </ol>
+          </div>
         </div>
 
         <Reveal delay={200}>
-          <p className="mx-auto mt-10 max-w-2xl text-center text-sm text-slate-500">
-            O mesmo vale ao contrário: cancelou a nota, o estoque volta e o
-            caixa acerta. É o que muda quando a operação vive num sistema só.
+          <div className="mt-12 rounded-2xl border border-ink-700 bg-ink-900/40 p-6">
+            <p className="text-center text-xs font-semibold uppercase tracking-widest text-slate-500">
+              Perfis de operação atendidos
+            </p>
+            <div className="mt-4 flex flex-wrap justify-center gap-2">
+              {PROFILES.map((p) => (
+                <span
+                  key={p}
+                  className="rounded-full border border-ink-600 bg-ink-950/60 px-3 py-1.5 text-xs text-slate-300"
+                >
+                  {p}
+                </span>
+              ))}
+            </div>
+            <p className="mt-5 text-center text-xs text-slate-500">
+              Os módulos ativos variam conforme o perfil da empresa. Nem toda
+              operação usa produção, logística ou emissão fiscal.
+            </p>
+          </div>
+        </Reveal>
+
+        <Reveal delay={260}>
+          <p className="mx-auto mt-10 max-w-2xl text-center text-sm leading-relaxed text-slate-400">
+            Não importa o tamanho ou o segmento da sua empresa. A Endurance
+            organiza a operação em uma plataforma que acompanha o crescimento do
+            negócio.
           </p>
         </Reveal>
       </div>
@@ -1257,7 +1382,7 @@ function Solutions() {
               Conheça as opções <ArrowRight className="h-4 w-4" />
             </a>
             <span className="text-xs text-slate-500">
-              Comece grátis · sem cartão de crédito
+              Conversa sem compromisso · resposta no mesmo dia útil
             </span>
           </div>
         </Reveal>
@@ -1281,7 +1406,7 @@ const FAQS = [
     q: "Que tipo de suporte vocês oferecem?",
     // Sem nome de plano: a home não compara planos, e citar "Enterprise" aqui
     // obrigava o leitor a saber de cor uma tabela que ela não mostra mais.
-    a: "Suporte por e-mail desde a conta gratuita, e suporte prioritário por chat e WhatsApp nas contratações pagas. Para operações maiores há gerente de conta e atendimento 24/7 — os detalhes ficam na página de planos.",
+    a: "Suporte por e-mail em todas as contratações, e suporte prioritário por chat e WhatsApp conforme o plano. Para operações maiores há gerente de conta e atendimento 24/7. Os detalhes ficam na página de planos.",
   },
   {
     q: "O sistema integra com outras ferramentas?",
@@ -1378,8 +1503,8 @@ function FinalCta() {
             </span>
           </h2>
           <p className="relative mx-auto mt-4 max-w-2xl text-slate-400">
-            Uma operação inteira num lugar só, com a inteligência lendo os
-            números junto com você. Comece hoje — sem cartão, sem risco.
+            Conte como a sua empresa funciona hoje e mostramos como a plataforma
+            se encaixa nela. A conversa vale para qualquer porte ou segmento.
           </p>
           <div className="relative mt-8 flex flex-wrap items-center justify-center gap-3">
             <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
@@ -1395,10 +1520,10 @@ function FinalCta() {
           </div>
           <div className="relative mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <a
-              href="/onboarding"
+              href="mailto:contato@endurance.com.br?subject=Quero%20conhecer%20o%20ENDURANCE"
               className="btn-sheen inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-7 py-3 text-sm font-semibold text-ink-950 transition hover:bg-brand-400 sm:w-auto"
             >
-              Começar teste grátis <ArrowRight className="h-4 w-4" />
+              Solicitar demonstração <ArrowRight className="h-4 w-4" />
             </a>
             <a
               href="/precos"
@@ -1425,7 +1550,7 @@ function Footer() {
       t: "Produto",
       links: [
         { l: "Funcionalidades", href: "#recursos" },
-        { l: "Tudo conectado", href: "#conectado" },
+        { l: "A plataforma", href: "#conectado" },
         { l: "Inteligência", href: "#ia" },
         { l: "Planos", href: "/precos" },
       ],
