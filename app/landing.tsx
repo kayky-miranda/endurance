@@ -294,7 +294,7 @@ function Navbar() {
         <div className="hidden items-center gap-3 md:flex">
           <a
             href="/precos"
-            className="hidden text-sm text-slate-400 transition hover:text-slate-100 lg:inline"
+            className="hidden pr-3 text-sm text-slate-400 transition hover:text-slate-100 lg:inline"
           >
             Planos
           </a>
@@ -380,10 +380,10 @@ function Hero() {
           </Reveal>
           <Reveal delay={60}>
             <h1 className="mt-6 text-4xl font-bold leading-[1.06] tracking-tight sm:text-6xl">
-              Da venda ao caixa, do estoque à nota:
+              A gestão completa da sua empresa,
               <br className="hidden sm:block" />{" "}
               <span className="text-gradient shine-text">
-                quando tudo se conecta, a gestão flui
+                guiada por inteligência
               </span>
             </h1>
           </Reveal>
