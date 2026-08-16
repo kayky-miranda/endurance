@@ -37,7 +37,15 @@ type ModuleCard = {
  * frase é uma promessa ("já vem pronto para o seu ___") e prometia salão e
  * academia, que saíram da oferta porque os módulos deles estão em construção.
  */
-const TYPE_WORDS = ["mercado", "consultório", "clínica", "negócio"];
+// O artigo entra na palavra animada porque o gênero muda com ela: a frase era
+// "Já vem pronto para o seu clínica". ("pronto" concorda com o sistema, não
+// com o negócio, então continua no masculino em todas.)
+const TYPE_WORDS = [
+  "o seu mercado",
+  "o seu consultório",
+  "a sua clínica",
+  "o seu negócio",
+];
 
 export default function OnboardingClient({
   niches,
@@ -167,7 +175,7 @@ export default function OnboardingClient({
             <span className="text-brand-400">A gente monta o resto.</span>
           </h1>
           <p className="mt-4 h-6 text-lg text-slate-300">
-            Já vem pronto para o seu <Typewriter />
+            Já vem pronto para <Typewriter />
           </p>
           <p className="mt-4 max-w-xl leading-relaxed text-slate-400">
             Escreva uma frase sobre o seu negócio. Em segundos, o ENDURANCE
@@ -371,8 +379,10 @@ export default function OnboardingClient({
                 <span className="font-semibold text-brand-200">
                   {selected.size}
                 </span>{" "}
-                ferramenta(s) prontas. Leva 10 segundos e seu espaço fica
-                privado.
+                {selected.size === 1
+                  ? "ferramenta pronta"
+                  : "ferramentas prontas"}
+                . Leva 10 segundos e seu espaço fica privado.
               </p>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
