@@ -1,4 +1,5 @@
 import "server-only";
+import { timingSafeEqual } from "node:crypto";
 import { logger } from "@/lib/logger";
 
 /**
@@ -21,6 +22,15 @@ export function isAuthorizedCron(req: Request): boolean {
     logger.warn("Cron endpoint sem CRON_SECRET — liberando em dev");
     return true;
   }
-  const auth = req.headers.get("authorization");
-  return auth === `Bearer ${secret}`;
+  const auth = req.headers.get("authorization") ?? "";
+  const esperado = `Bearer ${secret}`;
+  // Comparação de tempo constante: `===` sai no primeiro byte diferente e, em
+  // tese, deixa o tempo de resposta contar quantos caracteres do segredo já
+  // estão certos. O ruído da rede torna o ataque impraticável na prática, mas
+  // a comparação certa não custa nada. Os comprimentos precisam bater antes,
+  // porque timingSafeEqual lança com buffers de tamanhos diferentes — e o
+  // tamanho por si só não revela o segredo.
+  const a = Buffer.from(auth);
+  const b = Buffer.from(esperado);
+  return a.length === b.length && timingSafeEqual(a, b);
 }

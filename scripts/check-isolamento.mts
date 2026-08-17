@@ -18,6 +18,10 @@ import { getRequisitionDetail, updateRequisition, deleteRequisition } from "../l
 import { getQuotationDetail, chooseWinner } from "../lib/endurance/quotations.ts";
 import { decideApproval } from "../lib/endurance/approvals.ts";
 import { emitNfce, cancelNfce } from "../lib/endurance/fiscal-service.ts";
+import { applyStockMovement, transferStock } from "../lib/endurance/stock-ledger.ts";
+import { confirmSimulatedPix, cancelPixCharge, getPixChargeStatus } from "../lib/endurance/pix-service.ts";
+import { closeCash, addMovement } from "../lib/endurance/cash.ts";
+import { markEntryPaid } from "../lib/endurance/finance.ts";
 
 const say = (s = "") => console.log(s);
 const vazou: string[] = [];
@@ -36,7 +40,7 @@ async function novaEmpresa(tag: string) {
       name: `ZZISO ${tag}`,
       niche: "outro",
       nicheLabel: "Outro",
-      locations: { create: { name: "Matriz", code: "MTZ", isDefault: true } },
+      locations: { create: [{ name: "Matriz", code: "MTZ", isDefault: true }, { name: "Filial", code: "FIL", isDefault: false }] },
     },
   });
   orgs.push(o.id);
@@ -154,6 +158,72 @@ try {
   const cnc = await cancelNfce(A.orgId, docB.id, "ZZISO tentativa de cancelamento cruzado");
   barrado(cnc.ok === false, "cancelNfce recusa documento de outra empresa", cnc.error ?? "");
 
+
+  // ---- superfícies acrescentadas pela auditoria de segurança ----------------
+  // A auditoria confirmou que o isolamento é 100% aplicativo: não há RLS no
+  // banco. Enquanto for assim, cada função nova precisa lembrar do filtro por
+  // organização — e é este arquivo que cobra isso.
+  const prodB2 = await prisma.product.create({
+    data: { organizationId: B.orgId, name: "ZZISO Produto B2", price: 10, stock: 100, sku: "ZZB2" },
+  });
+  const contaB2 = await prisma.financialEntry.create({
+    data: {
+      organizationId: B.orgId, kind: "receber", description: "ZZISO conta B2",
+      category: "Vendas", amount: 500, status: "pendente", dueDate: new Date(),
+    },
+  });
+  const caixaB2 = await prisma.cashSession.create({
+    data: { organizationId: B.orgId, userId: B.userId, openingAmount: 300, status: "aberto" },
+  });
+  const pixB2 = await prisma.pixCharge.create({
+    data: {
+      organizationId: B.orgId, token: `zziso-${Date.now()}`, txid: `TXZZISO${Date.now()}`,
+      amount: 100, status: "pendente", provider: "",
+    },
+  });
+  const locsA = await prisma.location.findMany({ where: { organizationId: A.orgId } });
+
+  let erroMov = "";
+  try {
+    await prisma.$transaction((tx) =>
+      applyStockMovement(tx, {
+        organizationId: A.orgId, productId: prodB2.id, delta: -50, reason: "venda",
+        refType: "sale", locationId: locsA[0].id, actor: { id: A.userId, name: "ZZISO A" },
+      }),
+    );
+  } catch (e) { erroMov = e instanceof Error ? e.message : String(e); }
+  barrado(Boolean(erroMov), "applyStockMovement recusa produto de outra empresa", erroMov);
+
+  const tr = await transferStock(A.orgId, {
+    productId: prodB2.id, fromLocationId: locsA[0].id, toLocationId: locsA[1].id,
+    quantity: 10, actor: { id: A.userId, name: "ZZISO A" },
+  });
+  barrado(tr.ok === false, "transferStock recusa produto de outra empresa", tr.error ?? "");
+
+  const fin = await markEntryPaid(A.orgId, contaB2.id);
+  barrado(fin.ok === false, "markEntryPaid recusa lançamento de outra empresa", fin.error ?? "");
+
+  const cxFecha = await closeCash(A.orgId, B.userId, 300, "ZZISO invasao");
+  barrado(cxFecha.ok === false, "closeCash não fecha caixa de operador de outra empresa", cxFecha.error ?? "");
+  const cxMov = await addMovement(A.orgId, B.userId, "sangria", 100, "ZZISO invasao");
+  barrado(cxMov.ok === false, "addMovement não movimenta caixa de outra empresa", cxMov.error ?? "");
+
+  const pxGet = await getPixChargeStatus(A.orgId, pixB2.id);
+  barrado(pxGet.ok === false, "getPixChargeStatus não devolve cobrança de outra empresa", pxGet.error ?? "");
+  const pxConf = await confirmSimulatedPix(A.orgId, pixB2.id);
+  barrado(pxConf.ok === false, "confirmSimulatedPix recusa cobrança de outra empresa", pxConf.error ?? "");
+  const pxCanc = await cancelPixCharge(A.orgId, pixB2.id);
+  barrado(pxCanc.ok === false, "cancelPixCharge recusa cobrança de outra empresa", pxCanc.error ?? "");
+
+  const pDepois = await prisma.product.findUnique({ where: { id: prodB2.id } });
+  barrado(pDepois?.stock === 100, "estoque do produto B2 intacto", `veio ${pDepois?.stock}`);
+  const cDepois = await prisma.financialEntry.findUnique({ where: { id: contaB2.id } });
+  barrado(cDepois?.status === "pendente", "conta de B continua pendente", `veio ${cDepois?.status}`);
+  const cxDepois = await prisma.cashSession.findUnique({ where: { id: caixaB2.id } });
+  barrado(cxDepois?.status === "aberto", "caixa de B continua aberto", `veio ${cxDepois?.status}`);
+  const pxDepois = await prisma.pixCharge.findUnique({ where: { id: pixB2.id } });
+  barrado(pxDepois?.status === "pendente", "cobrança PIX de B continua pendente", `veio ${pxDepois?.status}`);
+
   say("\n── conferindo que nada da empresa B mudou ──────────────────");
   const prodDepois = await prisma.product.findUnique({ where: { id: prodB.id } });
   barrado(prodDepois?.stock === 100, "estoque da empresa B intacto", `veio ${prodDepois?.stock}`);
@@ -163,7 +233,8 @@ try {
   barrado(docDepois?.status === "autorizada", "documento fiscal da empresa B intacto", `status=${docDepois?.status}`);
   const movs = await prisma.stockMovement.count({ where: { organizationId: B.orgId } });
   barrado(movs === 0, "nenhuma movimentação criada na empresa B", `veio ${movs}`);
-  const contas = await prisma.financialEntry.count({ where: { organizationId: B.orgId } });
+  // Só "a pagar": o bloco acima cria um recebível em B de propósito, como alvo.
+  const contas = await prisma.financialEntry.count({ where: { organizationId: B.orgId, kind: "pagar" } });
   barrado(contas === 0, "nenhuma conta a pagar criada na empresa B", `veio ${contas}`);
 
   say("\n── RESULTADO ──────────────────────────────────────────────");
@@ -174,7 +245,7 @@ try {
   vazou.push("exceção");
 } finally {
   for (const orgId of orgs) {
-    for (const t of ["receiptItem", "receipt", "purchaseOrderItem", "purchaseOrder", "quotationPrice", "quotationSupplierItem", "quotationSupplier", "quotationItem", "quotation", "purchaseApproval", "purchaseRequisitionItem", "purchaseRequisition", "fiscalDocument", "salePayment", "saleItem", "sale", "financialEntry", "stockMovement", "productStock", "product", "supplier", "location", "user"] as const) {
+    for (const t of ["receiptItem", "receipt", "purchaseOrderItem", "purchaseOrder", "quotationPrice", "quotationSupplierItem", "quotationSupplier", "quotationItem", "quotation", "purchaseApproval", "purchaseRequisitionItem", "purchaseRequisition", "pixCharge", "cashSession", "fiscalDocument", "salePayment", "saleItem", "sale", "financialEntry", "stockMovement", "productStock", "product", "supplier", "location", "user"] as const) {
       try { await (prisma as never as Record<string, { deleteMany: (a: unknown) => Promise<unknown> }>)[t].deleteMany({ where: { organizationId: orgId } }); } catch { /* sem organizationId */ }
     }
     try { await prisma.$executeRawUnsafe(`DELETE FROM "endurance_main"."Organization" WHERE id = $1`, orgId); } catch { /* ignora */ }

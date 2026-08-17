@@ -28,6 +28,20 @@ export async function renderCarouselToPNGs(
       deviceScaleFactor: SCALE,
     });
 
+    // Este navegador roda DENTRO do servidor. Se algum dia escapar um script
+    // pelo HTML (o gerador escapa tudo, mas isto é a segunda tranca), ele não
+    // pode falar com a rede interna nem com a internet: só o necessário para
+    // desenhar o slide passa — dados embutidos e as fontes do Google.
+    await page.route("**/*", (route) => {
+      const url = route.request().url();
+      const permitido =
+        url.startsWith("data:") ||
+        url.startsWith("blob:") ||
+        url.startsWith("about:") ||
+        /^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(url);
+      return permitido ? route.continue() : route.abort();
+    });
+
     await page.setContent(html, { waitUntil: "networkidle" });
     await page.waitForTimeout(3000); // aguarda Google Fonts
 

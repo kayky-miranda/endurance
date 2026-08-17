@@ -254,6 +254,12 @@ export async function transferStock(
   } catch (e) {
     if (e instanceof InsufficientStockError)
       return { ok: false, error: `${e.message} no local de origem.` };
+    // O razão recusa produto de outra empresa lançando um Error comum. A
+    // transferência já era bloqueada (a transação reverte), mas subia como
+    // exceção: a tela mostrava "algo deu errado" em vez do motivo, e o erro
+    // entrava no monitoramento como se fosse falha nossa.
+    if (e instanceof Error && e.message.includes("Produto não encontrado"))
+      return { ok: false, error: "Produto não encontrado neste espaço." };
     throw e;
   }
 }

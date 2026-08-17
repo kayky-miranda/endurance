@@ -65,17 +65,36 @@ export async function PUT(req: Request) {
   const str = (v: unknown, max = 60) =>
     typeof v === "string" ? v.slice(0, max) : "";
 
+  // Fonte é NOME DE FAMÍLIA, não texto livre: entra numa regra CSS
+  // (`font-family: '...'`) do HTML que o renderizador executa num Chromium do
+  // servidor. Truncar em 60 caracteres não impedia nada — 39 já fechavam o
+  // bloco de estilo e abriam um script. Só letras, números e espaço.
+  const fonte = (v: unknown, padrao: string) => {
+    const limpo = (typeof v === "string" ? v : "")
+      .replace(/[^A-Za-z0-9 ]/g, "")
+      .trim()
+      .slice(0, 40);
+    return limpo || padrao;
+  };
+
+  // Handle do Instagram já tem formato restrito na origem: letras, números,
+  // ponto e sublinhado. Aceitar mais do que isso só abria espaço para HTML.
+  const handle = (typeof body.instagramHandle === "string" ? body.instagramHandle : "")
+    .replace(/^@/, "")
+    .replace(/[^A-Za-z0-9._]/g, "")
+    .slice(0, 30);
+
   const data = {
     primaryColor: hex(body.primaryColor, "#6366F1"),
     darkColor: hex(body.darkColor, "#312E81"),
     lightColor: hex(body.lightColor, "#A5B4FC"),
     lightBg: hex(body.lightBg, "#F8F7FF"),
     darkBg: hex(body.darkBg, "#0F0E17"),
-    fontHeading: str(body.fontHeading, 60) || "Plus Jakarta Sans",
-    fontBody: str(body.fontBody, 60) || "Plus Jakarta Sans",
+    fontHeading: fonte(body.fontHeading, "Plus Jakarta Sans"),
+    fontBody: fonte(body.fontBody, "Plus Jakarta Sans"),
     logoText: str(body.logoText, 60),
     tagline: str(body.tagline, 120),
-    instagramHandle: str(body.instagramHandle, 60).replace(/^@/, ""),
+    instagramHandle: handle,
   };
 
   const kit = await prisma.brandKit.upsert({

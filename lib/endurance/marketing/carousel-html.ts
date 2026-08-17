@@ -1,24 +1,67 @@
 import type { SlideData, BrandKitData } from "./types";
 
+/**
+ * Escape de HTML — obrigatório em TODA interpolação de texto deste arquivo.
+ *
+ * O HTML montado aqui não vai para o navegador do cliente: ele é carregado por
+ * um Chromium headless NO SERVIDOR (carousel-renderer.ts) para virar PNG. Isso
+ * inverte o risco de lugar. Um "<script>" que entrasse por aqui não atacaria
+ * outro usuário — executaria dentro do nosso próprio processo, com acesso à
+ * rede interna.
+ *
+ * Os campos de texto do kit de marca chegavam apenas TRUNCADOS em 60
+ * caracteres, e 39 já bastavam para fechar o bloco de estilo e abrir um script.
+ * As cores sempre foram validadas por regex de hexadecimal; o texto não era.
+ */
+function esc(v: unknown): string {
+  return String(v ?? "").replace(
+    /[<>&"']/g,
+    (c) =>
+      ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ]!,
+  );
+}
+
+/**
+ * Cor para dentro de CSS ou de um atributo style. A rota do kit de marca já
+ * valida hexadecimal, mas a validação é repetida aqui de propósito: este
+ * arquivo escreve HTML que roda no servidor, e não deve depender de um único
+ * validador a montante para continuar seguro.
+ */
+function cssColor(v: unknown, padrao = "#6366F1"): string {
+  const c = String(v ?? "");
+  return /^#[0-9A-Fa-f]{6}$/.test(c) ? c : padrao;
+}
+
+/**
+ * Nome de fonte para dentro de uma regra CSS. Só letras, números e espaço —
+ * aspas e chaves são exatamente o que permitia sair do `font-family`.
+ */
+function cssFont(v: unknown): string {
+  const limpo = String(v ?? "").replace(/[^A-Za-z0-9 ]/g, "").trim().slice(0, 40);
+  return limpo || "Plus Jakarta Sans";
+}
+
 export const CAROUSEL_VIEW_WIDTH = 420;
 export const CAROUSEL_VIEW_HEIGHT = 525;
 const TOTAL = 7;
 
 function css(b: BrandKitData): string {
   return `
-    @import url('https://fonts.googleapis.com/css2?family=${encodeURIComponent(b.fontHeading)}:wght@300;400;600;700&family=${encodeURIComponent(b.fontBody)}:wght@400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=${encodeURIComponent(cssFont(b.fontHeading))}:wght@300;400;600;700&family=${encodeURIComponent(cssFont(b.fontBody))}:wght@400;500;600&display=swap');
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --brand-primary: ${b.primaryColor};
-      --brand-dark: ${b.darkColor};
-      --brand-light: ${b.lightColor};
-      --light-bg: ${b.lightBg};
-      --dark-bg: ${b.darkBg};
+      --brand-primary: ${cssColor(b.primaryColor, "#6366F1")};
+      --brand-dark: ${cssColor(b.darkColor, "#312E81")};
+      --brand-light: ${cssColor(b.lightColor, "#A5B4FC")};
+      --light-bg: ${cssColor(b.lightBg, "#F8F7FF")};
+      --dark-bg: ${cssColor(b.darkBg, "#0F0E17")};
     }
-    body { background: #f0f0f0; display: flex; justify-content: center; align-items: flex-start; padding: 20px; font-family: '${b.fontBody}', sans-serif; }
+    body { background: #f0f0f0; display: flex; justify-content: center; align-items: flex-start; padding: 20px; font-family: '${cssFont(b.fontBody)}', sans-serif; }
     .ig-frame { width: ${CAROUSEL_VIEW_WIDTH}px; background: #fff; border-radius: 12px; box-shadow: 0 8px 40px rgba(0,0,0,0.18); overflow: hidden; }
     .ig-header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: #fff; border-bottom: 1px solid #eee; }
-    .ig-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 700; font-family: '${b.fontHeading}', sans-serif; flex-shrink: 0; }
+    .ig-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 700; font-family: '${cssFont(b.fontHeading)}', sans-serif; flex-shrink: 0; }
     .ig-meta { flex: 1; min-width: 0; }
     .ig-handle { font-size: 12px; font-weight: 600; color: #1a1a1a; }
     .ig-sub { font-size: 10px; color: #888; }
@@ -29,8 +72,8 @@ function css(b: BrandKitData): string {
     .slide.dark { background: var(--dark-bg); }
     .slide.gradient { background: linear-gradient(165deg, var(--brand-dark) 0%, var(--brand-primary) 55%, var(--brand-light) 100%); }
     .slide.hero, .slide.cta { justify-content: center; }
-    .serif { font-family: '${b.fontHeading}', sans-serif; }
-    .sans { font-family: '${b.fontBody}', sans-serif; }
+    .serif { font-family: '${cssFont(b.fontHeading)}', sans-serif; }
+    .sans { font-family: '${cssFont(b.fontBody)}', sans-serif; }
     .tag-light { font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--brand-primary); margin-bottom: 14px; display: block; }
     .tag-dark { font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--brand-light); margin-bottom: 14px; display: block; }
     .tag-grad { font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.65); margin-bottom: 14px; display: block; }
@@ -51,13 +94,13 @@ function css(b: BrandKitData): string {
     .bullet-desc-light { font-size: 11px; color: #8A8580; }
     .bullet-desc-dark { font-size: 11px; color: rgba(255,255,255,0.45); }
     .step-row { display: flex; align-items: flex-start; gap: 14px; padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.07); }
-    .step-num { font-size: 24px; font-weight: 300; color: var(--brand-primary); min-width: 32px; line-height: 1; font-family: '${b.fontHeading}', sans-serif; }
+    .step-num { font-size: 24px; font-weight: 300; color: var(--brand-primary); min-width: 32px; line-height: 1; font-family: '${cssFont(b.fontHeading)}', sans-serif; }
     .step-title { font-size: 13px; font-weight: 600; color: var(--dark-bg); }
     .step-desc { font-size: 11px; color: #8A8580; margin-top: 2px; }
     .logo-lockup { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
-    .logo-circle { width: 40px; height: 40px; border-radius: 50%; background: var(--brand-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 16px; font-weight: 700; font-family: '${b.fontHeading}', sans-serif; flex-shrink: 0; }
-    .logo-name { font-size: 13px; font-weight: 600; letter-spacing: 0.5px; color: #fff; font-family: '${b.fontHeading}', sans-serif; }
-    .cta-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; background: var(--light-bg); color: var(--brand-dark); font-weight: 600; font-size: 14px; border-radius: 28px; margin-top: 20px; font-family: '${b.fontBody}', sans-serif; }
+    .logo-circle { width: 40px; height: 40px; border-radius: 50%; background: var(--brand-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 16px; font-weight: 700; font-family: '${cssFont(b.fontHeading)}', sans-serif; flex-shrink: 0; }
+    .logo-name { font-size: 13px; font-weight: 600; letter-spacing: 0.5px; color: #fff; font-family: '${cssFont(b.fontHeading)}', sans-serif; }
+    .cta-btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; background: var(--light-bg); color: var(--brand-dark); font-weight: 600; font-size: 14px; border-radius: 28px; margin-top: 20px; font-family: '${cssFont(b.fontBody)}', sans-serif; }
     .progress-bar { position: absolute; bottom: 0; left: 0; right: 0; padding: 14px 28px 18px; z-index: 10; display: flex; align-items: center; gap: 10px; }
     .progress-track { flex: 1; height: 3px; border-radius: 2px; overflow: hidden; }
     .progress-fill { height: 100%; border-radius: 2px; }
@@ -111,37 +154,37 @@ function renderSlide(s: SlideData, brand: BrandKitData): string {
 
   if (isHero) {
     inner = `
-      <div class="bg-accent" style="width:280px;height:280px;top:-80px;right:-60px;background:radial-gradient(circle,${brand.primaryColor}22 0%,transparent 70%)"></div>
+      <div class="bg-accent" style="width:280px;height:280px;top:-80px;right:-60px;background:radial-gradient(circle,${cssColor(brand.primaryColor, "#6366F1")}22 0%,transparent 70%)"></div>
       <div class="content-z" style="text-align:center">
-        <span class="${tagClass} serif">${s.tag || "NOVIDADE"}</span>
-        <h1 class="serif ${hlClass}" style="font-size:32px">${s.headline}</h1>
-        <p class="sans ${bodyClass}" style="margin-top:10px">${s.body}</p>
-        <div style="margin-top:20px;width:40px;height:3px;background:${brand.primaryColor};border-radius:2px;margin-left:auto;margin-right:auto"></div>
+        <span class="${tagClass} serif">${esc(s.tag || "NOVIDADE")}</span>
+        <h1 class="serif ${hlClass}" style="font-size:32px">${esc(s.headline)}</h1>
+        <p class="sans ${bodyClass}" style="margin-top:10px">${esc(s.body)}</p>
+        <div style="margin-top:20px;width:40px;height:3px;background:${cssColor(brand.primaryColor, "#6366F1")};border-radius:2px;margin-left:auto;margin-right:auto"></div>
       </div>`;
   } else if (isCta) {
     inner = `
       <div class="bg-accent" style="width:300px;height:300px;bottom:-100px;left:-80px;background:radial-gradient(circle,rgba(255,255,255,0.12) 0%,transparent 70%)"></div>
       <div class="content-z" style="text-align:center">
         <div class="logo-lockup" style="justify-content:center">
-          <div class="logo-circle">${brand.logoText?.[0]?.toUpperCase() ?? "E"}</div>
-          <span class="logo-name">${brand.logoText || "ENDURANCE"}</span>
+          <div class="logo-circle">${esc(brand.logoText?.[0]?.toUpperCase() ?? "E")}</div>
+          <span class="logo-name">${esc(brand.logoText || "ENDURANCE")}</span>
         </div>
-        <span class="${tagClass} serif">${s.tag || "COMECE AGORA"}</span>
-        <h2 class="serif ${hlClass}">${s.headline}</h2>
-        <p class="sans ${bodyClass}">${s.body}</p>
-        <div class="cta-btn sans">${s.ctaText || "Fale conosco"} →</div>
+        <span class="${tagClass} serif">${esc(s.tag || "COMECE AGORA")}</span>
+        <h2 class="serif ${hlClass}">${esc(s.headline)}</h2>
+        <p class="sans ${bodyClass}">${esc(s.body)}</p>
+        <div class="cta-btn sans">${esc(s.ctaText || "Fale conosco")} →</div>
       </div>`;
   } else if (s.layout === "steps") {
     const steps = (s.steps ?? []).slice(0, 3);
     inner = `
-      <span class="${tagClass} sans">${s.tag || "COMO FUNCIONA"}</span>
-      <h2 class="serif ${hlClass}" style="font-size:24px;margin-bottom:16px">${s.headline}</h2>
+      <span class="${tagClass} sans">${esc(s.tag || "COMO FUNCIONA")}</span>
+      <h2 class="serif ${hlClass}" style="font-size:24px;margin-bottom:16px">${esc(s.headline)}</h2>
       ${steps.map((st) => `
         <div class="step-row">
-          <span class="step-num serif">${st.num}</span>
+          <span class="step-num serif">${esc(st.num)}</span>
           <div>
-            <p class="step-title sans">${st.title}</p>
-            <p class="step-desc sans">${st.desc}</p>
+            <p class="step-title sans">${esc(st.title)}</p>
+            <p class="step-desc sans">${esc(st.desc)}</p>
           </div>
         </div>`).join("")}`;
   } else {
@@ -150,16 +193,16 @@ function renderSlide(s: SlideData, brand: BrandKitData): string {
     const lblClass = isLight ? "bullet-label-light" : "bullet-label-dark";
     const dscClass = isLight ? "bullet-desc-light" : "bullet-desc-dark";
     inner = `
-      <span class="${tagClass} sans">${s.tag}</span>
-      <h2 class="serif ${hlClass}" style="font-size:24px;margin-bottom:16px">${s.headline}</h2>
+      <span class="${tagClass} sans">${esc(s.tag)}</span>
+      <h2 class="serif ${hlClass}" style="font-size:24px;margin-bottom:16px">${esc(s.headline)}</h2>
       ${bullets.length > 0 ? bullets.map((b) => `
         <div class="bullet-row ${bClass}">
-          <span class="bullet-icon">${b.icon}</span>
+          <span class="bullet-icon">${esc(b.icon)}</span>
           <div>
-            <p class="sans ${lblClass}">${b.label}</p>
-            <p class="sans ${dscClass}">${b.desc}</p>
+            <p class="sans ${lblClass}">${esc(b.label)}</p>
+            <p class="sans ${dscClass}">${esc(b.desc)}</p>
           </div>
-        </div>`).join("") : `<p class="sans ${bodyClass}">${s.body}</p>`}`;
+        </div>`).join("") : `<p class="sans ${bodyClass}">${esc(s.body)}</p>`}`;
   }
 
   return `
@@ -191,15 +234,15 @@ export function renderCarouselHTML(
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Carrossel — ${brand.logoText}</title>
+<title>Carrossel — ${esc(brand.logoText)}</title>
 <style>${css(brand)}</style>
 </head>
 <body>
 <div class="ig-frame">
   <div class="ig-header">
-    <div class="ig-avatar">${brand.logoText?.[0]?.toUpperCase() ?? "E"}</div>
+    <div class="ig-avatar">${esc(brand.logoText?.[0]?.toUpperCase() ?? "E")}</div>
     <div class="ig-meta">
-      <div class="ig-handle">${handle}</div>
+      <div class="ig-handle">${esc(handle)}</div>
       <div class="ig-sub">Patrocinado</div>
     </div>
     <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5" fill="#888"/><circle cx="12" cy="12" r="1.5" fill="#888"/><circle cx="19" cy="12" r="1.5" fill="#888"/></svg>
@@ -214,7 +257,7 @@ export function renderCarouselHTML(
     <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
     <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="margin-left:auto"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
   </div>
-  <div class="ig-caption"><strong>${handle}</strong> ${slides[0]?.headline ?? ""}<br><span style="color:#9ca3af;font-size:11px">há 2 horas</span></div>
+  <div class="ig-caption"><strong>${esc(handle)}</strong> ${esc(slides[0]?.headline ?? "")}<br><span style="color:#9ca3af;font-size:11px">há 2 horas</span></div>
 </div>
 <script>
 (function(){
