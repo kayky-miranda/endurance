@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Loader2,
@@ -16,6 +15,7 @@ import { BrandMark } from "@/app/components/BrandMark";
 import {
   readOperation,
   hasProfile,
+  modulesForAreas,
   type OperationProfile,
 } from "@/lib/endurance/operation-profile";
 import type { OnboardingResult } from "@/lib/endurance/types";
@@ -61,8 +61,7 @@ export default function AnalysisClient({
   slug: string;
   moduleLabels: Record<string, string>;
 }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
+  const [salvando, setSalvando] = useState(false);
   const [fase, setFase] = useState<Fase>("escrever");
   const [texto, setTexto] = useState("");
   const [erro, setErro] = useState<string | null>(null);
@@ -72,6 +71,22 @@ export default function AnalysisClient({
   );
 
   const curto = texto.trim().length < MIN_CHARS;
+
+  /**
+   * O que vai ser ligado de verdade: o pacote do ramo (quando a classificação
+   * reconheceu um) MAIS os módulos das áreas que apareceram na descrição.
+   *
+   * A tela mostra exatamente esta lista, e a action grava exatamente ela. Era
+   * aqui que a promessa se quebrava: o resumo listava "Produção · Estoque ·
+   * Compras · Fiscal" e a empresa entrava só com os módulos core, porque o
+   * ramo tinha caído em "outro" e o resto era descartado na gravação.
+   */
+  const modulosAtivar = [
+    ...new Set([
+      ...(classificacao?.suggestedModules ?? []),
+      ...modulesForAreas(perfil?.areas ?? []),
+    ]),
+  ].filter((id) => moduleLabels[id]);
 
   async function analisar() {
     setErro(null);
@@ -93,20 +108,32 @@ export default function AnalysisClient({
     setFase("resumo");
   }
 
-  function concluir() {
-    start(async () => {
-      const res = await applyOnboardingAction({
-        niche: classificacao?.niche ?? "outro",
-        segment: classificacao?.segment ?? perfil?.kind ?? "",
-        moduleIds: classificacao?.suggestedModules ?? [],
-        description: texto,
-      });
-      if (!res.ok) {
-        setErro(res.error);
-        return;
-      }
-      router.push(`/espaco/${slug}`);
+  /**
+   * Salva a configuração e entra na plataforma.
+   *
+   * Troca de página inteira, e não `router.push`, por dois motivos. O menu
+   * lateral é montado no servidor a partir dos módulos que acabamos de ligar,
+   * e uma navegação de cliente pode reaproveitar a árvore anterior. E, com
+   * `router.push`, a URL só muda quando o servidor responde: enquanto a
+   * próxima rota carrega, a pessoa continua vendo a tela de resumo com o
+   * botão aparentemente sem efeito.
+   */
+  async function concluir() {
+    setErro(null);
+    setSalvando(true);
+    const res = await applyOnboardingAction({
+      niche: classificacao?.niche ?? "outro",
+      segment: classificacao?.segment ?? perfil?.kind ?? "",
+      moduleIds: modulosAtivar,
+      description: texto,
+      kind: perfil?.kind ?? "",
     });
+    if (!res.ok) {
+      setErro(res.error);
+      setSalvando(false);
+      return;
+    }
+    window.location.assign(`/espaco/${slug}`);
   }
 
   return (
@@ -170,7 +197,7 @@ export default function AnalysisClient({
           <div className="mt-6 flex flex-col-reverse items-center gap-3 sm:flex-row sm:justify-between">
             <button
               type="button"
-              onClick={() => router.push(`/espaco/${slug}`)}
+              onClick={() => window.location.assign(`/espaco/${slug}`)}
               className="text-xs text-slate-500 transition hover:text-slate-300"
             >
               Pular por enquanto
@@ -270,13 +297,13 @@ export default function AnalysisClient({
             </p>
           )}
 
-          {classificacao && classificacao.suggestedModules.length > 0 && (
+          {modulosAtivar.length > 0 && (
             <div className="mt-6 rounded-2xl border border-brand-500/25 bg-brand-500/5 p-5">
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-brand-300">
                 <Boxes className="h-3.5 w-3.5" /> Módulos que vamos ativar
               </p>
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {classificacao.suggestedModules.map((id) => (
+                {modulosAtivar.map((id) => (
                   <span
                     key={id}
                     className="rounded-full border border-ink-600 bg-ink-950/60 px-2.5 py-1 text-xs text-slate-300"
@@ -309,10 +336,10 @@ export default function AnalysisClient({
             <button
               type="button"
               onClick={concluir}
-              disabled={pending}
+              disabled={salvando}
               className="btn-sheen inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-ink-950 transition hover:bg-brand-400 disabled:opacity-60 sm:w-auto"
             >
-              {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Ir para a plataforma <ArrowRight className="h-4 w-4" />
             </button>
           </div>

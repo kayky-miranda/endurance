@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { readOperation, hasProfile } from "@/lib/endurance/operation-profile";
+import {
+  readOperation,
+  hasProfile,
+  modulesForAreas,
+} from "@/lib/endurance/operation-profile";
+import { allModuleIds } from "@/lib/endurance/catalog";
 
 /**
  * A tela de análise afirma coisas sobre a empresa do cliente ("modelo B2B",
@@ -116,6 +121,54 @@ describe("números citados", () => {
     const p = readOperation("Somos uma indústria.");
     expect(p.headcount).toBeNull();
     expect(p.units).toBeNull();
+  });
+});
+
+describe("módulos a partir das áreas", () => {
+  const mods = (texto: string) => modulesForAreas(readOperation(texto).areas);
+
+  it("todo id devolvido existe no catálogo", () => {
+    // O onboarding grava esta lista. Um id inventado viraria linha morta em
+    // OrgModule e módulo fantasma na barra lateral.
+    const validos = new Set(allModuleIds());
+    for (const id of mods("Controlamos estoque, produção, compras, vendas, financeiro, fiscal, logística, clientes, agenda e contratos."))
+      expect(validos.has(id), id).toBe(true);
+  });
+
+  it("uma indústria recebe os módulos operacionais, não só os core", () => {
+    // Era o defeito: indústria caía em ramo "outro" e entrava na plataforma
+    // com sete módulos, depois de a tela ter listado produção e compras.
+    const ids = mods(
+      "Indústria de peças com produção própria. Controlamos estoque, compras de matéria-prima e emitimos nota fiscal.",
+    );
+    expect(ids).toContain("estoque");
+    expect(ids).toContain("compras");
+    expect(ids).toContain("fornecedores");
+    expect(ids).toContain("nfe");
+  });
+
+  it("não liga PDV nem fechamento de caixa por causa de 'vendas'", () => {
+    // Venda de balcão é uma forma específica de vender. Uma indústria que
+    // vende para outras empresas não tem frente de caixa.
+    const ids = mods("Vendemos para outras empresas e controlamos o financeiro.");
+    expect(ids).not.toContain("pdv");
+    expect(ids).not.toContain("caixa");
+  });
+
+  it("um prestador de serviços não recebe estoque nem produção", () => {
+    const ids = mods("Consultoria com agenda de atendimentos e controle financeiro.");
+    expect(ids).toContain("financeiro");
+    expect(ids).not.toContain("estoque");
+    expect(ids).not.toContain("produtos");
+  });
+
+  it("sem áreas identificadas não sugere nada", () => {
+    expect(mods("Empresa nova.")).toEqual([]);
+  });
+
+  it("não repete id quando duas áreas pedem o mesmo módulo", () => {
+    const ids = mods("Controlamos estoque e logística de entregas.");
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
 

@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Loader2,
@@ -83,8 +82,7 @@ const maskPhone = (v: string) =>
     .replace(/(\d{4})(\d)$/, "$1-$2");
 
 export default function SignupClient() {
-  const router = useRouter();
-  const [pending, start] = useTransition();
+  const [salvando, setSalvando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [looking, setLooking] = useState(false);
   const [lookupMsg, setLookupMsg] = useState<string | null>(null);
@@ -114,7 +112,7 @@ export default function SignupClient() {
     }
     setLookupMsg(null);
     setLooking(true);
-    start(async () => {
+    void (async () => {
       const res = await lookupCnpjPublicAction(f.cnpj);
       setLooking(false);
       if (!res.ok) {
@@ -131,17 +129,27 @@ export default function SignupClient() {
         estado: res.data.state || prev.estado,
       }));
       setLookupMsg("Dados encontrados e preenchidos.");
-    });
+    })();
   }
 
-  function submit(e: React.FormEvent) {
+  /**
+   * Troca de página inteira em vez de `router.push`: com a navegação de
+   * cliente a URL só muda quando o servidor responde, então a pessoa fica
+   * olhando o formulário preenchido sem sinal de que a conta já foi criada.
+   * Se ela clicar de novo, recebe "esse e-mail já tem conta" — a pior
+   * mensagem possível para quem acabou de se cadastrar.
+   */
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    start(async () => {
-      const res = await companySignupAction(f);
-      if (res.ok && "slug" in res) router.push("/onboarding/empresa");
-      else setError("error" in res ? res.error : "Não consegui criar a conta.");
-    });
+    setSalvando(true);
+    const res = await companySignupAction(f);
+    if (res.ok && "slug" in res) {
+      window.location.assign("/onboarding/empresa");
+      return;
+    }
+    setError("error" in res ? res.error : "Não consegui criar a conta.");
+    setSalvando(false);
   }
 
   const input =
@@ -412,12 +420,10 @@ export default function SignupClient() {
                 </a>
                 <button
                   type="submit"
-                  disabled={pending}
+                  disabled={salvando}
                   className="btn-sheen inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-ink-950 transition hover:bg-brand-400 disabled:opacity-60 sm:w-auto"
                 >
-                  {pending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : null}
+                  {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   Continuar <ArrowRight className="h-4 w-4" />
                 </button>
               </div>

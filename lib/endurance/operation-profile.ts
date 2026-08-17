@@ -213,3 +213,48 @@ function needsSentence(areas: OperationArea[]): string {
 export function hasProfile(p: OperationProfile): boolean {
   return Boolean(p.kind || p.model || p.areas.length > 0);
 }
+
+/**
+ * Módulos que cada área de gestão implica — INDEPENDENTE do ramo.
+ *
+ * Os módulos operacionais nasceram todos dentro do ramo "mercado_varejo",
+ * porque foi o primeiro nicho a existir. O efeito colateral aparecia no
+ * cadastro de qualquer empresa que não fosse loja: uma indústria que dizia
+ * controlar estoque, compras, produção e fiscal era classificada como "outro"
+ * e entrava na plataforma só com os sete módulos core, sem nada do que a
+ * tela de análise tinha acabado de listar. Com a IA desligada acontecia o
+ * inverso — as mesmas palavras casavam com varejo e ela ganhava PDV e
+ * fechamento de caixa, que nunca vai usar.
+ *
+ * Aqui a ligação passa a ser área → módulo. O ramo continua existindo para
+ * dar nome e sugerir um pacote inicial; ele deixa de ser a porta que decide
+ * o que a empresa pode ligar.
+ *
+ * Estoque e compras trazem seus vizinhos diretos (movimentações, cadastro de
+ * produtos, fornecedores) porque um sem o outro não opera. PDV e fechamento
+ * de caixa NÃO entram por "vendas": venda de balcão é uma forma específica de
+ * vender, não a única.
+ */
+const AREA_MODULES: Record<string, string[]> = {
+  producao: ["produtos", "estoque", "movimentacoes"],
+  estoque: ["estoque", "movimentacoes", "produtos", "conferencia", "transferencias"],
+  compras: ["compras", "fornecedores", "pedidos_compra", "recebimento", "cotacoes"],
+  vendas: ["crm", "precificacao"],
+  financeiro: ["financeiro"],
+  fiscal: ["nfe", "nfce"],
+  logistica: ["transferencias", "movimentacoes"],
+  clientes: ["crm"],
+  agenda: ["agenda_consultas"],
+  contratos: ["financeiro"],
+};
+
+/**
+ * Módulos sugeridos a partir das áreas identificadas na descrição.
+ * Devolve ids do catálogo, sem repetir e sem inventar: área que não mapeia
+ * para nada simplesmente não contribui.
+ */
+export function modulesForAreas(areas: OperationArea[]): string[] {
+  const out = new Set<string>();
+  for (const a of areas) for (const id of AREA_MODULES[a.id] ?? []) out.add(id);
+  return [...out];
+}
