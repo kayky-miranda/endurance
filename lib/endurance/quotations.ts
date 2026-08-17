@@ -155,6 +155,25 @@ export async function createQuotation(
       return { ok: false, error: "Solicitação inválida." };
     if (req.status !== "aprovada")
       return { ok: false, error: "Só solicitações aprovadas geram cotação." };
+
+    // Uma solicitação, uma cotação viva.
+    //
+    // Sem esta trava a mesma solicitação aprovada podia virar duas cotações:
+    // as duas ficavam abertas, as duas podiam ser fechadas com vencedor, e
+    // cada uma gerava um pedido de compra. A empresa comprava em dobro, e
+    // nada na tela indicava o problema — a solicitação continuava na lista de
+    // "aprovadas aguardando cotação" depois de já ter uma.
+    const emAndamento = await prisma.quotation.findFirst({
+      where: { requisitionId: req.id, status: { not: "cancelada" } },
+      select: { number: true, status: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (emAndamento)
+      return {
+        ok: false,
+        error: `A solicitação ${req.number} já está na cotação ${emAndamento.number}. Cancele essa cotação antes de abrir outra.`,
+      };
+
     requisitionId = req.id;
     items = req.items.map((it) => ({
       productId: it.productId,
@@ -380,6 +399,26 @@ export async function chooseWinner(
   if (!bid) return { ok: false, error: "Fornecedor não participa desta cotação." };
   if (Number(bid.total) <= 0)
     return { ok: false, error: "Registre a proposta do fornecedor antes de escolhê-lo." };
+
+  // Segunda trava do mesmo problema. A da criação impede abrir duas cotações
+  // daqui em diante; esta protege as que já existiam antes dela — e o caso em
+  // que a primeira cotação foi criada, a solicitação convertida, e alguém
+  // tenta fechar a segunda mesmo assim.
+  if (q.requisitionId) {
+    const jaFechada = await prisma.quotation.findFirst({
+      where: {
+        requisitionId: q.requisitionId,
+        status: "fechada",
+        id: { not: quotationId },
+      },
+      select: { number: true },
+    });
+    if (jaFechada)
+      return {
+        ok: false,
+        error: `Esta solicitação já foi fechada na cotação ${jaFechada.number}. Cancele o pedido de lá antes de fechar esta.`,
+      };
+  }
 
   await prisma.$transaction([
     prisma.quotation.update({
