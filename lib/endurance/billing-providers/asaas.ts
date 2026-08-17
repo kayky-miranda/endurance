@@ -154,7 +154,14 @@ export function verifyAsaasWebhook(headerToken: string | null): {
 } {
   const expected = process.env.ASAAS_WEBHOOK_TOKEN;
   if (!expected) {
-    logger.warn("Webhook Asaas sem ASAAS_WEBHOOK_TOKEN — não verificado");
+    // Segredo ausente bloqueia em produção. Este token ESTÁ configurado hoje,
+    // mas liberar sem ele deixava a porta aberta para o dia em que alguém
+    // removesse a variável — e o webhook de cobrança ativa assinatura.
+    if (process.env.NODE_ENV === "production") {
+      logger.error("Webhook Asaas sem ASAAS_WEBHOOK_TOKEN definido — bloqueando");
+      return { ok: false, verified: false };
+    }
+    logger.warn("Webhook Asaas sem ASAAS_WEBHOOK_TOKEN — liberando em dev");
     return { ok: true, verified: false };
   }
   if (!headerToken) return { ok: false, verified: false };

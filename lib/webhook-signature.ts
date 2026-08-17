@@ -8,10 +8,34 @@ import { logger } from "@/lib/logger";
  * Sem isso, qualquer um pode chamar /api/pix/webhook e marcar uma cobrança
  * como paga, ou /api/whatsapp/webhook e poluir o histórico.
  *
- * Em dev/sandbox, se o segredo não estiver definido, a validação retorna
- * `ok: true` com `verified: false` — o webhook segue funcionando para testes,
- * mas o `verified` viaja no log.
+ * Segredo ausente: em DEV libera com aviso (o webhook precisa funcionar para
+ * testes locais); em PRODUÇÃO bloqueia. Antes liberava nos dois, e o teste de
+ * ataque mostrou o custo disso: MERCADO_PAGO_WEBHOOK_SECRET e META_APP_SECRET
+ * não estão configurados em produção, então os dois endpoints aceitavam
+ * qualquer POST. Não dava para forjar pagamento (o handler do PIX reconsulta o
+ * PSP antes de marcar como pago), mas dava para disparar consultas ao provedor
+ * sem autenticação, usar a resposta como oráculo de enumeração de referências,
+ * e escrever status de mensagem no banco a partir de entrada anônima.
+ *
+ * A mesma decisão já estava tomada em lib/cron-auth.ts — só não tinha sido
+ * aplicada aqui. Divergência entre dois lugares que resolvem o mesmo problema
+ * é o que faz um deles ficar para trás.
  */
+
+/**
+ * Segredo ausente: libera em dev, bloqueia em produção.
+ * Deixa registro nos dois casos, com o nome da variável que falta.
+ */
+function semSegredo(nomeEnv: string, canal: string): VerifyResult {
+  if (process.env.NODE_ENV === "production") {
+    logger.error(
+      `Webhook ${canal} recebido sem ${nomeEnv} definido — bloqueando`,
+    );
+    return { ok: false, verified: false, reason: "secret-missing" };
+  }
+  logger.warn(`Webhook ${canal} sem ${nomeEnv} — liberando em dev`);
+  return { ok: true, verified: false, reason: "secret-missing" };
+}
 
 export interface VerifyResult {
   ok: boolean;
@@ -39,10 +63,7 @@ export function verifyMercadoPagoSignature(
   dataId: string,
 ): VerifyResult {
   const secret = process.env.MERCADO_PAGO_WEBHOOK_SECRET;
-  if (!secret) {
-    logger.warn("PIX webhook sem MERCADO_PAGO_WEBHOOK_SECRET — assinatura não verificada");
-    return { ok: true, verified: false, reason: "secret-missing" };
-  }
+  if (!secret) return semSegredo("MERCADO_PAGO_WEBHOOK_SECRET", "PIX");
 
   const signatureHeader = req.headers.get("x-signature");
   const requestId = req.headers.get("x-request-id");
@@ -85,10 +106,7 @@ export function verifyMetaSignature(
   rawBody: string,
 ): VerifyResult {
   const secret = process.env.META_APP_SECRET;
-  if (!secret) {
-    logger.warn("WhatsApp webhook sem META_APP_SECRET — assinatura não verificada");
-    return { ok: true, verified: false, reason: "secret-missing" };
-  }
+  if (!secret) return semSegredo("META_APP_SECRET", "WhatsApp");
 
   if (!signatureHeader) return { ok: false, verified: false, reason: "no-signature" };
   const m = signatureHeader.match(/^sha256=([0-9a-f]+)$/i);
