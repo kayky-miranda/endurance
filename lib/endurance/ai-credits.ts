@@ -52,6 +52,9 @@ export interface AiBalance {
 
 const WINDOW_MS = 30 * 86_400_000;
 
+/** Instante a partir do qual a janela de 30 dias ainda é a atual. */
+const janelaAtual = () => new Date(Date.now() - WINDOW_MS);
+
 /**
  * Saldo do ciclo. Também usado pelo medidor da interface — limite invisível
  * gera chamado de suporte; limite visível gera upgrade.
@@ -105,6 +108,7 @@ export async function consumeAiCredit(
   const cost = AI_FEATURE_COST[feature] ?? 1;
   const balance = await getAiBalance(orgId);
   if (balance.unlimited) return { ok: true, remaining: Number.POSITIVE_INFINITY };
+  const included = balance.included;
 
   if (balance.remaining < cost) {
     return {
@@ -115,17 +119,46 @@ export async function consumeAiCredit(
     };
   }
 
-  // O incremento é atômico no banco. A checagem acima não é, então duas
-  // chamadas simultâneas podem estourar o teto por uma unidade — aceitável para
-  // um limite de consumo, e muito mais barato que serializar toda chamada de IA.
-  await prisma.subscription.updateMany({
-    where: { organizationId: orgId },
-    data: balance.windowExpired
-      ? { aiCreditsUsed: cost, aiCreditsSince: new Date() }
-      : { aiCreditsUsed: { increment: cost } },
-  });
+  // DÉBITO CONDICIONAL: o teto entra no `where`, então quem autoriza é o banco.
+  //
+  // Antes a checagem acima decidia e o incremento vinha depois, sem trava. O
+  // comentário dizia que chamadas simultâneas podiam "estourar o teto por uma
+  // unidade" — medindo, não era. Vinte chamadas em paralelo com três créditos
+  // de folga passaram TODAS e o contador terminou 37 acima da cota, porque
+  // todas leem o saldo antes de qualquer uma incrementar: o excesso cresce com
+  // o número de chamadas, não com uma unidade.
+  //
+  // Continua sendo uma consulta só, sem serializar nada: o UPDATE só encontra
+  // a linha se ainda couber o custo, e `count === 0` significa que outra
+  // chamada chegou primeiro.
+  if (balance.windowExpired) {
+    // Virada de ciclo: zera e já cobra este uso. A condição na janela evita
+    // que duas chamadas simultâneas reiniciem a janela duas vezes.
+    const virada = await prisma.subscription.updateMany({
+      where: { organizationId: orgId, aiCreditsSince: { lt: janelaAtual() } },
+      data: { aiCreditsUsed: cost, aiCreditsSince: new Date() },
+    });
+    if (virada.count > 0) return { ok: true, remaining: included - cost };
+    // Outra chamada virou a janela primeiro: segue pelo caminho normal.
+  }
 
-  return { ok: true, remaining: balance.remaining - cost };
+  const debitado = await prisma.subscription.updateMany({
+    where: {
+      organizationId: orgId,
+      aiCreditsUsed: { lte: included - cost },
+    },
+    data: { aiCreditsUsed: { increment: cost } },
+  });
+  if (debitado.count === 0) {
+    return {
+      ok: false,
+      remaining: 0,
+      error:
+        "Os créditos de IA deste ciclo acabaram. Faça upgrade do plano para continuar usando os recursos com inteligência artificial.",
+    };
+  }
+
+  return { ok: true, remaining: Math.max(0, balance.remaining - cost) };
 }
 
 /**
