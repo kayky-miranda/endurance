@@ -47,6 +47,25 @@ import {
 import { BrandMark } from "@/app/components/BrandMark";
 
 /* ------------------------------------------------------------------ *
+ * Contato comercial
+ * ------------------------------------------------------------------ */
+
+/**
+ * WhatsApp comercial: +55 (11) 91701-4062.
+ *
+ * Formato internacional e SÓ DÍGITOS — 55 (Brasil) + DDD + número. O wa.me
+ * recusa o link se houver "+", espaço, parêntese ou traço.
+ */
+const WHATSAPP_NUMERO = "5511917014062";
+
+/** Mensagem que já vai escrita na conversa, para o lead não começar do zero. */
+const WHATSAPP_MENSAGEM = "Olá! Quero conhecer o ENDURANCE.";
+
+const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(
+  WHATSAPP_MENSAGEM,
+)}`;
+
+/* ------------------------------------------------------------------ *
  * Utilidades de animação
  * ------------------------------------------------------------------ */
 function Reveal({
@@ -1518,11 +1537,22 @@ function FinalCta() {
             </span>
           </div>
           <div className="relative mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            {/*
+              Abre o WhatsApp, não o e-mail. O cliente de e-mail dependia de o
+              visitante ter um configurado no aparelho — em celular, quase
+              sempre não tem, e o clique não fazia nada. O WhatsApp abre no app
+              se houver e no navegador se não houver.
+
+              `target="_blank"` porque o destino é externo; `rel` junto porque
+              sem ele a página aberta ganha acesso a esta via `window.opener`.
+            */}
             <a
-              href="mailto:contato@endurance.com.br?subject=Quero%20conhecer%20o%20ENDURANCE"
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
               className="btn-sheen inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-7 py-3 text-sm font-semibold text-ink-950 transition hover:bg-brand-400 sm:w-auto"
             >
-              Solicitar demonstração <ArrowRight className="h-4 w-4" />
+              Solicitar demonstração <MessageCircle className="h-4 w-4" />
             </a>
             <a
               href="/precos"
